@@ -16,8 +16,13 @@ async function getValidCartId(): Promise<string | null> {
   const cookieStore = await cookies();
   const cartId = cookieStore.get(CART_COOKIE)?.value;
   if (!cartId) return null;
-  const existing = await getCartFromShopify(cartId);
-  return existing ? cartId : null;
+  try {
+    const existing = await getCartFromShopify(cartId);
+    return existing ? cartId : null;
+  } catch {
+    // Malformed or expired cart id (e.g. left over from switching data sources) - treat as no cart.
+    return null;
+  }
 }
 
 async function getOrCreateCartId(): Promise<string> {
