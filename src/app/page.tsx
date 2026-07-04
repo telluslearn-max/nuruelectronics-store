@@ -6,7 +6,12 @@ export default async function HomePage() {
 
   return (
     <div>
-      <h1 className="mb-8 text-2xl font-semibold tracking-tight">All products</h1>
+      <div className="mb-8">
+        <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">All products</h1>
+        <p className="mt-2 text-neutral-500">
+          {products.length} {products.length === 1 ? "product" : "products"}
+        </p>
+      </div>
       <ProductGrid products={products} />
     </div>
   );

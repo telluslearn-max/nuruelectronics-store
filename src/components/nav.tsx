@@ -8,18 +8,19 @@ export function Nav() {
   const itemCount = cart?.totalQuantity ?? 0;
 
   return (
-    <header className="sticky top-0 z-40 border-b bg-white/80 backdrop-blur">
+    <header className="sticky top-0 z-40 border-b border-border-subtle bg-background/80 backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4">
         <Link href="/" className="text-lg font-semibold tracking-tight">
           Store
         </Link>
         <button
           onClick={openCart}
-          className="relative rounded-full border px-4 py-2 text-sm font-medium hover:bg-neutral-50"
+          aria-label={`Open cart${itemCount > 0 ? `, ${itemCount} items` : ""}`}
+          className="relative rounded-control border border-border-subtle px-4 py-2 text-sm font-medium transition hover:border-foreground"
         >
           Cart
           {itemCount > 0 && (
-            <span className="ml-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-black text-xs text-white">
+            <span className="ml-2 inline-flex h-5 w-5 items-center justify-center rounded-control bg-accent text-xs text-accent-foreground">
               {itemCount}
             </span>
           )}

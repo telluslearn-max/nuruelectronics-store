@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { CartProvider } from "@/components/cart/cart-context";
 import { CartDrawer } from "@/components/cart/cart-drawer";
+import { Footer } from "@/components/footer";
 import { Nav } from "@/components/nav";
 import { getCart } from "@/lib/actions";
 
@@ -37,6 +38,7 @@ export default async function RootLayout({
         <CartProvider initialCart={cart}>
           <Nav />
           <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">{children}</main>
+          <Footer />
           <CartDrawer />
         </CartProvider>
       </body>
