@@ -105,12 +105,16 @@ const cartFragment = /* GraphQL */ `
 
 export const getProductsQuery = /* GraphQL */ `
   ${productFragment}
-  query getProducts($first: Int = 24) {
-    products(first: $first) {
+  query getProducts($first: Int = 24, $after: String) {
+    products(first: $first, after: $after) {
       edges {
         node {
           ...productFields
         }
+      }
+      pageInfo {
+        hasNextPage
+        endCursor
       }
     }
   }

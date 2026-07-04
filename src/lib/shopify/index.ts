@@ -25,6 +25,14 @@ export const isShopifyConfigured = Boolean(domain && token);
 
 type Edge<T> = { node: T };
 type Connection<T> = { edges: Edge<T>[] };
+type PageInfo = { hasNextPage: boolean; endCursor: string | null };
+type PaginatedConnection<T> = Connection<T> & { pageInfo: PageInfo };
+
+export type ProductsPage = {
+  products: Product[];
+  hasNextPage: boolean;
+  endCursor: string | null;
+};
 
 async function shopifyFetch<T>(query: string, variables?: Record<string, unknown>): Promise<T> {
   const res = await fetch(`https://${domain}/api/${apiVersion}/graphql.json`, {
@@ -89,14 +97,18 @@ function reshapeCart(node: Omit<Cart, "lines"> & { lines: Connection<RawCartLine
   };
 }
 
-export async function getProducts(): Promise<Product[]> {
+export async function getProducts(after?: string): Promise<ProductsPage> {
   if (!isShopifyConfigured) {
-    return mockProducts;
+    return { products: mockProducts, hasNextPage: false, endCursor: null };
   }
-  const data = await shopifyFetch<{ products: Connection<Parameters<typeof reshapeProduct>[0]> }>(
-    getProductsQuery,
-  );
-  return data.products.edges.map((edge) => reshapeProduct(edge.node));
+  const data = await shopifyFetch<{
+    products: PaginatedConnection<Parameters<typeof reshapeProduct>[0]>;
+  }>(getProductsQuery, { after });
+  return {
+    products: data.products.edges.map((edge) => reshapeProduct(edge.node)),
+    hasNextPage: data.products.pageInfo.hasNextPage,
+    endCursor: data.products.pageInfo.endCursor,
+  };
 }
 
 export async function getProductByHandle(handle: string): Promise<Product | null> {

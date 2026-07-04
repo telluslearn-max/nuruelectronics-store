@@ -5,9 +5,11 @@ import {
   addToCart as addToCartInShopify,
   createCart,
   getCart as getCartFromShopify,
+  getProducts,
   removeFromCart as removeFromCartInShopify,
   updateCartLine as updateCartLineInShopify,
 } from "./shopify";
+import type { ProductsPage } from "./shopify";
 import type { Cart } from "./shopify/types";
 
 const CART_COOKIE = "cartId";
@@ -56,4 +58,8 @@ export async function updateItemQuantity(lineId: string, quantity: number): Prom
 export async function removeItem(lineId: string): Promise<Cart> {
   const cartId = await getOrCreateCartId();
   return removeFromCartInShopify(cartId, lineId);
+}
+
+export async function loadMoreProducts(cursor: string): Promise<ProductsPage> {
+  return getProducts(cursor);
 }
