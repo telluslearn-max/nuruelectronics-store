@@ -105,8 +105,8 @@ const cartFragment = /* GraphQL */ `
 
 export const getProductsQuery = /* GraphQL */ `
   ${productFragment}
-  query getProducts($first: Int = 24, $after: String) {
-    products(first: $first, after: $after) {
+  query getProducts($first: Int = 24, $after: String, $query: String) {
+    products(first: $first, after: $after, query: $query) {
       edges {
         node {
           ...productFields

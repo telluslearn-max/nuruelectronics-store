@@ -9,10 +9,12 @@ export function ProductList({
   initialProducts,
   initialHasNextPage,
   initialEndCursor,
+  searchTerm,
 }: {
   initialProducts: Product[];
   initialHasNextPage: boolean;
   initialEndCursor: string | null;
+  searchTerm?: string;
 }) {
   const [products, setProducts] = useState(initialProducts);
   const [hasNextPage, setHasNextPage] = useState(initialHasNextPage);
@@ -22,7 +24,7 @@ export function ProductList({
   function handleLoadMore() {
     if (!endCursor) return;
     startTransition(async () => {
-      const page = await loadMoreProducts(endCursor);
+      const page = await loadMoreProducts(endCursor, searchTerm);
       setProducts((prev) => [...prev, ...page.products]);
       setHasNextPage(page.hasNextPage);
       setEndCursor(page.endCursor);

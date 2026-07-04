@@ -97,13 +97,17 @@ function reshapeCart(node: Omit<Cart, "lines"> & { lines: Connection<RawCartLine
   };
 }
 
-export async function getProducts(after?: string): Promise<ProductsPage> {
+export async function getProducts(options: { after?: string; searchTerm?: string } = {}): Promise<ProductsPage> {
+  const { after, searchTerm } = options;
   if (!isShopifyConfigured) {
-    return { products: mockProducts, hasNextPage: false, endCursor: null };
+    const products = searchTerm
+      ? mockProducts.filter((p) => p.title.toLowerCase().includes(searchTerm.toLowerCase()))
+      : mockProducts;
+    return { products, hasNextPage: false, endCursor: null };
   }
   const data = await shopifyFetch<{
     products: PaginatedConnection<Parameters<typeof reshapeProduct>[0]>;
-  }>(getProductsQuery, { after });
+  }>(getProductsQuery, { after, query: searchTerm });
   return {
     products: data.products.edges.map((edge) => reshapeProduct(edge.node)),
     hasNextPage: data.products.pageInfo.hasNextPage,

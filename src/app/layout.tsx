@@ -18,8 +18,12 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Store",
-  description: "A simple headless storefront powered by Shopify.",
+  metadataBase: new URL("https://www.nuruelectronics.com"),
+  title: {
+    default: "NURU",
+    template: "%s | NURU",
+  },
+  description: "Shop Samsung Galaxy phones in Kenya at NURU.",
 };
 
 export default async function RootLayout({
