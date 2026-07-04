@@ -5,6 +5,7 @@ import {
   createCartMutation,
   getCartQuery,
   getProductByHandleQuery,
+  getProductHandlesQuery,
   getProductsQuery,
   removeFromCartMutation,
   updateCartMutation,
@@ -128,6 +129,24 @@ export async function getProducts(
     hasNextPage: data.products.pageInfo.hasNextPage,
     endCursor: data.products.pageInfo.endCursor,
   };
+}
+
+export async function getAllProductHandles(): Promise<string[]> {
+  if (!isShopifyConfigured) {
+    return mockProducts.map((p) => p.handle);
+  }
+  const handles: string[] = [];
+  let after: string | undefined;
+  // Cap the loop defensively; the catalog is ~80 products today.
+  for (let page = 0; page < 10; page++) {
+    const data = await shopifyFetch<{
+      products: PaginatedConnection<{ handle: string }>;
+    }>(getProductHandlesQuery, { after }, { revalidate: 3600 });
+    handles.push(...data.products.edges.map((edge) => edge.node.handle));
+    if (!data.products.pageInfo.hasNextPage || !data.products.pageInfo.endCursor) break;
+    after = data.products.pageInfo.endCursor;
+  }
+  return handles;
 }
 
 export async function getProductByHandle(handle: string): Promise<Product | null> {

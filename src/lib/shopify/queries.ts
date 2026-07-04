@@ -122,6 +122,22 @@ export const getProductsQuery = /* GraphQL */ `
   }
 `;
 
+export const getProductHandlesQuery = /* GraphQL */ `
+  query getProductHandles($first: Int = 100, $after: String) {
+    products(first: $first, after: $after) {
+      edges {
+        node {
+          handle
+        }
+      }
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
+    }
+  }
+`;
+
 export const getProductByHandleQuery = /* GraphQL */ `
   ${productFragment}
   query getProductByHandle($handle: String!) {

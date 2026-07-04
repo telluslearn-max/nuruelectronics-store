@@ -38,7 +38,7 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
     openGraph: {
       title: product.title,
       description,
-      images: image ? [{ url: image.url }] : undefined,
+      images: [{ url: image ? image.url : `/products/${handle}/opengraph-image` }],
     },
   };
 }
