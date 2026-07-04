@@ -2,6 +2,7 @@ import Link from "next/link";
 import { CategoryTiles } from "@/components/category-tiles";
 import { ProductList } from "@/components/product-list";
 import { ProductMedia } from "@/components/product-media";
+import { TrustBadges } from "@/components/trust-badges";
 import { formatPrice } from "@/lib/format";
 import { getProducts } from "@/lib/shopify";
 import type { Product } from "@/lib/shopify/types";
@@ -59,7 +60,10 @@ export default async function HomePage() {
         <section className="animate-fade-up overflow-hidden rounded-card bg-surface-dark text-surface-dark-foreground">
           <div className="grid grid-cols-1 items-center gap-8 p-8 sm:p-12 md:grid-cols-2">
             <div>
-              <h1 className="text-title sm:text-display">{hero.title}</h1>
+              <p className="text-sm font-medium uppercase tracking-wide text-accent">
+                Genuine Samsung. Delivered fast.
+              </p>
+              <h1 className="mt-2 text-title sm:text-display">{hero.title}</h1>
               <p className="mt-4 max-w-md text-neutral-400">{firstSentence(hero.description)}</p>
               {heroPrice && (
                 <p className="mt-4 text-lg font-medium">
@@ -101,6 +105,10 @@ export default async function HomePage() {
           ))}
         </section>
       )}
+
+      <section className="mt-16 border-y border-border-subtle py-10">
+        <TrustBadges />
+      </section>
 
       <section className="mt-16">
         <h2 className="text-title">Shop by category</h2>

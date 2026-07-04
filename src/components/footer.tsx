@@ -9,7 +9,9 @@ export function Footer() {
           <div>
             <p className="text-lg font-semibold tracking-tight">NURU</p>
             <p className="mt-2 max-w-xs text-sm text-neutral-500">
-              Samsung Galaxy phones, tablets, audio, and wearables in Kenya.
+              NURU is a Kenya-based electronics store specializing in genuine Samsung Galaxy
+              devices — phones, tablets, audio, and wearables. Every device ships with
+              manufacturer warranty and fast delivery across Kenya.
             </p>
           </div>
           <div>
