@@ -1,18 +1,48 @@
 import Link from "next/link";
+import { categories } from "@/lib/categories";
 
 export function Footer() {
   return (
     <footer className="border-t border-border-subtle">
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 py-8 text-sm text-neutral-500 sm:flex-row sm:items-center sm:justify-between">
-        <p>&copy; {new Date().getFullYear()} NURU. All rights reserved.</p>
-        <nav className="flex gap-6">
-          <Link href="/" className="hover:text-foreground">
-            Shop
-          </Link>
-          <a href="mailto:hello@example.com" className="hover:text-foreground">
-            Contact
-          </a>
-        </nav>
+      <div className="mx-auto w-full max-w-6xl px-4 py-12">
+        <div className="grid grid-cols-2 gap-8 sm:grid-cols-3">
+          <div>
+            <p className="text-lg font-semibold tracking-tight">NURU</p>
+            <p className="mt-2 max-w-xs text-sm text-neutral-500">
+              Samsung Galaxy phones, tablets, audio, and wearables in Kenya.
+            </p>
+          </div>
+          <div>
+            <p className="text-sm font-medium">Shop</p>
+            <ul className="mt-3 space-y-2 text-sm text-neutral-500">
+              {categories.map((category) => (
+                <li key={category.slug}>
+                  <Link href={`/category/${category.slug}`} className="hover:text-foreground">
+                    {category.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div>
+            <p className="text-sm font-medium">Support</p>
+            <ul className="mt-3 space-y-2 text-sm text-neutral-500">
+              <li>
+                <a href="mailto:hello@example.com" className="hover:text-foreground">
+                  Contact us
+                </a>
+              </li>
+              <li>
+                <Link href="/search" className="hover:text-foreground">
+                  Search
+                </Link>
+              </li>
+            </ul>
+          </div>
+        </div>
+        <p className="mt-10 border-t border-border-subtle pt-6 text-sm text-neutral-400">
+          &copy; {new Date().getFullYear()} NURU. All rights reserved.
+        </p>
       </div>
     </footer>
   );

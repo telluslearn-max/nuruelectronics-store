@@ -40,8 +40,14 @@ export default async function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         <CartProvider initialCart={cart}>
+          <a
+            href="#main"
+            className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-control focus:bg-foreground focus:px-4 focus:py-2 focus:text-sm focus:text-background"
+          >
+            Skip to content
+          </a>
           <Nav />
-          <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">{children}</main>
+          <main id="main" className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">{children}</main>
           <Footer />
           <CartDrawer />
         </CartProvider>

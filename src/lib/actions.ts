@@ -60,6 +60,10 @@ export async function removeItem(lineId: string): Promise<Cart> {
   return removeFromCartInShopify(cartId, lineId);
 }
 
-export async function loadMoreProducts(cursor: string, searchTerm?: string): Promise<ProductsPage> {
-  return getProducts({ after: cursor, searchTerm });
+export async function loadMoreProducts(
+  cursor: string,
+  searchTerm?: string,
+  sort?: { sortKey: "PRICE"; reverse: boolean },
+): Promise<ProductsPage> {
+  return getProducts({ after: cursor, searchTerm, sortKey: sort?.sortKey, reverse: sort?.reverse });
 }

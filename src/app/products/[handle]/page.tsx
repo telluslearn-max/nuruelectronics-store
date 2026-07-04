@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ProductGallery } from "@/components/product-gallery";
 import { ProductOptions } from "@/components/product-options";
+import { categoryForProductType } from "@/lib/categories";
 import { getProductByHandle } from "@/lib/shopify";
 
 type ProductPageProps = {
@@ -42,6 +43,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
   }
 
   const price = product.priceRange.minVariantPrice;
+  const category = categoryForProductType(product.productType);
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "Product",
@@ -57,6 +59,24 @@ export default async function ProductPage({ params }: ProductPageProps) {
         : "https://schema.org/OutOfStock",
     },
   };
+  const breadcrumbJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Home", item: "https://www.nuruelectronics.com" },
+      ...(category
+        ? [
+            {
+              "@type": "ListItem",
+              position: 2,
+              name: category.label,
+              item: `https://www.nuruelectronics.com/category/${category.slug}`,
+            },
+          ]
+        : []),
+      { "@type": "ListItem", position: category ? 3 : 2, name: product.title },
+    ],
+  };
 
   return (
     <div>
@@ -64,9 +84,33 @@ export default async function ProductPage({ params }: ProductPageProps) {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
-      <Link href="/" className="text-sm text-neutral-500 hover:text-foreground">
-        &larr; Back to shop
-      </Link>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
+      />
+      <nav aria-label="Breadcrumb" className="text-sm text-neutral-500">
+        <ol className="flex flex-wrap items-center gap-1.5">
+          <li>
+            <Link href="/" className="hover:text-foreground">
+              Home
+            </Link>
+          </li>
+          {category && (
+            <li className="flex items-center gap-1.5">
+              <span aria-hidden="true">/</span>
+              <Link href={`/category/${category.slug}`} className="hover:text-foreground">
+                {category.label}
+              </Link>
+            </li>
+          )}
+          <li className="flex items-center gap-1.5">
+            <span aria-hidden="true">/</span>
+            <span aria-current="page" className="text-foreground">
+              {product.title}
+            </span>
+          </li>
+        </ol>
+      </nav>
 
       <div className="mt-4 grid grid-cols-1 gap-10 md:grid-cols-2">
         <ProductGallery

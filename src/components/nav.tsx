@@ -1,10 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { categories } from "@/lib/categories";
 import { useCart } from "./cart/cart-context";
 
 export function Nav() {
   const { cart, openCart } = useCart();
+  const pathname = usePathname();
   const itemCount = cart?.totalQuantity ?? 0;
 
   return (
@@ -35,6 +38,31 @@ export function Nav() {
           )}
         </button>
       </div>
+      <nav aria-label="Categories" className="border-t border-border-subtle/60">
+        <div className="mx-auto max-w-6xl overflow-x-auto px-4">
+          <ul className="flex gap-6 whitespace-nowrap py-2.5 text-sm">
+            {categories.map((category) => {
+              const href = `/category/${category.slug}`;
+              const isCurrent = pathname === href;
+              return (
+                <li key={category.slug}>
+                  <Link
+                    href={href}
+                    aria-current={isCurrent ? "page" : undefined}
+                    className={
+                      isCurrent
+                        ? "font-medium text-foreground"
+                        : "text-neutral-500 transition hover:text-foreground"
+                    }
+                  >
+                    {category.label}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      </nav>
     </header>
   );
 }
