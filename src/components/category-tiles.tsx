@@ -15,7 +15,13 @@ export function CategoryTiles() {
             kind={category.art}
             className="h-14 w-14 text-neutral-400 transition group-hover:text-foreground"
           />
-          <span className="text-sm font-medium">{category.label}</span>
+          <div>
+            <p className="text-sm font-medium">{category.label}</p>
+            <p className="mt-1 text-xs text-neutral-500">{category.blurb}</p>
+          </div>
+          <span className="text-xs font-medium text-accent">
+            Shop now <span aria-hidden="true">&rarr;</span>
+          </span>
         </Link>
       ))}
     </div>

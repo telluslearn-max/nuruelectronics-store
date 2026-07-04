@@ -2,10 +2,14 @@ import Link from "next/link";
 import { CategoryTiles } from "@/components/category-tiles";
 import { ProductList } from "@/components/product-list";
 import { ProductMedia } from "@/components/product-media";
+import { SectionHeading } from "@/components/section-heading";
 import { TrustBadges } from "@/components/trust-badges";
+import { categories } from "@/lib/categories";
 import { formatPrice } from "@/lib/format";
 import { getProducts } from "@/lib/shopify";
 import type { Product } from "@/lib/shopify/types";
+
+const phoneSeries = categories.find((c) => c.slug === "phones")?.series ?? [];
 
 function firstSentence(text: string) {
   const match = text.match(/^.*?[.!?](?:\s|$)/);
@@ -111,14 +115,35 @@ export default async function HomePage() {
       </section>
 
       <section className="mt-16">
-        <h2 className="text-title">Shop by category</h2>
+        <SectionHeading
+          eyebrow="Shop by category"
+          title="Everything for your Galaxy"
+          subtitle="Pick a category and get straight to the right products."
+        />
         <div className="mt-6">
           <CategoryTiles />
         </div>
       </section>
 
+      {phoneSeries.length > 0 && (
+        <section className="mt-16">
+          <SectionHeading eyebrow="Quick links" title="Shop by series" />
+          <div className="mt-6 flex flex-wrap gap-3">
+            {phoneSeries.map((series) => (
+              <Link
+                key={series.slug}
+                href={`/category/phones?series=${series.slug}`}
+                className="rounded-control border border-border-subtle px-5 py-2.5 text-sm font-medium transition hover:border-foreground"
+              >
+                {series.label}
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+
       <section className="mt-16">
-        <h2 className="text-title">All products</h2>
+        <SectionHeading eyebrow="Full catalog" title="All products" />
         <div className="mt-6">
           <ProductList
             initialProducts={allPage.products}
