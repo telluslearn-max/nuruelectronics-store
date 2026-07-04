@@ -3,8 +3,18 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AddToCartButton } from "@/components/cart/add-to-cart-button";
 import { useCart } from "@/components/cart/cart-context";
+import { WhatsAppOrderButton } from "@/components/whatsapp-order-button";
 import { formatPrice } from "@/lib/format";
 import type { Product, ProductVariant } from "@/lib/shopify/types";
+
+function variantLabel(variant: ProductVariant | undefined) {
+  if (!variant) return undefined;
+  const label = variant.selectedOptions
+    .filter((o) => o.value !== "Default")
+    .map((o) => o.value)
+    .join(", ");
+  return label || undefined;
+}
 
 function variantMatches(variant: ProductVariant, selected: Record<string, string>) {
   return variant.selectedOptions.every((option) => selected[option.name] === option.value);
@@ -133,29 +143,44 @@ export function ProductOptions({ product }: { product: Product }) {
         </div>
       </div>
 
-      <div ref={buyBlockRef} className="mt-8">
+      <div ref={buyBlockRef} className="mt-8 space-y-3">
         <AddToCartButton
           variantId={selectedVariant?.id}
           availableForSale={selectedVariant?.availableForSale ?? false}
           quantity={quantity}
         />
+        <WhatsAppOrderButton
+          productTitle={product.title}
+          variantLabel={variantLabel(selectedVariant)}
+          price={formatPrice(price.amount, price.currencyCode)}
+          productHandle={product.handle}
+        />
       </div>
 
       {showStickyBar && (
         <div className="fixed inset-x-0 bottom-0 z-30 animate-fade-up border-t border-border-subtle bg-background/95 backdrop-blur">
-          <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
+          <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3">
             <div className="min-w-0">
               <p className="truncate text-sm font-medium">{product.title}</p>
               <p className="text-sm text-neutral-500">
                 {formatPrice(price.amount, price.currencyCode)}
               </p>
             </div>
-            <div className="w-36 shrink-0 sm:w-44">
-              <AddToCartButton
-                variantId={selectedVariant?.id}
-                availableForSale={selectedVariant?.availableForSale ?? false}
-                quantity={quantity}
+            <div className="flex shrink-0 items-center gap-2">
+              <WhatsAppOrderButton
+                productTitle={product.title}
+                variantLabel={variantLabel(selectedVariant)}
+                price={formatPrice(price.amount, price.currencyCode)}
+                productHandle={product.handle}
+                compact
               />
+              <div className="w-36 sm:w-44">
+                <AddToCartButton
+                  variantId={selectedVariant?.id}
+                  availableForSale={selectedVariant?.availableForSale ?? false}
+                  quantity={quantity}
+                />
+              </div>
             </div>
           </div>
         </div>
