@@ -46,6 +46,22 @@ const ART: Record<ArtKind, React.ReactNode> = {
   ),
 };
 
+export function ArtGlyph({ kind, className }: { kind: ArtKind; className?: string }) {
+  return (
+    <svg
+      viewBox="40 30 120 140"
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="4"
+      strokeLinecap="round"
+      aria-hidden="true"
+    >
+      {ART[kind]}
+    </svg>
+  );
+}
+
 function PlaceholderArt({ kind }: { kind: ArtKind }) {
   return (
     <div
