@@ -74,9 +74,10 @@ export default async function ProductPage({ params }: ProductPageProps) {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">{product.title}</h1>
           <ProductOptions product={product} />
-          <p className="mt-8 border-t border-border-subtle pt-6 text-neutral-600">
-            {product.description}
-          </p>
+          <div
+            className="mt-8 border-t border-border-subtle pt-6 text-neutral-600 [&_a]:text-accent [&_a]:underline [&_a]:underline-offset-2 [&_a]:hover:opacity-80 [&_li]:mb-1 [&_p]:mb-4 [&_p:last-child]:mb-0 [&_ul]:mb-4 [&_ul]:list-disc [&_ul]:pl-5"
+            dangerouslySetInnerHTML={{ __html: product.descriptionHtml }}
+          />
         </div>
       </div>
     </div>
