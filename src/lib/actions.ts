@@ -60,6 +60,25 @@ export async function removeItem(lineId: string): Promise<Cart> {
   return removeFromCartInShopify(cartId, lineId);
 }
 
+export type SearchSuggestion = {
+  handle: string;
+  title: string;
+  productType: string;
+  price: { amount: string; currencyCode: string };
+};
+
+export async function searchSuggestions(term: string): Promise<SearchSuggestion[]> {
+  const trimmed = term.trim();
+  if (trimmed.length < 2) return [];
+  const { products } = await getProducts({ searchTerm: trimmed, first: 5 });
+  return products.map((p) => ({
+    handle: p.handle,
+    title: p.title,
+    productType: p.productType,
+    price: p.priceRange.minVariantPrice,
+  }));
+}
+
 export async function loadMoreProducts(
   cursor: string,
   searchTerm?: string,

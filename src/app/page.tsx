@@ -1,7 +1,7 @@
 import Link from "next/link";
+import { CategoryTiles } from "@/components/category-tiles";
 import { ProductList } from "@/components/product-list";
-import { ProductMedia, ArtGlyph } from "@/components/product-media";
-import { categories } from "@/lib/categories";
+import { ProductMedia } from "@/components/product-media";
 import { formatPrice } from "@/lib/format";
 import { getProducts } from "@/lib/shopify";
 import type { Product } from "@/lib/shopify/types";
@@ -104,20 +104,8 @@ export default async function HomePage() {
 
       <section className="mt-16">
         <h2 className="text-title">Shop by category</h2>
-        <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
-          {categories.map((category) => (
-            <Link
-              key={category.slug}
-              href={`/category/${category.slug}`}
-              className="group flex flex-col items-center gap-3 rounded-card border border-border-subtle p-6 text-center transition hover:border-foreground"
-            >
-              <ArtGlyph
-                kind={category.art}
-                className="h-14 w-14 text-neutral-400 transition group-hover:text-foreground"
-              />
-              <span className="text-sm font-medium">{category.label}</span>
-            </Link>
-          ))}
+        <div className="mt-6">
+          <CategoryTiles />
         </div>
       </section>
 

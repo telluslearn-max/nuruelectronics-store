@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { CategoryTiles } from "@/components/category-tiles";
 import { ProductList } from "@/components/product-list";
 import { getProducts } from "@/lib/shopify";
 
@@ -21,22 +22,38 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
     ? await getProducts({ searchTerm: query })
     : { products: [], hasNextPage: false, endCursor: null };
 
+  const showBrowseInstead = !query || products.length === 0;
+
   return (
     <div>
       <div className="mb-8">
-        <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+        <h1 className="text-title sm:text-3xl">
           {query ? `Search results for "${query}"` : "Search"}
         </h1>
+        {!query && (
+          <p className="mt-2 text-neutral-500">Type in the search box above to find products.</p>
+        )}
       </div>
-      {query ? (
+
+      {query && (
         <ProductList
+          key={query}
           initialProducts={products}
           initialHasNextPage={hasNextPage}
           initialEndCursor={endCursor}
           searchTerm={query}
         />
-      ) : (
-        <p className="py-16 text-center text-neutral-500">Enter a search term above.</p>
+      )}
+
+      {showBrowseInstead && (
+        <section className="mt-12">
+          <h2 className="text-lg font-medium">
+            {query ? "Nothing matched — browse instead" : "Browse by category"}
+          </h2>
+          <div className="mt-6">
+            <CategoryTiles />
+          </div>
+        </section>
       )}
     </div>
   );

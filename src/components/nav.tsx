@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { categories } from "@/lib/categories";
 import { useCart } from "./cart/cart-context";
+import { SearchBox } from "./search-box";
 
 export function Nav() {
   const { cart, openCart } = useCart();
@@ -16,15 +17,7 @@ export function Nav() {
         <Link href="/" className="text-lg font-semibold tracking-tight">
           NURU
         </Link>
-        <form action="/search" role="search" className="flex-1">
-          <input
-            type="search"
-            name="q"
-            placeholder="Search products"
-            aria-label="Search products"
-            className="w-full rounded-control border border-border-subtle bg-background px-4 py-2 text-sm focus:border-foreground focus:outline-none"
-          />
-        </form>
+        <SearchBox />
         <button
           onClick={openCart}
           aria-label={`Open cart${itemCount > 0 ? `, ${itemCount} items` : ""}`}
