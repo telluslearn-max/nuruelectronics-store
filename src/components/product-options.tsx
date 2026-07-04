@@ -2,13 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { AddToCartButton } from "@/components/cart/add-to-cart-button";
+import { formatPrice } from "@/lib/format";
 import type { Product, ProductVariant } from "@/lib/shopify/types";
-
-function formatPrice(amount: string, currencyCode: string) {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: currencyCode }).format(
-    Number(amount),
-  );
-}
 
 function variantMatches(variant: ProductVariant, selected: Record<string, string>) {
   return variant.selectedOptions.every((option) => selected[option.name] === option.value);

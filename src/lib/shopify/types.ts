@@ -25,6 +25,8 @@ export type Product = {
   description: string;
   descriptionHtml: string;
   availableForSale: boolean;
+  productType: string;
+  tags: string[];
   priceRange: {
     minVariantPrice: Money;
     maxVariantPrice: Money;

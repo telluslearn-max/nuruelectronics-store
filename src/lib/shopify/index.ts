@@ -34,7 +34,11 @@ export type ProductsPage = {
   endCursor: string | null;
 };
 
-async function shopifyFetch<T>(query: string, variables?: Record<string, unknown>): Promise<T> {
+async function shopifyFetch<T>(
+  query: string,
+  variables?: Record<string, unknown>,
+  options: { revalidate?: number } = {},
+): Promise<T> {
   const res = await fetch(`https://${domain}/api/${apiVersion}/graphql.json`, {
     method: "POST",
     headers: {
@@ -42,7 +46,10 @@ async function shopifyFetch<T>(query: string, variables?: Record<string, unknown
       "X-Shopify-Storefront-Access-Token": token as string,
     },
     body: JSON.stringify({ query, variables }),
-    cache: "no-store",
+    // Cart reads/mutations must never be cached; product reads opt into ISR.
+    ...(options.revalidate !== undefined
+      ? { next: { revalidate: options.revalidate } }
+      : { cache: "no-store" as const }),
   });
 
   const json = await res.json();
@@ -97,8 +104,16 @@ function reshapeCart(node: Omit<Cart, "lines"> & { lines: Connection<RawCartLine
   };
 }
 
-export async function getProducts(options: { after?: string; searchTerm?: string } = {}): Promise<ProductsPage> {
-  const { after, searchTerm } = options;
+export async function getProducts(
+  options: {
+    after?: string;
+    searchTerm?: string;
+    sortKey?: "PRICE" | "TITLE" | "BEST_SELLING" | "CREATED_AT" | "RELEVANCE";
+    reverse?: boolean;
+    first?: number;
+  } = {},
+): Promise<ProductsPage> {
+  const { after, searchTerm, sortKey, reverse, first } = options;
   if (!isShopifyConfigured) {
     const products = searchTerm
       ? mockProducts.filter((p) => p.title.toLowerCase().includes(searchTerm.toLowerCase()))
@@ -107,7 +122,7 @@ export async function getProducts(options: { after?: string; searchTerm?: string
   }
   const data = await shopifyFetch<{
     products: PaginatedConnection<Parameters<typeof reshapeProduct>[0]>;
-  }>(getProductsQuery, { after, query: searchTerm });
+  }>(getProductsQuery, { after, query: searchTerm, sortKey, reverse, first }, { revalidate: 60 });
   return {
     products: data.products.edges.map((edge) => reshapeProduct(edge.node)),
     hasNextPage: data.products.pageInfo.hasNextPage,
@@ -122,6 +137,7 @@ export async function getProductByHandle(handle: string): Promise<Product | null
   const data = await shopifyFetch<{ product: Parameters<typeof reshapeProduct>[0] | null }>(
     getProductByHandleQuery,
     { handle },
+    { revalidate: 60 },
   );
   return data.product ? reshapeProduct(data.product) : null;
 }

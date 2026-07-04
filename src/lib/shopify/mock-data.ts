@@ -12,6 +12,8 @@ export const mockProducts: Product[] = [
     description: "A durable canvas tote for everyday carry.",
     descriptionHtml: "<p>A durable canvas tote for everyday carry.</p>",
     availableForSale: true,
+    productType: "Accessories",
+    tags: ["mock"],
     priceRange: { minVariantPrice: money("28.00"), maxVariantPrice: money("28.00") },
     images: [
       { url: "https://picsum.photos/seed/tote/800/800", altText: "Canvas Tote Bag", width: 800, height: 800 },
@@ -34,6 +36,8 @@ export const mockProducts: Product[] = [
     description: "A minimalist ceramic mug, dishwasher safe.",
     descriptionHtml: "<p>A minimalist ceramic mug, dishwasher safe.</p>",
     availableForSale: true,
+    productType: "Accessories",
+    tags: ["mock"],
     priceRange: { minVariantPrice: money("18.00"), maxVariantPrice: money("18.00") },
     images: [
       { url: "https://picsum.photos/seed/mug/800/800", altText: "Ceramic Mug", width: 800, height: 800 },
@@ -56,6 +60,8 @@ export const mockProducts: Product[] = [
     description: "A warm wool beanie, one size fits most.",
     descriptionHtml: "<p>A warm wool beanie, one size fits most.</p>",
     availableForSale: true,
+    productType: "Accessories",
+    tags: ["mock"],
     priceRange: { minVariantPrice: money("24.00"), maxVariantPrice: money("24.00") },
     images: [
       { url: "https://picsum.photos/seed/beanie/800/800", altText: "Wool Beanie", width: 800, height: 800 },
@@ -85,6 +91,8 @@ export const mockProducts: Product[] = [
     description: "A slim bifold leather wallet.",
     descriptionHtml: "<p>A slim bifold leather wallet.</p>",
     availableForSale: true,
+    productType: "Accessories",
+    tags: ["mock"],
     priceRange: { minVariantPrice: money("45.00"), maxVariantPrice: money("45.00") },
     images: [
       { url: "https://picsum.photos/seed/wallet/800/800", altText: "Leather Wallet", width: 800, height: 800 },
@@ -107,6 +115,8 @@ export const mockProducts: Product[] = [
     description: "UV400 protection, polarized lenses.",
     descriptionHtml: "<p>UV400 protection, polarized lenses.</p>",
     availableForSale: true,
+    productType: "Accessories",
+    tags: ["mock"],
     priceRange: { minVariantPrice: money("32.00"), maxVariantPrice: money("32.00") },
     images: [
       { url: "https://picsum.photos/seed/sunglasses/800/800", altText: "Classic Sunglasses", width: 800, height: 800 },
@@ -129,6 +139,8 @@ export const mockProducts: Product[] = [
     description: "Keeps drinks cold for 24 hours.",
     descriptionHtml: "<p>Keeps drinks cold for 24 hours.</p>",
     availableForSale: true,
+    productType: "Accessories",
+    tags: ["mock"],
     priceRange: { minVariantPrice: money("22.00"), maxVariantPrice: money("22.00") },
     images: [
       { url: "https://picsum.photos/seed/bottle/800/800", altText: "Insulated Water Bottle", width: 800, height: 800 },

@@ -6,6 +6,8 @@ const productFragment = /* GraphQL */ `
     description
     descriptionHtml
     availableForSale
+    productType
+    tags
     priceRange {
       minVariantPrice {
         amount
@@ -105,8 +107,8 @@ const cartFragment = /* GraphQL */ `
 
 export const getProductsQuery = /* GraphQL */ `
   ${productFragment}
-  query getProducts($first: Int = 24, $after: String, $query: String) {
-    products(first: $first, after: $after, query: $query) {
+  query getProducts($first: Int = 24, $after: String, $query: String, $sortKey: ProductSortKeys, $reverse: Boolean) {
+    products(first: $first, after: $after, query: $query, sortKey: $sortKey, reverse: $reverse) {
       edges {
         node {
           ...productFields

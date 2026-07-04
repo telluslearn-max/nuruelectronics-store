@@ -69,7 +69,11 @@ export default async function ProductPage({ params }: ProductPageProps) {
       </Link>
 
       <div className="mt-4 grid grid-cols-1 gap-10 md:grid-cols-2">
-        <ProductGallery images={product.images} title={product.title} />
+        <ProductGallery
+          images={product.images}
+          title={product.title}
+          productType={product.productType}
+        />
 
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">{product.title}</h1>

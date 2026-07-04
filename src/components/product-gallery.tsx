@@ -3,24 +3,30 @@
 import Image from "next/image";
 import { useState } from "react";
 import type { ProductImage } from "@/lib/shopify/types";
+import { ProductMedia } from "./product-media";
 
-export function ProductGallery({ images, title }: { images: ProductImage[]; title: string }) {
+export function ProductGallery({
+  images,
+  title,
+  productType,
+}: {
+  images: ProductImage[];
+  title: string;
+  productType?: string;
+}) {
   const [activeIndex, setActiveIndex] = useState(0);
   const active = images[activeIndex];
 
   return (
     <div>
       <div className="relative aspect-square overflow-hidden rounded-card bg-neutral-100">
-        {active && (
-          <Image
-            src={active.url}
-            alt={active.altText ?? title}
-            fill
-            className="object-cover"
-            sizes="(min-width: 768px) 50vw, 100vw"
-            priority
-          />
-        )}
+        <ProductMedia
+          image={active}
+          title={title}
+          productType={productType}
+          sizes="(min-width: 768px) 50vw, 100vw"
+          priority
+        />
       </div>
 
       {images.length > 1 && (

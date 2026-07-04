@@ -1,15 +1,10 @@
 "use client";
 
-import Image from "next/image";
 import { useEffect, useRef, useTransition } from "react";
 import { removeItem, updateItemQuantity } from "@/lib/actions";
+import { formatPrice } from "@/lib/format";
+import { ProductMedia } from "@/components/product-media";
 import { useCart } from "./cart-context";
-
-function formatPrice(amount: string, currencyCode: string) {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: currencyCode }).format(
-    Number(amount),
-  );
-}
 
 export function CartDrawer() {
   const { cart, setCart, isOpen, closeCart } = useCart();
@@ -72,17 +67,13 @@ export function CartDrawer() {
                 const image = line.merchandise.product.images[0];
                 return (
                   <li key={line.id} className="flex gap-4">
-                    {image && (
-                      <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-neutral-100">
-                        <Image
-                          src={image.url}
-                          alt={image.altText ?? line.merchandise.product.title}
-                          fill
-                          sizes="80px"
-                          className="object-cover"
-                        />
-                      </div>
-                    )}
+                    <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-neutral-100">
+                      <ProductMedia
+                        image={image}
+                        title={line.merchandise.product.title}
+                        sizes="80px"
+                      />
+                    </div>
                     <div className="flex flex-1 flex-col">
                       <p className="font-medium">{line.merchandise.product.title}</p>
                       {line.merchandise.title !== "Default" && (
