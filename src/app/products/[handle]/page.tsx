@@ -1,10 +1,19 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { ProductCard } from "@/components/product-card";
 import { ProductGallery } from "@/components/product-gallery";
 import { ProductOptions } from "@/components/product-options";
 import { categoryForProductType } from "@/lib/categories";
-import { getProductByHandle } from "@/lib/shopify";
+import { getProductByHandle, getProducts } from "@/lib/shopify";
+import type { Product } from "@/lib/shopify/types";
+
+async function getRelatedProducts(product: Product): Promise<Product[]> {
+  const collectionTag = product.tags.find((tag) => tag.startsWith("collection-"));
+  if (!collectionTag) return [];
+  const { products } = await getProducts({ searchTerm: `tag:${collectionTag}`, first: 5 });
+  return products.filter((p) => p.handle !== product.handle).slice(0, 4);
+}
 
 type ProductPageProps = {
   params: Promise<{ handle: string }>;
@@ -44,6 +53,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
 
   const price = product.priceRange.minVariantPrice;
   const category = categoryForProductType(product.productType);
+  const related = await getRelatedProducts(product);
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "Product",
@@ -128,6 +138,17 @@ export default async function ProductPage({ params }: ProductPageProps) {
           />
         </div>
       </div>
+
+      {related.length > 0 && (
+        <section className="mt-16">
+          <h2 className="text-title">You may also like</h2>
+          <div className="mt-6 grid grid-cols-2 gap-x-4 gap-y-8 lg:grid-cols-4">
+            {related.map((p) => (
+              <ProductCard key={p.id} product={p} />
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 }

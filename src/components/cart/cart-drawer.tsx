@@ -34,10 +34,10 @@ export function CartDrawer() {
     >
       <button
         aria-label="Close cart"
-        className="absolute inset-0 bg-black/40"
+        className="absolute inset-0 animate-fade-in bg-black/40"
         onClick={closeCart}
       />
-      <div className="relative flex h-full w-full max-w-md flex-col bg-background shadow-xl">
+      <div className="relative flex h-full w-full max-w-md animate-slide-in flex-col bg-background shadow-xl">
         <div className="flex items-center justify-between border-b border-border-subtle p-4">
           <h2 className="text-lg font-semibold">Your Cart</h2>
           <button
