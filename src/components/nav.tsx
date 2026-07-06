@@ -6,7 +6,13 @@ import { categories } from "@/lib/categories";
 import { useCart } from "./cart/cart-context";
 import { SearchBox } from "./search-box";
 
-export function Nav() {
+export function Nav({
+  authEnabled,
+  customerName,
+}: {
+  authEnabled: boolean;
+  customerName: string | null;
+}) {
   const { cart, openCart } = useCart();
   const pathname = usePathname();
   const itemCount = cart?.totalQuantity ?? 0;
@@ -18,6 +24,14 @@ export function Nav() {
           NURU
         </Link>
         <SearchBox />
+        {authEnabled && (
+          <Link
+            href={customerName ? "/account" : "/api/auth/login"}
+            className="shrink-0 whitespace-nowrap text-sm font-medium text-neutral-600 transition hover:text-foreground"
+          >
+            {customerName ? customerName.split(" ")[0] : "Sign in"}
+          </Link>
+        )}
         <button
           onClick={openCart}
           aria-label={`Open cart${itemCount > 0 ? `, ${itemCount} items` : ""}`}

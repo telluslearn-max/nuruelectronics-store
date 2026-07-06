@@ -6,6 +6,8 @@ import { CartDrawer } from "@/components/cart/cart-drawer";
 import { Footer } from "@/components/footer";
 import { Nav } from "@/components/nav";
 import { getCart } from "@/lib/actions";
+import { getCurrentCustomer } from "@/lib/customer";
+import { isCustomerAuthConfigured } from "@/lib/customer-auth";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -31,7 +33,10 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const cart = await getCart();
+  const [cart, customer] = await Promise.all([
+    getCart(),
+    isCustomerAuthConfigured ? getCurrentCustomer() : Promise.resolve(null),
+  ]);
 
   return (
     <html
@@ -46,7 +51,7 @@ export default async function RootLayout({
           >
             Skip to content
           </a>
-          <Nav />
+          <Nav authEnabled={isCustomerAuthConfigured} customerName={customer?.displayName ?? null} />
           <main id="main" className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">{children}</main>
           <Footer />
           <CartDrawer />
