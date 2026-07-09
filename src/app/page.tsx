@@ -128,7 +128,7 @@ export default async function HomePage() {
 
       {phoneGroups.length > 0 && (
         <section className="mt-16">
-          <SectionHeading eyebrow="Quick links" title="Shop Galaxy by series" />
+          <SectionHeading eyebrow="Quick links" title="Shop phones by brand & series" />
           <div className="mt-6 flex flex-wrap gap-3">
             {phoneGroups.map((group) => (
               <Link

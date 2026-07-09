@@ -33,13 +33,29 @@ export const categories: Category[] = [
     label: "Phones",
     types: ["Smartphones"],
     query: productTypeQuery(["Smartphones"]),
-    blurb: "Smartphones from Samsung, Apple, Google, and more.",
+    // Redmi (9 units) outsells Google (5 units) in this catalog, so it's
+    // named ahead of Google here despite Google being the more globally
+    // recognized brand.
+    blurb: "Smartphones from Samsung, Apple, Redmi, Google, and more.",
     art: "phone",
     groups: [
       { slug: "foldables", label: "Foldables", query: "tag:collection-foldables" },
       { slug: "s26", label: "Galaxy S26", query: "tag:collection-galaxy-s26-series" },
       { slug: "s25", label: "Galaxy S25", query: "tag:collection-galaxy-s25-series" },
       { slug: "a-series", label: "Galaxy A", query: "tag:collection-galaxy-a-series" },
+      { slug: "iphone-17", label: "iPhone 17", query: "tag:collection-iphone-17-series" },
+      { slug: "legacy-iphone", label: "Legacy iPhone", query: "tag:collection-legacy-iphones" },
+      {
+        // Redmi/Xiaomi also make tablets tagged with the same collection
+        // tags, so this is intersected with Smartphones — otherwise "Redmi &
+        // Xiaomi" on the Phones page would also surface Redmi/Xiaomi tablets.
+        slug: "redmi-xiaomi",
+        label: "Redmi & Xiaomi",
+        query: `(tag:collection-redmi OR tag:collection-xiaomi) AND ${productTypeQuery(["Smartphones"])}`,
+      },
+      { slug: "pixel", label: "Google Pixel", query: "tag:collection-google-pixel" },
+      { slug: "nothing", label: "Nothing", query: "tag:collection-nothing" },
+      { slug: "oneplus", label: "OnePlus", query: "tag:collection-oneplus" },
     ],
   },
   {
@@ -154,6 +170,14 @@ export const categories: Category[] = [
         label: "Audio Accessories",
         query: productTypeQuery(["Audio", "Audio Accessories"]),
       },
+      // Top 5 audio brands by volume get their own chip; smaller brands
+      // (Marshall, Beats, Sonos, LG, Denon, Hollyland) stay reachable via
+      // browsing/search rather than adding an oversized filter list.
+      { slug: "jbl", label: "JBL", query: "tag:collection-jbl" },
+      { slug: "boya", label: "Boya", query: "tag:collection-boya" },
+      { slug: "bose", label: "Bose", query: "tag:collection-bose" },
+      { slug: "rode", label: "Rode", query: "tag:collection-rode" },
+      { slug: "shokz", label: "Shokz", query: "tag:collection-shokz" },
     ],
   },
   {
@@ -187,6 +211,20 @@ export const categories: Category[] = [
       { slug: "chargers", label: "Wall Chargers", query: productTypeQuery(["Chargers"]) },
       { slug: "power-banks", label: "Power Banks", query: productTypeQuery(["Power Banks"]) },
       { slug: "cables", label: "Cables", query: productTypeQuery(["Cables"]) },
+      // Anker and Baseus together outsell Apple in this category despite
+      // neither having had a filter before. Both also sell audio/car/laptop
+      // gear outside this category, so intersect with this category's own
+      // types — otherwise these chips would leak in unrelated products.
+      {
+        slug: "anker",
+        label: "Anker",
+        query: `tag:collection-anker AND ${productTypeQuery(["Chargers", "Power Banks", "Cables"])}`,
+      },
+      {
+        slug: "baseus",
+        label: "Baseus",
+        query: `tag:collection-baseus AND ${productTypeQuery(["Chargers", "Power Banks", "Cables"])}`,
+      },
     ],
   },
   {
@@ -207,6 +245,14 @@ export const categories: Category[] = [
         slug: "accessories",
         label: "Accessories",
         query: productTypeQuery(["Gaming Accessories"]),
+      },
+      // Razer alone is 58% of this category's catalog. Razer also makes
+      // gaming headsets categorized as Audio, so intersect with this
+      // category's own types to keep the chip scoped to Gaming.
+      {
+        slug: "razer",
+        label: "Razer",
+        query: `tag:collection-razer AND ${productTypeQuery(["Gaming Consoles", "Gaming Accessories", "Gaming Peripherals"])}`,
       },
     ],
   },
@@ -254,6 +300,10 @@ export const categories: Category[] = [
         label: "Camera Accessories",
         query: productTypeQuery(["Camera Accessories", "Photo Accessories"]),
       },
+      // DJI is the single largest camera-category vendor (32% of products).
+      { slug: "dji", label: "DJI", query: "tag:collection-dji" },
+      { slug: "insta360", label: "Insta360", query: "tag:collection-insta360" },
+      { slug: "fujifilm", label: "Fujifilm", query: "tag:collection-fujifilm" },
     ],
   },
   {
@@ -293,6 +343,10 @@ export const categories: Category[] = [
         label: "Laundry & Cooling",
         query: productTypeQuery(["Washing Machines", "Freezers", "Refrigerators", "Fans"]),
       },
+      // Vision Plus is the largest appliance vendor (34% of this category).
+      { slug: "vision-plus", label: "Vision Plus", query: "tag:collection-vision-plus" },
+      { slug: "hisense", label: "Hisense", query: "tag:collection-hisense" },
+      { slug: "tcl", label: "TCL", query: "tag:collection-tcl" },
     ],
   },
   {
