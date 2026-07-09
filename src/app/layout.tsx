@@ -25,7 +25,8 @@ export const metadata: Metadata = {
     default: "NURU",
     template: "%s | NURU",
   },
-  description: "Shop Samsung Galaxy phones in Kenya at NURU.",
+  description:
+    "Shop genuine electronics in Kenya at NURU — phones, laptops, audio, gaming, cameras, and appliances from top brands, with fast Nairobi delivery.",
 };
 
 export default async function RootLayout({

@@ -18,6 +18,25 @@ import {
   recalculateMockCart,
 } from "./mock-data";
 
+// Parses the simple query shapes this codebase generates (`product_type:"X"`,
+// `tag:X`, joined with " OR ") so mock mode can exercise category/ecosystem/kit
+// filters locally. Falls back to a title-substring match for freeform text,
+// which is what the /search page passes.
+export function matchesSearchTerm(product: Product, searchTerm: string): boolean {
+  return searchTerm.split(" OR ").some((rawClause) => {
+    const clause = rawClause.trim();
+    if (clause.startsWith("product_type:")) {
+      const value = clause.slice("product_type:".length).replace(/^"|"$/g, "");
+      return product.productType.toLowerCase() === value.toLowerCase();
+    }
+    if (clause.startsWith("tag:")) {
+      const value = clause.slice("tag:".length).replace(/^"|"$/g, "");
+      return product.tags.some((tag) => tag.toLowerCase() === value.toLowerCase());
+    }
+    return product.title.toLowerCase().includes(clause.toLowerCase());
+  });
+}
+
 const domain = process.env.SHOPIFY_STORE_DOMAIN;
 const token = process.env.SHOPIFY_STOREFRONT_ACCESS_TOKEN;
 const apiVersion = "2024-10";
@@ -117,7 +136,7 @@ export async function getProducts(
   const { after, searchTerm, sortKey, reverse, first } = options;
   if (!isShopifyConfigured) {
     const products = searchTerm
-      ? mockProducts.filter((p) => p.title.toLowerCase().includes(searchTerm.toLowerCase()))
+      ? mockProducts.filter((p) => matchesSearchTerm(p, searchTerm))
       : mockProducts;
     return { products, hasNextPage: false, endCursor: null };
   }

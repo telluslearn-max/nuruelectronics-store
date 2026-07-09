@@ -38,6 +38,34 @@ const ART: Record<ArtKind, React.ReactNode> = {
       <line x1="92" y1="82" x2="92" y2="98" />
     </>
   ),
+  laptop: (
+    <>
+      <rect x="65" y="55" width="70" height="75" rx="6" />
+      <path d="M55 130h90l8 20H47l8-20z" />
+    </>
+  ),
+  gaming: (
+    <>
+      <rect x="45" y="80" width="110" height="55" rx="24" />
+      <circle cx="80" cy="107" r="7" />
+      <circle cx="120" cy="100" r="5" />
+      <circle cx="132" cy="112" r="5" />
+    </>
+  ),
+  camera: (
+    <>
+      <rect x="50" y="70" width="100" height="70" rx="10" />
+      <circle cx="100" cy="105" r="24" />
+      <rect x="80" y="55" width="30" height="18" rx="4" />
+    </>
+  ),
+  appliance: (
+    <>
+      <rect x="55" y="45" width="90" height="110" rx="8" />
+      <line x1="55" y1="90" x2="145" y2="90" />
+      <circle cx="75" cy="70" r="4" />
+    </>
+  ),
   generic: (
     <>
       <rect x="55" y="55" width="90" height="90" rx="16" />
