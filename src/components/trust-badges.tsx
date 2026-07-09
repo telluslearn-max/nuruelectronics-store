@@ -22,8 +22,8 @@ const BADGES = [
     ),
   },
   {
-    title: "100% Genuine Samsung",
-    body: "Every device verified authentic before it ships.",
+    title: "100% Genuine Products",
+    body: "Every item verified authentic before it ships.",
     icon: (
       <>
         <path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z" />

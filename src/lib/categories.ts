@@ -1,62 +1,369 @@
 export type Category = {
   slug: string;
   label: string;
+  types: string[];
   query: string;
   blurb: string;
   art: ArtKind;
-  series?: { slug: string; label: string; query: string }[];
+  groups?: { slug: string; label: string; query: string }[];
 };
 
-export type ArtKind = "phone" | "tablet" | "buds" | "watch" | "charger" | "generic";
+export type ArtKind =
+  | "phone"
+  | "tablet"
+  | "buds"
+  | "watch"
+  | "charger"
+  | "laptop"
+  | "gaming"
+  | "camera"
+  | "appliance"
+  | "generic";
+
+// Shopify search syntax requires quoting field values that contain spaces or
+// special characters (e.g. product_type:"Hubs & Docks") — build queries
+// through this helper rather than hand-writing raw strings.
+function productTypeQuery(types: string[]): string {
+  return types.map((t) => `product_type:${JSON.stringify(t)}`).join(" OR ");
+}
 
 export const categories: Category[] = [
   {
     slug: "phones",
     label: "Phones",
-    query: "product_type:Smartphones",
-    blurb: "Samsung Galaxy smartphones, from foldables to the A series.",
+    types: ["Smartphones"],
+    query: productTypeQuery(["Smartphones"]),
+    // Redmi (9 units) outsells Google (5 units) in this catalog, so it's
+    // named ahead of Google here despite Google being the more globally
+    // recognized brand.
+    blurb: "Smartphones from Samsung, Apple, Redmi, Google, and more.",
     art: "phone",
-    series: [
+    groups: [
       { slug: "foldables", label: "Foldables", query: "tag:collection-foldables" },
       { slug: "s26", label: "Galaxy S26", query: "tag:collection-galaxy-s26-series" },
       { slug: "s25", label: "Galaxy S25", query: "tag:collection-galaxy-s25-series" },
       { slug: "a-series", label: "Galaxy A", query: "tag:collection-galaxy-a-series" },
+      { slug: "iphone-17", label: "iPhone 17", query: "tag:collection-iphone-17-series" },
+      { slug: "legacy-iphone", label: "Legacy iPhone", query: "tag:collection-legacy-iphones" },
+      {
+        // Redmi/Xiaomi also make tablets tagged with the same collection
+        // tags, so this is intersected with Smartphones — otherwise "Redmi &
+        // Xiaomi" on the Phones page would also surface Redmi/Xiaomi tablets.
+        slug: "redmi-xiaomi",
+        label: "Redmi & Xiaomi",
+        query: `(tag:collection-redmi OR tag:collection-xiaomi) AND ${productTypeQuery(["Smartphones"])}`,
+      },
+      { slug: "pixel", label: "Google Pixel", query: "tag:collection-google-pixel" },
+      { slug: "nothing", label: "Nothing", query: "tag:collection-nothing" },
+      { slug: "oneplus", label: "OnePlus", query: "tag:collection-oneplus" },
     ],
   },
   {
     slug: "tablets",
     label: "Tablets",
-    query: "product_type:Tablets",
-    blurb: "Galaxy Tab lineup for work and play.",
+    types: ["Tablets", "Tablet Accessories", "E-Readers"],
+    query: productTypeQuery(["Tablets", "Tablet Accessories", "E-Readers"]),
+    blurb: "Tablets and e-readers for work, study, and play.",
     art: "tablet",
+    groups: [
+      { slug: "galaxy-tab", label: "Galaxy Tab", query: "tag:collection-tablets" },
+      { slug: "surface", label: "Surface", query: "tag:collection-microsoft-surface" },
+      { slug: "e-readers", label: "E-Readers", query: productTypeQuery(["E-Readers"]) },
+      {
+        slug: "accessories",
+        label: "Tablet Accessories",
+        query: productTypeQuery(["Tablet Accessories"]),
+      },
+    ],
+  },
+  {
+    slug: "computers",
+    label: "Computers",
+    types: [
+      "Laptops",
+      "Desktops",
+      "Displays",
+      "Computer Accessories",
+      "Hubs & Docks",
+      "Laptop Stands",
+    ],
+    query: productTypeQuery([
+      "Laptops",
+      "Desktops",
+      "Displays",
+      "Computer Accessories",
+      "Hubs & Docks",
+      "Laptop Stands",
+    ]),
+    blurb: "Laptops, desktops, and everything for your desk.",
+    art: "laptop",
+    groups: [
+      { slug: "mac", label: "Mac", query: "tag:collection-mac" },
+      { slug: "surface", label: "Surface", query: "tag:collection-microsoft-surface" },
+      { slug: "displays", label: "Displays & Monitors", query: productTypeQuery(["Displays"]) },
+      {
+        slug: "docks-hubs",
+        label: "Docks & Hubs",
+        query: productTypeQuery(["Hubs & Docks"]),
+      },
+      {
+        slug: "laptop-stands",
+        label: "Laptop Stands",
+        query: productTypeQuery(["Laptop Stands"]),
+      },
+    ],
   },
   {
     slug: "audio",
     label: "Audio",
-    query: "product_type:Audio",
-    blurb: "Galaxy Buds for music, calls, and everything between.",
+    // Gaming Audio stays here rather than under Gaming: gaming headsets are
+    // still fundamentally listening devices, and keeps Gaming lean
+    // (consoles/peripherals only). Sound Bars stay here rather than under
+    // Appliances for the same reason — still an audio product first.
+    types: [
+      "Audio",
+      "Audio Accessories",
+      "Earbuds",
+      "Headphones",
+      "Speakers",
+      "Smart Speakers",
+      "Sound Bars",
+      "Wearable Audio",
+      "Audio Recorders",
+      "Microphones",
+      "Gaming Audio",
+    ],
+    query: productTypeQuery([
+      "Audio",
+      "Audio Accessories",
+      "Earbuds",
+      "Headphones",
+      "Speakers",
+      "Smart Speakers",
+      "Sound Bars",
+      "Wearable Audio",
+      "Audio Recorders",
+      "Microphones",
+      "Gaming Audio",
+    ]),
+    blurb: "Earbuds, headphones, and speakers for music, calls, and everything between.",
     art: "buds",
+    groups: [
+      {
+        slug: "earbuds-headphones",
+        label: "Earbuds & Headphones",
+        query: productTypeQuery(["Earbuds", "Headphones", "Wearable Audio"]),
+      },
+      {
+        slug: "speakers",
+        label: "Speakers & Sound Bars",
+        query: productTypeQuery(["Speakers", "Smart Speakers", "Sound Bars"]),
+      },
+      {
+        slug: "microphones",
+        label: "Microphones & Recorders",
+        query: productTypeQuery(["Microphones", "Audio Recorders"]),
+      },
+      { slug: "gaming-audio", label: "Gaming Audio", query: productTypeQuery(["Gaming Audio"]) },
+      {
+        slug: "accessories",
+        label: "Audio Accessories",
+        query: productTypeQuery(["Audio", "Audio Accessories"]),
+      },
+      // Top 5 audio brands by volume get their own chip; smaller brands
+      // (Marshall, Beats, Sonos, LG, Denon, Hollyland) stay reachable via
+      // browsing/search rather than adding an oversized filter list.
+      { slug: "jbl", label: "JBL", query: "tag:collection-jbl" },
+      { slug: "boya", label: "Boya", query: "tag:collection-boya" },
+      { slug: "bose", label: "Bose", query: "tag:collection-bose" },
+      { slug: "rode", label: "Rode", query: "tag:collection-rode" },
+      { slug: "shokz", label: "Shokz", query: "tag:collection-shokz" },
+    ],
   },
   {
     slug: "wearables",
     label: "Wearables",
-    query: "product_type:Wearables",
-    blurb: "Galaxy Watch for health, fitness, and time.",
+    // Smart Glasses go here rather than under Cameras, despite having a
+    // camera (Ray-Ban Meta) — matches shopper mental model (worn on body).
+    types: ["Wearables", "Smart Glasses"],
+    query: productTypeQuery(["Wearables", "Smart Glasses"]),
+    blurb: "Smartwatches, fitness trackers, and smart glasses.",
     art: "watch",
+    groups: [
+      { slug: "galaxy-watch", label: "Galaxy Watch", query: "tag:collection-wearables" },
+      { slug: "apple-watch", label: "Apple Watch", query: "tag:collection-apple-watch" },
+      { slug: "fitness", label: "Fitness Trackers", query: "tag:collection-whoop" },
+      {
+        slug: "smart-glasses",
+        label: "Smart Glasses",
+        query: productTypeQuery(["Smart Glasses"]),
+      },
+    ],
   },
   {
     slug: "chargers",
     label: "Chargers",
-    query: "product_type:Chargers",
+    types: ["Chargers", "Power Banks", "Cables"],
+    query: productTypeQuery(["Chargers", "Power Banks", "Cables"]),
     blurb: "Fast chargers and wireless charging pads.",
     art: "charger",
+    groups: [
+      { slug: "chargers", label: "Wall Chargers", query: productTypeQuery(["Chargers"]) },
+      { slug: "power-banks", label: "Power Banks", query: productTypeQuery(["Power Banks"]) },
+      { slug: "cables", label: "Cables", query: productTypeQuery(["Cables"]) },
+      // Anker and Baseus together outsell Apple in this category despite
+      // neither having had a filter before. Both also sell audio/car/laptop
+      // gear outside this category, so intersect with this category's own
+      // types — otherwise these chips would leak in unrelated products.
+      {
+        slug: "anker",
+        label: "Anker",
+        query: `tag:collection-anker AND ${productTypeQuery(["Chargers", "Power Banks", "Cables"])}`,
+      },
+      {
+        slug: "baseus",
+        label: "Baseus",
+        query: `tag:collection-baseus AND ${productTypeQuery(["Chargers", "Power Banks", "Cables"])}`,
+      },
+    ],
+  },
+  {
+    slug: "gaming",
+    label: "Gaming",
+    types: ["Gaming Consoles", "Gaming Accessories", "Gaming Peripherals"],
+    query: productTypeQuery(["Gaming Consoles", "Gaming Accessories", "Gaming Peripherals"]),
+    blurb: "Consoles, controllers, and gear for every player.",
+    art: "gaming",
+    groups: [
+      { slug: "consoles", label: "Consoles", query: productTypeQuery(["Gaming Consoles"]) },
+      {
+        slug: "peripherals",
+        label: "Peripherals",
+        query: productTypeQuery(["Gaming Peripherals"]),
+      },
+      {
+        slug: "accessories",
+        label: "Accessories",
+        query: productTypeQuery(["Gaming Accessories"]),
+      },
+      // Razer alone is 58% of this category's catalog. Razer also makes
+      // gaming headsets categorized as Audio, so intersect with this
+      // category's own types to keep the chip scoped to Gaming.
+      {
+        slug: "razer",
+        label: "Razer",
+        query: `tag:collection-razer AND ${productTypeQuery(["Gaming Consoles", "Gaming Accessories", "Gaming Peripherals"])}`,
+      },
+    ],
+  },
+  {
+    slug: "cameras",
+    label: "Cameras",
+    // Streaming Devices / Media Players live here rather than under
+    // Appliances — closer to content-creation/small-electronics than
+    // whitegoods.
+    types: [
+      "Cameras",
+      "Camera Accessories",
+      "Instant Cameras",
+      "Photo Accessories",
+      "Gimbals",
+      "Streaming Devices",
+      "Media Players",
+    ],
+    query: productTypeQuery([
+      "Cameras",
+      "Camera Accessories",
+      "Instant Cameras",
+      "Photo Accessories",
+      "Gimbals",
+      "Streaming Devices",
+      "Media Players",
+    ]),
+    blurb: "Cameras, gimbals, and gear for creators.",
+    art: "camera",
+    groups: [
+      { slug: "cameras", label: "Cameras", query: productTypeQuery(["Cameras"]) },
+      {
+        slug: "instant-cameras",
+        label: "Instant Cameras",
+        query: productTypeQuery(["Instant Cameras"]),
+      },
+      { slug: "gimbals", label: "Gimbals & Stabilizers", query: productTypeQuery(["Gimbals"]) },
+      {
+        slug: "streaming",
+        label: "Streaming & Media",
+        query: productTypeQuery(["Streaming Devices", "Media Players"]),
+      },
+      {
+        slug: "accessories",
+        label: "Camera Accessories",
+        query: productTypeQuery(["Camera Accessories", "Photo Accessories"]),
+      },
+      // DJI is the single largest camera-category vendor (32% of products).
+      { slug: "dji", label: "DJI", query: "tag:collection-dji" },
+      { slug: "insta360", label: "Insta360", query: "tag:collection-insta360" },
+      { slug: "fujifilm", label: "Fujifilm", query: "tag:collection-fujifilm" },
+    ],
+  },
+  {
+    slug: "appliances",
+    label: "Appliances",
+    types: [
+      "Televisions",
+      "Refrigerators",
+      "Washing Machines",
+      "Microwaves",
+      "Cookers",
+      "Freezers",
+      "Water Dispensers",
+      "Fans",
+    ],
+    query: productTypeQuery([
+      "Televisions",
+      "Refrigerators",
+      "Washing Machines",
+      "Microwaves",
+      "Cookers",
+      "Freezers",
+      "Water Dispensers",
+      "Fans",
+    ]),
+    blurb: "TVs, kitchen, and home appliances for every room.",
+    art: "appliance",
+    groups: [
+      { slug: "tvs", label: "TVs", query: productTypeQuery(["Televisions"]) },
+      {
+        slug: "kitchen",
+        label: "Kitchen Appliances",
+        query: productTypeQuery(["Microwaves", "Cookers", "Water Dispensers"]),
+      },
+      {
+        slug: "laundry-cooling",
+        label: "Laundry & Cooling",
+        query: productTypeQuery(["Washing Machines", "Freezers", "Refrigerators", "Fans"]),
+      },
+      // Vision Plus is the largest appliance vendor (34% of this category).
+      { slug: "vision-plus", label: "Vision Plus", query: "tag:collection-vision-plus" },
+      { slug: "hisense", label: "Hisense", query: "tag:collection-hisense" },
+      { slug: "tcl", label: "TCL", query: "tag:collection-tcl" },
+    ],
   },
   {
     slug: "accessories",
     label: "Accessories",
-    query: "product_type:Accessories",
-    blurb: "Keyboard covers, SmartTags, and more.",
+    types: ["Accessories", "Car Accessories"],
+    query: productTypeQuery(["Accessories", "Car Accessories"]),
+    blurb: "Cables, cases, car accessories, and everyday essentials.",
     art: "generic",
+    groups: [
+      { slug: "general", label: "General Accessories", query: productTypeQuery(["Accessories"]) },
+      {
+        slug: "car",
+        label: "Car Accessories",
+        query: productTypeQuery(["Car Accessories"]),
+      },
+    ],
   },
 ];
 
@@ -64,15 +371,11 @@ export function getCategory(slug: string): Category | undefined {
   return categories.find((c) => c.slug === slug);
 }
 
+const typeToCategorySlug: Record<string, string> = Object.fromEntries(
+  categories.flatMap((c) => c.types.map((t) => [t, c.slug])),
+);
+
 export function categoryForProductType(productType: string): Category | undefined {
-  const map: Record<string, string> = {
-    Smartphones: "phones",
-    Tablets: "tablets",
-    Audio: "audio",
-    Wearables: "wearables",
-    Chargers: "chargers",
-    Accessories: "accessories",
-  };
-  const slug = map[productType];
+  const slug = typeToCategorySlug[productType];
   return slug ? getCategory(slug) : undefined;
 }

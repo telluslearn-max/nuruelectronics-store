@@ -1,6 +1,6 @@
 import { ImageResponse } from "next/og";
 
-export const alt = "NURU — Samsung Galaxy phones, tablets, audio, and wearables in Kenya";
+export const alt = "NURU — genuine electronics in Kenya: phones, laptops, audio, gaming, cameras, and appliances";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -32,7 +32,7 @@ export default function Image() {
           />
         </div>
         <div style={{ fontSize: 34, color: "#a1a1aa", marginTop: 16 }}>
-          Samsung Galaxy phones, tablets, audio &amp; wearables
+          Phones, laptops, audio, gaming &amp; appliances
         </div>
       </div>
     ),

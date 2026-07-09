@@ -15,9 +15,7 @@ export const mockProducts: Product[] = [
     productType: "Accessories",
     tags: ["mock"],
     priceRange: { minVariantPrice: money("28.00"), maxVariantPrice: money("28.00") },
-    images: [
-      { url: "https://picsum.photos/seed/tote/800/800", altText: "Canvas Tote Bag", width: 800, height: 800 },
-    ],
+    images: [],
     variants: [
       {
         id: "gid://mock/ProductVariant/1",
@@ -39,9 +37,7 @@ export const mockProducts: Product[] = [
     productType: "Accessories",
     tags: ["mock"],
     priceRange: { minVariantPrice: money("18.00"), maxVariantPrice: money("18.00") },
-    images: [
-      { url: "https://picsum.photos/seed/mug/800/800", altText: "Ceramic Mug", width: 800, height: 800 },
-    ],
+    images: [],
     variants: [
       {
         id: "gid://mock/ProductVariant/2",
@@ -63,9 +59,7 @@ export const mockProducts: Product[] = [
     productType: "Accessories",
     tags: ["mock"],
     priceRange: { minVariantPrice: money("24.00"), maxVariantPrice: money("24.00") },
-    images: [
-      { url: "https://picsum.photos/seed/beanie/800/800", altText: "Wool Beanie", width: 800, height: 800 },
-    ],
+    images: [],
     variants: [
       {
         id: "gid://mock/ProductVariant/3",
@@ -94,9 +88,7 @@ export const mockProducts: Product[] = [
     productType: "Accessories",
     tags: ["mock"],
     priceRange: { minVariantPrice: money("45.00"), maxVariantPrice: money("45.00") },
-    images: [
-      { url: "https://picsum.photos/seed/wallet/800/800", altText: "Leather Wallet", width: 800, height: 800 },
-    ],
+    images: [],
     variants: [
       {
         id: "gid://mock/ProductVariant/5",
@@ -118,9 +110,7 @@ export const mockProducts: Product[] = [
     productType: "Accessories",
     tags: ["mock"],
     priceRange: { minVariantPrice: money("32.00"), maxVariantPrice: money("32.00") },
-    images: [
-      { url: "https://picsum.photos/seed/sunglasses/800/800", altText: "Classic Sunglasses", width: 800, height: 800 },
-    ],
+    images: [],
     variants: [
       {
         id: "gid://mock/ProductVariant/6",
@@ -142,15 +132,148 @@ export const mockProducts: Product[] = [
     productType: "Accessories",
     tags: ["mock"],
     priceRange: { minVariantPrice: money("22.00"), maxVariantPrice: money("22.00") },
-    images: [
-      { url: "https://picsum.photos/seed/bottle/800/800", altText: "Insulated Water Bottle", width: 800, height: 800 },
-    ],
+    images: [],
     variants: [
       {
         id: "gid://mock/ProductVariant/7",
         title: "Default",
         availableForSale: true,
         price: money("22.00"),
+        selectedOptions: [{ name: "Title", value: "Default" }],
+      },
+    ],
+    options: [{ id: "1", name: "Title", values: ["Default"] }],
+  },
+  // The rest exercise the multi-brand taxonomy (categories, ecosystems, kits)
+  // added alongside the Samsung-only catalog, for local dev without real
+  // Shopify credentials.
+  {
+    id: "gid://mock/Product/7",
+    handle: "iphone-17-pro",
+    title: "iPhone 17 Pro",
+    description: "Apple's flagship phone with a titanium frame.",
+    descriptionHtml: "<p>Apple's flagship phone with a titanium frame.</p>",
+    availableForSale: true,
+    productType: "Smartphones",
+    tags: ["mock", "apple", "ecosystem-apple", "collection-iphone-17-series"],
+    priceRange: { minVariantPrice: money("1199.00"), maxVariantPrice: money("1199.00") },
+    images: [],
+    variants: [
+      {
+        id: "gid://mock/ProductVariant/8",
+        title: "Default",
+        availableForSale: true,
+        price: money("1199.00"),
+        selectedOptions: [{ name: "Title", value: "Default" }],
+      },
+    ],
+    options: [{ id: "1", name: "Title", values: ["Default"] }],
+  },
+  {
+    id: "gid://mock/Product/8",
+    handle: "macbook-air-15",
+    title: "MacBook Air 15\"",
+    description: "Thin, light, and fast enough for everyday work.",
+    descriptionHtml: "<p>Thin, light, and fast enough for everyday work.</p>",
+    availableForSale: true,
+    productType: "Laptops",
+    tags: ["mock", "apple", "ecosystem-apple", "collection-mac", "kit-work-study"],
+    priceRange: { minVariantPrice: money("1299.00"), maxVariantPrice: money("1299.00") },
+    images: [],
+    variants: [
+      {
+        id: "gid://mock/ProductVariant/9",
+        title: "Default",
+        availableForSale: true,
+        price: money("1299.00"),
+        selectedOptions: [{ name: "Title", value: "Default" }],
+      },
+    ],
+    options: [{ id: "1", name: "Title", values: ["Default"] }],
+  },
+  {
+    id: "gid://mock/Product/9",
+    handle: "nintendo-switch-2",
+    title: "Nintendo Switch 2",
+    description: "Nintendo's next-generation hybrid console.",
+    descriptionHtml: "<p>Nintendo's next-generation hybrid console.</p>",
+    availableForSale: true,
+    productType: "Gaming Consoles",
+    tags: ["mock", "nintendo", "kit-gaming"],
+    priceRange: { minVariantPrice: money("449.00"), maxVariantPrice: money("449.00") },
+    images: [],
+    variants: [
+      {
+        id: "gid://mock/ProductVariant/10",
+        title: "Default",
+        availableForSale: true,
+        price: money("449.00"),
+        selectedOptions: [{ name: "Title", value: "Default" }],
+      },
+    ],
+    options: [{ id: "1", name: "Title", values: ["Default"] }],
+  },
+  {
+    id: "gid://mock/Product/10",
+    handle: "canon-eos-r50",
+    title: "Canon EOS R50",
+    description: "A lightweight mirrorless camera built for content creators.",
+    descriptionHtml: "<p>A lightweight mirrorless camera built for content creators.</p>",
+    availableForSale: true,
+    productType: "Cameras",
+    tags: ["mock", "canon", "kit-content-creator"],
+    priceRange: { minVariantPrice: money("799.00"), maxVariantPrice: money("799.00") },
+    images: [],
+    variants: [
+      {
+        id: "gid://mock/ProductVariant/11",
+        title: "Default",
+        availableForSale: true,
+        price: money("799.00"),
+        selectedOptions: [{ name: "Title", value: "Default" }],
+      },
+    ],
+    options: [{ id: "1", name: "Title", values: ["Default"] }],
+  },
+  {
+    id: "gid://mock/Product/11",
+    handle: "tcl-55-qled-tv",
+    title: "TCL 55\" QLED TV",
+    description: "A vibrant 4K QLED TV for movie nights.",
+    descriptionHtml: "<p>A vibrant 4K QLED TV for movie nights.</p>",
+    availableForSale: true,
+    productType: "Televisions",
+    tags: ["mock", "tcl", "kit-home-theater"],
+    priceRange: { minVariantPrice: money("649.00"), maxVariantPrice: money("649.00") },
+    images: [],
+    variants: [
+      {
+        id: "gid://mock/ProductVariant/12",
+        title: "Default",
+        availableForSale: true,
+        price: money("649.00"),
+        selectedOptions: [{ name: "Title", value: "Default" }],
+      },
+    ],
+    options: [{ id: "1", name: "Title", values: ["Default"] }],
+  },
+  {
+    id: "gid://mock/Product/12",
+    handle: "anker-power-bank-20000mah",
+    title: "Anker Power Bank 20000mAh",
+    description: "High-capacity power bank for phones and laptops.",
+    descriptionHtml: "<p>High-capacity power bank for phones and laptops.</p>",
+    availableForSale: true,
+    productType: "Power Banks",
+    tags: ["mock", "anker", "kit-power-charging"],
+    priceRange: { minVariantPrice: money("59.00"), maxVariantPrice: money("59.00") },
+    images: [],
+    variants: [
+      {
+        id: "gid://mock/ProductVariant/13",
+        title: "Default",
+        availableForSale: true,
+        price: money("59.00"),
         selectedOptions: [{ name: "Title", value: "Default" }],
       },
     ],

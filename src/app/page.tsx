@@ -5,11 +5,12 @@ import { ProductMedia } from "@/components/product-media";
 import { SectionHeading } from "@/components/section-heading";
 import { TrustBadges } from "@/components/trust-badges";
 import { categories } from "@/lib/categories";
+import { ecosystems, kits } from "@/lib/collections";
 import { formatPrice } from "@/lib/format";
 import { getProducts } from "@/lib/shopify";
 import type { Product } from "@/lib/shopify/types";
 
-const phoneSeries = categories.find((c) => c.slug === "phones")?.series ?? [];
+const phoneGroups = categories.find((c) => c.slug === "phones")?.groups ?? [];
 
 function firstSentence(text: string) {
   const match = text.match(/^.*?[.!?](?:\s|$)/);
@@ -65,7 +66,7 @@ export default async function HomePage() {
           <div className="grid grid-cols-1 items-center gap-8 p-8 sm:p-12 md:grid-cols-2">
             <div>
               <p className="text-sm font-medium uppercase tracking-wide text-accent">
-                Genuine Samsung. Delivered fast.
+                Genuine electronics. Delivered fast.
               </p>
               <h1 className="mt-2 text-title sm:text-display">{hero.title}</h1>
               <p className="mt-4 max-w-md text-neutral-400">{firstSentence(hero.description)}</p>
@@ -117,7 +118,7 @@ export default async function HomePage() {
       <section className="mt-16">
         <SectionHeading
           eyebrow="Shop by category"
-          title="Everything for your Galaxy"
+          title="Electronics for every need"
           subtitle="Pick a category and get straight to the right products."
         />
         <div className="mt-6">
@@ -125,22 +126,52 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {phoneSeries.length > 0 && (
+      {phoneGroups.length > 0 && (
         <section className="mt-16">
-          <SectionHeading eyebrow="Quick links" title="Shop by series" />
+          <SectionHeading eyebrow="Quick links" title="Shop phones by brand & series" />
           <div className="mt-6 flex flex-wrap gap-3">
-            {phoneSeries.map((series) => (
+            {phoneGroups.map((group) => (
               <Link
-                key={series.slug}
-                href={`/category/phones?series=${series.slug}`}
+                key={group.slug}
+                href={`/category/phones?group=${group.slug}`}
                 className="rounded-control border border-border-subtle px-5 py-2.5 text-sm font-medium transition hover:border-foreground"
               >
-                {series.label}
+                {group.label}
               </Link>
             ))}
           </div>
         </section>
       )}
+
+      <section className="mt-16">
+        <SectionHeading eyebrow="Shop by brand" title="Find your favorite brand" />
+        <div className="mt-6 flex flex-wrap gap-3">
+          {ecosystems.map((ecosystem) => (
+            <Link
+              key={ecosystem.slug}
+              href={`/ecosystem/${ecosystem.slug}`}
+              className="rounded-control border border-border-subtle px-5 py-2.5 text-sm font-medium transition hover:border-foreground"
+            >
+              {ecosystem.label}
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      <section className="mt-16">
+        <SectionHeading eyebrow="Shop by need" title="Curated for what you're doing" />
+        <div className="mt-6 flex flex-wrap gap-3">
+          {kits.map((kit) => (
+            <Link
+              key={kit.slug}
+              href={`/kit/${kit.slug}`}
+              className="rounded-control border border-border-subtle px-5 py-2.5 text-sm font-medium transition hover:border-foreground"
+            >
+              {kit.label}
+            </Link>
+          ))}
+        </div>
+      </section>
 
       <section className="mt-16">
         <SectionHeading eyebrow="Full catalog" title="All products" />
