@@ -15,9 +15,7 @@ export const mockProducts: Product[] = [
     productType: "Accessories",
     tags: ["mock"],
     priceRange: { minVariantPrice: money("28.00"), maxVariantPrice: money("28.00") },
-    images: [
-      { url: "https://picsum.photos/seed/tote/800/800", altText: "Canvas Tote Bag", width: 800, height: 800 },
-    ],
+    images: [],
     variants: [
       {
         id: "gid://mock/ProductVariant/1",
@@ -39,9 +37,7 @@ export const mockProducts: Product[] = [
     productType: "Accessories",
     tags: ["mock"],
     priceRange: { minVariantPrice: money("18.00"), maxVariantPrice: money("18.00") },
-    images: [
-      { url: "https://picsum.photos/seed/mug/800/800", altText: "Ceramic Mug", width: 800, height: 800 },
-    ],
+    images: [],
     variants: [
       {
         id: "gid://mock/ProductVariant/2",
@@ -63,9 +59,7 @@ export const mockProducts: Product[] = [
     productType: "Accessories",
     tags: ["mock"],
     priceRange: { minVariantPrice: money("24.00"), maxVariantPrice: money("24.00") },
-    images: [
-      { url: "https://picsum.photos/seed/beanie/800/800", altText: "Wool Beanie", width: 800, height: 800 },
-    ],
+    images: [],
     variants: [
       {
         id: "gid://mock/ProductVariant/3",
@@ -94,9 +88,7 @@ export const mockProducts: Product[] = [
     productType: "Accessories",
     tags: ["mock"],
     priceRange: { minVariantPrice: money("45.00"), maxVariantPrice: money("45.00") },
-    images: [
-      { url: "https://picsum.photos/seed/wallet/800/800", altText: "Leather Wallet", width: 800, height: 800 },
-    ],
+    images: [],
     variants: [
       {
         id: "gid://mock/ProductVariant/5",
@@ -118,9 +110,7 @@ export const mockProducts: Product[] = [
     productType: "Accessories",
     tags: ["mock"],
     priceRange: { minVariantPrice: money("32.00"), maxVariantPrice: money("32.00") },
-    images: [
-      { url: "https://picsum.photos/seed/sunglasses/800/800", altText: "Classic Sunglasses", width: 800, height: 800 },
-    ],
+    images: [],
     variants: [
       {
         id: "gid://mock/ProductVariant/6",
@@ -142,9 +132,7 @@ export const mockProducts: Product[] = [
     productType: "Accessories",
     tags: ["mock"],
     priceRange: { minVariantPrice: money("22.00"), maxVariantPrice: money("22.00") },
-    images: [
-      { url: "https://picsum.photos/seed/bottle/800/800", altText: "Insulated Water Bottle", width: 800, height: 800 },
-    ],
+    images: [],
     variants: [
       {
         id: "gid://mock/ProductVariant/7",
@@ -169,9 +157,7 @@ export const mockProducts: Product[] = [
     productType: "Smartphones",
     tags: ["mock", "apple", "ecosystem-apple", "collection-iphone-17-series"],
     priceRange: { minVariantPrice: money("1199.00"), maxVariantPrice: money("1199.00") },
-    images: [
-      { url: "https://picsum.photos/seed/iphone17pro/800/800", altText: "iPhone 17 Pro", width: 800, height: 800 },
-    ],
+    images: [],
     variants: [
       {
         id: "gid://mock/ProductVariant/8",
@@ -193,9 +179,7 @@ export const mockProducts: Product[] = [
     productType: "Laptops",
     tags: ["mock", "apple", "ecosystem-apple", "collection-mac", "kit-work-study"],
     priceRange: { minVariantPrice: money("1299.00"), maxVariantPrice: money("1299.00") },
-    images: [
-      { url: "https://picsum.photos/seed/macbookair15/800/800", altText: "MacBook Air 15", width: 800, height: 800 },
-    ],
+    images: [],
     variants: [
       {
         id: "gid://mock/ProductVariant/9",
@@ -217,9 +201,7 @@ export const mockProducts: Product[] = [
     productType: "Gaming Consoles",
     tags: ["mock", "nintendo", "kit-gaming"],
     priceRange: { minVariantPrice: money("449.00"), maxVariantPrice: money("449.00") },
-    images: [
-      { url: "https://picsum.photos/seed/switch2/800/800", altText: "Nintendo Switch 2", width: 800, height: 800 },
-    ],
+    images: [],
     variants: [
       {
         id: "gid://mock/ProductVariant/10",
@@ -241,9 +223,7 @@ export const mockProducts: Product[] = [
     productType: "Cameras",
     tags: ["mock", "canon", "kit-content-creator"],
     priceRange: { minVariantPrice: money("799.00"), maxVariantPrice: money("799.00") },
-    images: [
-      { url: "https://picsum.photos/seed/eosr50/800/800", altText: "Canon EOS R50", width: 800, height: 800 },
-    ],
+    images: [],
     variants: [
       {
         id: "gid://mock/ProductVariant/11",
@@ -265,9 +245,7 @@ export const mockProducts: Product[] = [
     productType: "Televisions",
     tags: ["mock", "tcl", "kit-home-theater"],
     priceRange: { minVariantPrice: money("649.00"), maxVariantPrice: money("649.00") },
-    images: [
-      { url: "https://picsum.photos/seed/tcl55qled/800/800", altText: "TCL 55 inch QLED TV", width: 800, height: 800 },
-    ],
+    images: [],
     variants: [
       {
         id: "gid://mock/ProductVariant/12",
@@ -289,9 +267,7 @@ export const mockProducts: Product[] = [
     productType: "Power Banks",
     tags: ["mock", "anker", "kit-power-charging"],
     priceRange: { minVariantPrice: money("59.00"), maxVariantPrice: money("59.00") },
-    images: [
-      { url: "https://picsum.photos/seed/ankerpowerbank/800/800", altText: "Anker Power Bank 20000mAh", width: 800, height: 800 },
-    ],
+    images: [],
     variants: [
       {
         id: "gid://mock/ProductVariant/13",
