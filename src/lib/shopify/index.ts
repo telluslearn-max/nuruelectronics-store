@@ -7,6 +7,7 @@ import {
   getProductByHandleQuery,
   getProductHandlesQuery,
   getProductsQuery,
+  getProductsWithSpecsQuery,
   removeFromCartMutation,
   updateCartMutation,
 } from "./queries";
@@ -134,9 +135,11 @@ export async function getProducts(
     sortKey?: "PRICE" | "TITLE" | "BEST_SELLING" | "CREATED_AT" | "RELEVANCE";
     reverse?: boolean;
     first?: number;
+    /** Also fetch spec metafields per product (e.g. for the PDP comparison table). Adds query cost, so opt-in only. */
+    includeSpecs?: boolean;
   } = {},
 ): Promise<ProductsPage> {
-  const { after, searchTerm, sortKey, reverse, first } = options;
+  const { after, searchTerm, sortKey, reverse, first, includeSpecs } = options;
   if (!isShopifyConfigured) {
     const products = searchTerm
       ? mockProducts.filter((p) => matchesSearchTerm(p, searchTerm))
@@ -145,7 +148,11 @@ export async function getProducts(
   }
   const data = await shopifyFetch<{
     products: PaginatedConnection<Parameters<typeof reshapeProduct>[0]>;
-  }>(getProductsQuery, { after, query: searchTerm, sortKey, reverse, first }, { revalidate: 60 });
+  }>(
+    includeSpecs ? getProductsWithSpecsQuery : getProductsQuery,
+    { after, query: searchTerm, sortKey, reverse, first },
+    { revalidate: 60 },
+  );
   return {
     products: data.products.edges.map((edge) => reshapeProduct(edge.node)),
     hasNextPage: data.products.pageInfo.hasNextPage,

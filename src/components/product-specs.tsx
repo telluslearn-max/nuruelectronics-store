@@ -1,6 +1,6 @@
 import type { ProductSpec } from "@/lib/shopify/types";
 
-const SPEC_LABELS: Record<string, string> = {
+export const SPEC_LABELS: Record<string, string> = {
   // Compute
   processor: "Processor",
   ram: "RAM",

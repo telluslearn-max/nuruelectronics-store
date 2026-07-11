@@ -138,45 +138,74 @@ export const getProductHandlesQuery = /* GraphQL */ `
   }
 `;
 
+// Shared across any query that needs spec metafields, so the single-product
+// page and multi-product fetches (e.g. the PDP comparison table's related
+// products) stay in sync with the same key list.
+const specsMetafieldsBlock = `
+  metafields(identifiers: [
+    # Compute (phones, tablets, computers, gaming)
+    { namespace: "specs", key: "processor" }
+    { namespace: "specs", key: "ram" }
+    { namespace: "specs", key: "storage" }
+    { namespace: "specs", key: "os" }
+    # Display / imaging (phones, tablets, computers, TVs, cameras, gaming)
+    { namespace: "specs", key: "display" }
+    { namespace: "specs", key: "resolution" }
+    { namespace: "specs", key: "camera" }
+    { namespace: "specs", key: "sensor" }
+    # Audio (earbuds, headphones, speakers, soundbars)
+    { namespace: "specs", key: "driver_size" }
+    # Audio (microphones)
+    { namespace: "specs", key: "polar_pattern" }
+    { namespace: "specs", key: "frequency_response" }
+    # Power (phones, tablets, wearables, audio, cameras, chargers, power banks)
+    { namespace: "specs", key: "battery" }
+    { namespace: "specs", key: "output_power" }
+    { namespace: "specs", key: "capacity" }
+    # Connectivity & fit (broad)
+    { namespace: "specs", key: "connectivity" }
+    { namespace: "specs", key: "compatibility" }
+    { namespace: "specs", key: "water_resistance" }
+    # Physical (broad)
+    { namespace: "specs", key: "dimensions" }
+    { namespace: "specs", key: "weight" }
+    { namespace: "specs", key: "material" }
+    # Appliances & everything else
+    { namespace: "specs", key: "energy_rating" }
+    { namespace: "specs", key: "included_in_box" }
+  ]) {
+    key
+    value
+  }
+`;
+
 export const getProductByHandleQuery = /* GraphQL */ `
   ${productFragment}
   query getProductByHandle($handle: String!) {
     product(handle: $handle) {
       ...productFields
-      metafields(identifiers: [
-        # Compute (phones, tablets, computers, gaming)
-        { namespace: "specs", key: "processor" }
-        { namespace: "specs", key: "ram" }
-        { namespace: "specs", key: "storage" }
-        { namespace: "specs", key: "os" }
-        # Display / imaging (phones, tablets, computers, TVs, cameras, gaming)
-        { namespace: "specs", key: "display" }
-        { namespace: "specs", key: "resolution" }
-        { namespace: "specs", key: "camera" }
-        { namespace: "specs", key: "sensor" }
-        # Audio (earbuds, headphones, speakers, soundbars)
-        { namespace: "specs", key: "driver_size" }
-        # Audio (microphones)
-        { namespace: "specs", key: "polar_pattern" }
-        { namespace: "specs", key: "frequency_response" }
-        # Power (phones, tablets, wearables, audio, cameras, chargers, power banks)
-        { namespace: "specs", key: "battery" }
-        { namespace: "specs", key: "output_power" }
-        { namespace: "specs", key: "capacity" }
-        # Connectivity & fit (broad)
-        { namespace: "specs", key: "connectivity" }
-        { namespace: "specs", key: "compatibility" }
-        { namespace: "specs", key: "water_resistance" }
-        # Physical (broad)
-        { namespace: "specs", key: "dimensions" }
-        { namespace: "specs", key: "weight" }
-        { namespace: "specs", key: "material" }
-        # Appliances & everything else
-        { namespace: "specs", key: "energy_rating" }
-        { namespace: "specs", key: "included_in_box" }
-      ]) {
-        key
-        value
+      ${specsMetafieldsBlock}
+    }
+  }
+`;
+
+// Same shape as getProductsQuery, but also pulls spec metafields per product.
+// Used where specs feed into UI (e.g. the PDP comparison table) rather than
+// the default product-listing fetch, since the metafields lookup adds cost
+// to every product in the page and most listings don't need it.
+export const getProductsWithSpecsQuery = /* GraphQL */ `
+  ${productFragment}
+  query getProductsWithSpecs($first: Int = 24, $after: String, $query: String, $sortKey: ProductSortKeys, $reverse: Boolean) {
+    products(first: $first, after: $after, query: $query, sortKey: $sortKey, reverse: $reverse) {
+      edges {
+        node {
+          ...productFields
+          ${specsMetafieldsBlock}
+        }
+      }
+      pageInfo {
+        hasNextPage
+        endCursor
       }
     }
   }

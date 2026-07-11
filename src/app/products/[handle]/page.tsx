@@ -14,7 +14,11 @@ import type { Product } from "@/lib/shopify/types";
 async function getRelatedProducts(product: Product): Promise<Product[]> {
   const collectionTag = product.tags.find((tag) => tag.startsWith("collection-"));
   if (!collectionTag) return [];
-  const { products } = await getProducts({ searchTerm: `tag:${collectionTag}`, first: 5 });
+  const { products } = await getProducts({
+    searchTerm: `tag:${collectionTag}`,
+    first: 5,
+    includeSpecs: true,
+  });
   return products.filter((p) => p.handle !== product.handle).slice(0, 4);
 }
 

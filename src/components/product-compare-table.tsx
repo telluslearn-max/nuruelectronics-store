@@ -1,13 +1,21 @@
 import Image from "next/image";
 import Link from "next/link";
 import { formatPrice } from "@/lib/format";
+import { SPEC_LABELS } from "@/components/product-specs";
 import type { Product } from "@/lib/shopify/types";
+
+// SPEC_LABELS is grouped by category in declaration order (compute, display,
+// audio, power, connectivity, physical, appliances) — reuse that order here
+// so comparison rows read in the same sensible sequence as the PDP's own
+// Specifications section.
+const SPEC_KEY_ORDER = Object.keys(SPEC_LABELS);
 
 /**
  * Spec comparison table: the viewed product plus its closest siblings
  * (same collection tag), side by side. Rows are built from real product
  * data only — price, each product's own option axes (Storage, Color, ...),
- * and availability — nothing fabricated.
+ * spec metafields, and availability — nothing fabricated. A spec row only
+ * appears if at least one column actually has that value set.
  */
 export function ProductCompareTable({
   current,
@@ -20,6 +28,13 @@ export function ProductCompareTable({
 
   const optionNames = Array.from(
     new Set(columns.flatMap((p) => p.options.map((o) => o.name))),
+  );
+
+  const specsByHandle = new Map(
+    columns.map((p) => [p.handle, new Map((p.specs ?? []).map((s) => [s.key, s.value]))]),
+  );
+  const specKeys = SPEC_KEY_ORDER.filter((key) =>
+    columns.some((p) => specsByHandle.get(p.handle)?.has(key)),
   );
 
   return (
@@ -87,6 +102,18 @@ export function ProductCompareTable({
                   </td>
                 );
               })}
+            </tr>
+          ))}
+          {specKeys.map((key) => (
+            <tr key={key} className="border-t border-border-subtle">
+              <th scope="row" className="sticky left-0 z-10 bg-background py-3 pr-3 text-left font-medium text-neutral-500">
+                {SPEC_LABELS[key] ?? key}
+              </th>
+              {columns.map((p) => (
+                <td key={p.handle} className="px-3 py-3 text-neutral-600">
+                  {specsByHandle.get(p.handle)?.get(key) ?? "—"}
+                </td>
+              ))}
             </tr>
           ))}
           <tr className="border-t border-border-subtle">

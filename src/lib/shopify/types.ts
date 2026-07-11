@@ -39,7 +39,7 @@ export type Product = {
   images: ProductImage[];
   variants: ProductVariant[];
   options: { id: string; name: string; values: string[] }[];
-  /** Structured spec metafields (namespace "specs") — only populated on the single-product fetch. */
+  /** Structured spec metafields (namespace "specs") — populated on the single-product fetch, and on list fetches that opt in via `includeSpecs`. */
   specs?: ProductSpec[];
 };
 
