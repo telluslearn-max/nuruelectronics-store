@@ -1,11 +1,10 @@
 import Link from "next/link";
-import { CategoryTiles } from "@/components/category-tiles";
-import { ProductList } from "@/components/product-list";
+import { BentoGrid } from "@/components/bento-grid";
+import { Faq } from "@/components/faq";
 import { ProductMedia } from "@/components/product-media";
 import { SectionHeading } from "@/components/section-heading";
 import { TrustBadges } from "@/components/trust-badges";
 import { categories } from "@/lib/categories";
-import { ecosystems, kits } from "@/lib/collections";
 import { formatPrice } from "@/lib/format";
 import { getProducts } from "@/lib/shopify";
 import type { Product } from "@/lib/shopify/types";
@@ -46,18 +45,30 @@ function FeatureCard({ product }: { product: Product }) {
 }
 
 export default async function HomePage() {
-  const [flagshipPage, allPage] = await Promise.all([
+  const [flagshipPage, categoryHeroPages] = await Promise.all([
     getProducts({
       searchTerm: "product_type:Smartphones",
       sortKey: "PRICE",
       reverse: true,
       first: 3,
     }),
-    getProducts(),
+    Promise.all(
+      categories.map((category) =>
+        getProducts({ searchTerm: category.query, sortKey: "BEST_SELLING", first: 1 }),
+      ),
+    ),
   ]);
 
   const [hero, ...features] = flagshipPage.products;
   const heroPrice = hero?.priceRange.minVariantPrice;
+
+  const bentoCategories = categories.map((category, i) => ({
+    slug: category.slug,
+    label: category.label,
+    blurb: category.blurb,
+    art: category.art,
+    image: categoryHeroPages[i]?.products[0]?.images[0] ?? null,
+  }));
 
   return (
     <div>
@@ -118,11 +129,11 @@ export default async function HomePage() {
       <section className="mt-16">
         <SectionHeading
           eyebrow="Shop by category"
-          title="Electronics for every need"
-          subtitle="Pick a category and get straight to the right products."
+          title="Ten categories. One place to shop."
+          subtitle="From flagship phones to the small stuff that keeps them charged — browse everything NURU stocks."
         />
         <div className="mt-6">
-          <CategoryTiles />
+          <BentoGrid items={bentoCategories} basePath="/category" />
         </div>
       </section>
 
@@ -143,44 +154,25 @@ export default async function HomePage() {
         </section>
       )}
 
-      <section className="mt-16">
-        <SectionHeading eyebrow="Shop by brand" title="Find your favorite brand" />
-        <div className="mt-6 flex flex-wrap gap-3">
-          {ecosystems.map((ecosystem) => (
-            <Link
-              key={ecosystem.slug}
-              href={`/ecosystem/${ecosystem.slug}`}
-              className="rounded-control border border-border-subtle px-5 py-2.5 text-sm font-medium transition hover:border-foreground"
-            >
-              {ecosystem.label}
-            </Link>
-          ))}
+      <section className="mt-16 flex flex-col items-start gap-4 rounded-card border border-border-subtle p-8 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="text-lg font-semibold">Want the full picture?</h2>
+          <p className="mt-1 text-sm text-neutral-500">
+            Browse every brand, every use case, and the entire catalog in one place.
+          </p>
         </div>
+        <Link
+          href="/shop"
+          className="shrink-0 rounded-control bg-foreground px-6 py-3 text-sm font-medium text-background transition hover:opacity-90"
+        >
+          Explore the full shop
+        </Link>
       </section>
 
       <section className="mt-16">
-        <SectionHeading eyebrow="Shop by need" title="Curated for what you're doing" />
-        <div className="mt-6 flex flex-wrap gap-3">
-          {kits.map((kit) => (
-            <Link
-              key={kit.slug}
-              href={`/kit/${kit.slug}`}
-              className="rounded-control border border-border-subtle px-5 py-2.5 text-sm font-medium transition hover:border-foreground"
-            >
-              {kit.label}
-            </Link>
-          ))}
-        </div>
-      </section>
-
-      <section className="mt-16">
-        <SectionHeading eyebrow="Full catalog" title="All products" />
+        <SectionHeading eyebrow="Questions" title="Common questions" />
         <div className="mt-6">
-          <ProductList
-            initialProducts={allPage.products}
-            initialHasNextPage={allPage.hasNextPage}
-            initialEndCursor={allPage.endCursor}
-          />
+          <Faq />
         </div>
       </section>
     </div>

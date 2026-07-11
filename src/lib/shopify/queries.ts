@@ -143,6 +143,41 @@ export const getProductByHandleQuery = /* GraphQL */ `
   query getProductByHandle($handle: String!) {
     product(handle: $handle) {
       ...productFields
+      metafields(identifiers: [
+        # Compute (phones, tablets, computers, gaming)
+        { namespace: "specs", key: "processor" }
+        { namespace: "specs", key: "ram" }
+        { namespace: "specs", key: "storage" }
+        { namespace: "specs", key: "os" }
+        # Display / imaging (phones, tablets, computers, TVs, cameras, gaming)
+        { namespace: "specs", key: "display" }
+        { namespace: "specs", key: "resolution" }
+        { namespace: "specs", key: "camera" }
+        { namespace: "specs", key: "sensor" }
+        # Audio (earbuds, headphones, speakers, soundbars)
+        { namespace: "specs", key: "driver_size" }
+        # Audio (microphones)
+        { namespace: "specs", key: "polar_pattern" }
+        { namespace: "specs", key: "frequency_response" }
+        # Power (phones, tablets, wearables, audio, cameras, chargers, power banks)
+        { namespace: "specs", key: "battery" }
+        { namespace: "specs", key: "output_power" }
+        { namespace: "specs", key: "capacity" }
+        # Connectivity & fit (broad)
+        { namespace: "specs", key: "connectivity" }
+        { namespace: "specs", key: "compatibility" }
+        { namespace: "specs", key: "water_resistance" }
+        # Physical (broad)
+        { namespace: "specs", key: "dimensions" }
+        { namespace: "specs", key: "weight" }
+        { namespace: "specs", key: "material" }
+        # Appliances & everything else
+        { namespace: "specs", key: "energy_rating" }
+        { namespace: "specs", key: "included_in_box" }
+      ]) {
+        key
+        value
+      }
     }
   }
 `;

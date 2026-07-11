@@ -18,6 +18,11 @@ export type ProductVariant = {
   selectedOptions: { name: string; value: string }[];
 };
 
+export type ProductSpec = {
+  key: string;
+  value: string;
+};
+
 export type Product = {
   id: string;
   handle: string;
@@ -34,6 +39,8 @@ export type Product = {
   images: ProductImage[];
   variants: ProductVariant[];
   options: { id: string; name: string; values: string[] }[];
+  /** Structured spec metafields (namespace "specs") — only populated on the single-product fetch. */
+  specs?: ProductSpec[];
 };
 
 export type CartLine = {

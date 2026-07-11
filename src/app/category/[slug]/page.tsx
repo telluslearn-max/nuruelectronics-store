@@ -2,8 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { chipClass, CollectionPage } from "@/components/collection-page";
-import { getCategory } from "@/lib/categories";
+import { getCategory, getRelatedCategories } from "@/lib/categories";
 import { getProducts } from "@/lib/shopify";
+import type { Product } from "@/lib/shopify/types";
 
 type CategoryPageProps = {
   params: Promise<{ slug: string }>;
@@ -43,11 +44,42 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
         ? { sortKey: "PRICE" as const, reverse: true }
         : undefined;
 
-  const { products, hasNextPage, endCursor } = await getProducts({
-    searchTerm: query,
-    sortKey: sort?.sortKey,
-    reverse: sort?.reverse,
-  });
+  const relatedEdges = getRelatedCategories(category.slug);
+
+  // When browsing the whole category (no group filter), pull one best-seller
+  // per line instead of ranking across all of them — otherwise a single
+  // dominant brand/series can crowd out the rest of the lineup entirely.
+  const showLineupBreadth = !activeGroup && (category.groups?.length ?? 0) > 0;
+  const flagshipPromise: Promise<{ products: Product[] }> = showLineupBreadth
+    ? Promise.all(
+        category.groups!
+          .slice(0, 8)
+          .map((g) => getProducts({ searchTerm: g.query, sortKey: "BEST_SELLING", first: 1 })),
+      ).then((pages) => ({ products: pages.flatMap((p) => p.products) }))
+    : getProducts({ searchTerm: query, sortKey: "BEST_SELLING", first: 8 });
+
+  const [{ products, hasNextPage, endCursor }, flagshipPage, relatedPages] = await Promise.all([
+    getProducts({
+      searchTerm: query,
+      sortKey: sort?.sortKey,
+      reverse: sort?.reverse,
+    }),
+    flagshipPromise,
+    Promise.all(
+      relatedEdges.map((edge) =>
+        getProducts({ searchTerm: edge.category.query, sortKey: "BEST_SELLING", first: 8 }),
+      ),
+    ),
+  ]);
+
+  const relatedCategories = relatedEdges
+    .map((edge, i) => ({
+      label: edge.category.label,
+      slug: edge.category.slug,
+      reason: edge.reason,
+      products: relatedPages[i]?.products ?? [],
+    }))
+    .filter((entry) => entry.products.length > 0);
 
   const groupChips = category.groups && (
     <div className="mb-4 flex flex-wrap gap-2">
@@ -78,6 +110,8 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
       sortSlug={sortSlug}
       buildHref={(sort) => buildHref(category.slug, activeGroup?.slug, sort)}
       groupChips={groupChips}
+      flagshipProducts={flagshipPage.products}
+      relatedCategories={relatedCategories}
     />
   );
 }

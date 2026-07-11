@@ -80,6 +80,7 @@ export function Nav({
   const closeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const entries: NavEntry[] = [
+    { id: "shop", label: "Shop", href: "/shop", panelItems: [] },
     ...categories.map((category) => ({
       id: `category-${category.slug}`,
       label: category.label,
@@ -101,6 +102,7 @@ export function Nav({
       href: "/kit",
       panelItems: kits.map((k) => ({ href: `/kit/${k.slug}`, label: k.label })),
     },
+    { id: "support", label: "Support", href: "/support", panelItems: [] },
   ];
   const activeEntry = entries.find((e) => e.id === openId);
 
@@ -164,7 +166,7 @@ export function Nav({
       ref={headerRef}
       className="sticky top-0 z-40 border-b border-border-subtle bg-background/80 backdrop-blur"
     >
-      <div className="mx-auto flex max-w-6xl items-center gap-4 px-4 py-4">
+      <div className="mx-auto flex max-w-6xl items-center gap-2 px-4 py-4 sm:gap-4">
         <button
           type="button"
           aria-label="Open menu"
@@ -175,7 +177,7 @@ export function Nav({
         >
           <HamburgerIcon />
         </button>
-        <Link href="/" className="text-lg font-semibold tracking-tight">
+        <Link href="/" className="shrink-0 text-lg font-semibold tracking-tight">
           NURU
         </Link>
         <SearchBox />

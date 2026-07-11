@@ -76,7 +76,7 @@ export function SearchBox() {
   }
 
   return (
-    <div ref={containerRef} className="relative flex-1">
+    <div ref={containerRef} className="relative min-w-0 flex-1">
       <form action="/search" role="search" onSubmit={close}>
         <input
           type="search"

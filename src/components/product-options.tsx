@@ -70,8 +70,18 @@ export function ProductOptions({ product }: { product: Product }) {
 
   return (
     <div>
-      <p className="mt-2 text-lg text-neutral-700">
-        {formatPrice(price.amount, price.currencyCode)}
+      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+        <p className="text-lg text-neutral-700">{formatPrice(price.amount, price.currencyCode)}</p>
+        <span
+          className={`text-sm font-medium ${
+            selectedVariant?.availableForSale ? "text-accent" : "text-neutral-400"
+          }`}
+        >
+          {selectedVariant?.availableForSale ? "In stock" : "Out of stock"}
+        </span>
+      </div>
+      <p className="mt-1 text-sm text-neutral-500">
+        Same-day delivery in Nairobi &bull; Countrywide shipping available
       </p>
 
       {showOptions && (

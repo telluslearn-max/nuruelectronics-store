@@ -11,7 +11,7 @@ export default function EcosystemIndexPage() {
   return (
     <div>
       <div className="mb-8">
-        <h1 className="text-title sm:text-3xl">Shop by Brand</h1>
+        <h1 className="text-title sm:text-display">Shop by Brand</h1>
         <p className="mt-2 text-neutral-500">Find everything from your favorite brand in one place.</p>
       </div>
       <CollectionTiles items={ecosystems} basePath="/ecosystem" />

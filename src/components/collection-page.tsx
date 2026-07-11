@@ -1,6 +1,9 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { FeatureCarousel } from "@/components/feature-carousel";
 import { ProductList } from "@/components/product-list";
+import { RelatedCategories, type RelatedCategoryEntry } from "@/components/related-categories";
+import { SectionHeading } from "@/components/section-heading";
 import type { Product } from "@/lib/shopify/types";
 
 const SORTS = [
@@ -28,6 +31,8 @@ export function CollectionPage({
   sortSlug,
   buildHref,
   groupChips,
+  flagshipProducts,
+  relatedCategories,
 }: {
   title: string;
   blurb: string;
@@ -39,6 +44,10 @@ export function CollectionPage({
   sortSlug?: string;
   buildHref: (sort?: string) => string;
   groupChips?: ReactNode;
+  /** Best-sellers shown as a highlight carousel above the full listing. */
+  flagshipProducts?: Product[];
+  /** Ranked complementary categories to cross-sell below the listing, most relevant first. */
+  relatedCategories?: RelatedCategoryEntry[];
 }) {
   const itemListJsonLd = {
     "@context": "https://schema.org",
@@ -58,10 +67,25 @@ export function CollectionPage({
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(itemListJsonLd) }}
       />
-      <div className="mb-8">
-        <h1 className="text-title sm:text-3xl">{title}</h1>
+      <div className="mb-4">
+        <h1 className="text-title sm:text-display">{title}</h1>
         <p className="mt-2 text-neutral-500">{blurb}</p>
+        <p className="mt-3 text-xs font-medium uppercase tracking-wide text-neutral-400">
+          Genuine &bull; Manufacturer warranty &bull; Fast Nairobi delivery
+        </p>
       </div>
+
+      {flagshipProducts && flagshipProducts.length > 0 && (
+        <section className="mb-12">
+          <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-baseline sm:justify-between">
+            <SectionHeading eyebrow="Popular right now" title={`Top picks in ${title}`} />
+            <a href="#all-products" className="shrink-0 text-sm font-medium text-accent hover:opacity-80">
+              See all &darr;
+            </a>
+          </div>
+          <FeatureCarousel products={flagshipProducts} />
+        </section>
+      )}
 
       {groupChips}
 
@@ -86,14 +110,18 @@ export function CollectionPage({
         })}
       </div>
 
-      <ProductList
-        key={`${query}|${sortSlug ?? "featured"}`}
-        initialProducts={products}
-        initialHasNextPage={hasNextPage}
-        initialEndCursor={endCursor}
-        searchTerm={query}
-        sort={sort}
-      />
+      <div id="all-products" className="scroll-mt-24">
+        <ProductList
+          key={`${query}|${sortSlug ?? "featured"}`}
+          initialProducts={products}
+          initialHasNextPage={hasNextPage}
+          initialEndCursor={endCursor}
+          searchTerm={query}
+          sort={sort}
+        />
+      </div>
+
+      <RelatedCategories title={title} items={relatedCategories ?? []} />
     </div>
   );
 }

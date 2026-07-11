@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { AnnouncementBar } from "@/components/announcement-bar";
 import { CartProvider } from "@/components/cart/cart-context";
 import { CartDrawer } from "@/components/cart/cart-drawer";
 import { Footer } from "@/components/footer";
@@ -52,6 +53,7 @@ export default async function RootLayout({
           >
             Skip to content
           </a>
+          <AnnouncementBar />
           <Nav authEnabled={isCustomerAuthConfigured} customerName={customer?.displayName ?? null} />
           <main id="main" className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">{children}</main>
           <Footer />

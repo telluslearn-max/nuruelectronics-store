@@ -27,7 +27,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   return (
     <div>
       <div className="mb-8">
-        <h1 className="text-title sm:text-3xl">
+        <h1 className="text-title sm:text-display">
           {query ? `Search results for "${query}"` : "Search"}
         </h1>
         {!query && (

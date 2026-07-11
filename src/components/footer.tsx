@@ -30,6 +30,11 @@ export function Footer() {
             <p className="text-sm font-medium">Support</p>
             <ul className="mt-3 space-y-2 text-sm text-neutral-500">
               <li>
+                <Link href="/support" className="hover:text-foreground">
+                  Help & Support
+                </Link>
+              </li>
+              <li>
                 <a href="mailto:hello@example.com" className="hover:text-foreground">
                   Contact us
                 </a>

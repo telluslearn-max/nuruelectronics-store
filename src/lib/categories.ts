@@ -371,6 +371,66 @@ export function getCategory(slug: string): Category | undefined {
   return categories.find((c) => c.slug === slug);
 }
 
+/**
+ * Cross-sell graph: each category points to its most relevant neighbors,
+ * ranked, with a reason a shopper would actually care about. Not symmetric —
+ * e.g. wearables lead back to phones, but phones lead to wearables *and*
+ * audio, because that's the direction the upsell actually makes sense.
+ */
+const CATEGORY_MESH: Record<string, { slug: string; reason: string }[]> = {
+  phones: [
+    { slug: "wearables", reason: "Notifications and fitness tracking on your wrist" },
+    { slug: "audio", reason: "Calls and music without the wires" },
+  ],
+  tablets: [
+    { slug: "accessories", reason: "Keyboards, styluses, and cases" },
+    { slug: "chargers", reason: "Fast charging for longer sessions" },
+  ],
+  computers: [
+    { slug: "accessories", reason: "Docks, hubs, and stands for your desk" },
+    { slug: "chargers", reason: "Power for the road" },
+  ],
+  audio: [
+    { slug: "chargers", reason: "Keep earbuds and speakers topped up" },
+    { slug: "wearables", reason: "Control playback from your wrist" },
+  ],
+  wearables: [
+    { slug: "phones", reason: "Pairs with your phone for calls and apps" },
+    { slug: "chargers", reason: "Charging docks and cables" },
+  ],
+  chargers: [
+    { slug: "accessories", reason: "Cables, mounts, and everyday extras" },
+    { slug: "phones", reason: "Match the wattage to your phone" },
+  ],
+  gaming: [
+    { slug: "audio", reason: "Headsets for chat and immersive sound" },
+    { slug: "accessories", reason: "Controllers, stands, and storage" },
+  ],
+  cameras: [
+    { slug: "accessories", reason: "Bags, tripods, and memory cards" },
+    { slug: "chargers", reason: "Extra batteries and power banks" },
+  ],
+  appliances: [
+    { slug: "accessories", reason: "Cables and everyday extras" },
+    { slug: "chargers", reason: "Power banks and surge protection" },
+  ],
+  accessories: [
+    { slug: "chargers", reason: "Round out your charging kit" },
+    { slug: "phones", reason: "Cases and screen protection" },
+  ],
+};
+
+export function getRelatedCategories(slug: string, limit = 2): { category: Category; reason: string }[] {
+  const edges = CATEGORY_MESH[slug] ?? [];
+  return edges
+    .slice(0, limit)
+    .map((edge) => {
+      const category = getCategory(edge.slug);
+      return category ? { category, reason: edge.reason } : undefined;
+    })
+    .filter((entry): entry is { category: Category; reason: string } => entry !== undefined);
+}
+
 const typeToCategorySlug: Record<string, string> = Object.fromEntries(
   categories.flatMap((c) => c.types.map((t) => [t, c.slug])),
 );

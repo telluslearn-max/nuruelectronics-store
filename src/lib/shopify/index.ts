@@ -87,14 +87,17 @@ function reshapeVariants(variants: Connection<ProductVariant>): ProductVariant[]
   return variants.edges.map((edge) => edge.node);
 }
 
-function reshapeProduct(node: Omit<Product, "images" | "variants"> & {
+function reshapeProduct(node: Omit<Product, "images" | "variants" | "specs"> & {
   images: Connection<ProductImage>;
   variants: Connection<ProductVariant>;
+  metafields?: ({ key: string; value: string } | null)[];
 }): Product {
+  const { metafields, ...rest } = node;
   return {
-    ...node,
+    ...rest,
     images: reshapeImages(node.images),
     variants: reshapeVariants(node.variants),
+    specs: metafields?.filter((m): m is { key: string; value: string } => m !== null) ?? [],
   };
 }
 
