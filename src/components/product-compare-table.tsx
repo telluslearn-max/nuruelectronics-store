@@ -26,9 +26,12 @@ export function ProductCompareTable({
 }) {
   const columns = [current, ...related].slice(0, 5);
 
+  // "Title" is Shopify's auto-assigned option name for products with no real
+  // customer-facing options (single "Default Title" variant) — not a useful
+  // comparison row, so it's excluded.
   const optionNames = Array.from(
     new Set(columns.flatMap((p) => p.options.map((o) => o.name))),
-  );
+  ).filter((name) => name !== "Title");
 
   const specsByHandle = new Map(
     columns.map((p) => [p.handle, new Map((p.specs ?? []).map((s) => [s.key, s.value]))]),
