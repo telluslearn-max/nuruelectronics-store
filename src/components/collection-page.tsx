@@ -13,7 +13,7 @@ const SORTS = [
 ] as const;
 
 export function chipClass(isActive: boolean) {
-  return `rounded-control border px-4 py-1.5 text-sm transition ${
+  return `rounded-control border px-4 py-2 text-sm transition ${
     isActive
       ? "border-foreground bg-foreground text-background"
       : "border-border-subtle text-neutral-600 hover:border-foreground hover:text-foreground"
@@ -33,6 +33,8 @@ export function CollectionPage({
   groupChips,
   flagshipProducts,
   relatedCategories,
+  categoryNav,
+  breadcrumb,
 }: {
   title: string;
   blurb: string;
@@ -48,6 +50,10 @@ export function CollectionPage({
   flagshipProducts?: Product[];
   /** Ranked complementary categories to cross-sell below the listing, most relevant first. */
   relatedCategories?: RelatedCategoryEntry[];
+  /** "Shop by category" navigation shown at the very top of the page, above the flagship carousel. */
+  categoryNav?: ReactNode;
+  /** Breadcrumb trail shown above the title. */
+  breadcrumb?: ReactNode;
 }) {
   const itemListJsonLd = {
     "@context": "https://schema.org",
@@ -67,6 +73,8 @@ export function CollectionPage({
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(itemListJsonLd) }}
       />
+      {breadcrumb}
+
       <div className="mb-4">
         <h1 className="text-title sm:text-display">{title}</h1>
         <p className="mt-2 text-neutral-500">{blurb}</p>
@@ -74,6 +82,8 @@ export function CollectionPage({
           Genuine &bull; Manufacturer warranty &bull; Fast Nairobi delivery
         </p>
       </div>
+
+      {categoryNav}
 
       {flagshipProducts && flagshipProducts.length > 0 && (
         <section className="mb-12">

@@ -23,6 +23,14 @@ export function CartDrawer() {
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, closeCart]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    document.documentElement.style.overflow = "hidden";
+    return () => {
+      document.documentElement.style.overflow = "";
+    };
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   return (
@@ -90,7 +98,7 @@ export function CartDrawer() {
                               })
                             }
                             aria-label="Decrease quantity"
-                            className="flex h-9 w-9 items-center justify-center text-sm disabled:opacity-50"
+                            className="flex h-10 w-10 items-center justify-center text-sm disabled:opacity-50"
                           >
                             -
                           </button>
@@ -104,7 +112,7 @@ export function CartDrawer() {
                               })
                             }
                             aria-label="Increase quantity"
-                            className="flex h-9 w-9 items-center justify-center text-sm disabled:opacity-50"
+                            className="flex h-10 w-10 items-center justify-center text-sm disabled:opacity-50"
                           >
                             +
                           </button>
@@ -122,7 +130,7 @@ export function CartDrawer() {
                           setCart(updated);
                         })
                       }
-                      className="self-start text-sm text-neutral-400 hover:text-neutral-700"
+                      className="-m-2 self-start p-2 text-sm text-neutral-400 hover:text-neutral-700"
                     >
                       Remove
                     </button>
@@ -138,7 +146,8 @@ export function CartDrawer() {
             <div className="mb-4 flex items-center justify-between text-sm">
               <span>Subtotal</span>
               <span className="font-medium">
-                {formatPrice(cart.cost.subtotalAmount.amount, cart.cost.subtotalAmount.currencyCode)}
+                {formatPrice(cart.cost.subtotalAmount.amount, cart.cost.subtotalAmount.currencyCode)}{" "}
+                <span className="text-xs font-normal text-neutral-400">excl. VAT</span>
               </span>
             </div>
             <a

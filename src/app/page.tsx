@@ -9,7 +9,25 @@ import { formatPrice } from "@/lib/format";
 import { getProducts } from "@/lib/shopify";
 import type { Product } from "@/lib/shopify/types";
 
-const phoneGroups = categories.find((c) => c.slug === "phones")?.groups ?? [];
+// Hand-picked, cross-category — not just phones. Pulled from groups that
+// already exist in the catalog taxonomy, several called out in categories.ts
+// as the dominant vendor in their category (Razer, DJI, Vision Plus, Anker).
+const POPULAR_COLLECTIONS: { categorySlug: string; groupSlug: string }[] = [
+  { categorySlug: "phones", groupSlug: "foldables" },
+  { categorySlug: "phones", groupSlug: "s26" },
+  { categorySlug: "phones", groupSlug: "iphone-17" },
+  { categorySlug: "gaming", groupSlug: "razer" },
+  { categorySlug: "cameras", groupSlug: "dji" },
+  { categorySlug: "audio", groupSlug: "jbl" },
+  { categorySlug: "chargers", groupSlug: "anker" },
+  { categorySlug: "appliances", groupSlug: "vision-plus" },
+];
+
+const popularCollections = POPULAR_COLLECTIONS.map(({ categorySlug, groupSlug }) => {
+  const category = categories.find((c) => c.slug === categorySlug);
+  const group = category?.groups?.find((g) => g.slug === groupSlug);
+  return group ? { href: `/category/${categorySlug}?group=${groupSlug}`, label: group.label } : undefined;
+}).filter((entry): entry is { href: string; label: string } => entry !== undefined);
 
 function firstSentence(text: string) {
   const match = text.match(/^.*?[.!?](?:\s|$)/);
@@ -137,17 +155,17 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {phoneGroups.length > 0 && (
+      {popularCollections.length > 0 && (
         <section className="mt-16">
-          <SectionHeading eyebrow="Quick links" title="Shop phones by brand & series" />
+          <SectionHeading eyebrow="Quick discovery" title="Popular collections right now" />
           <div className="mt-6 flex flex-wrap gap-3">
-            {phoneGroups.map((group) => (
+            {popularCollections.map((collection) => (
               <Link
-                key={group.slug}
-                href={`/category/phones?group=${group.slug}`}
+                key={collection.href}
+                href={collection.href}
                 className="rounded-control border border-border-subtle px-5 py-2.5 text-sm font-medium transition hover:border-foreground"
               >
-                {group.label}
+                {collection.label}
               </Link>
             ))}
           </div>

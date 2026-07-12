@@ -28,7 +28,7 @@ export function BentoGrid({ items, basePath }: { items: BentoItem[]; basePath: s
           href={`${basePath}/${item.slug}`}
           className="group relative flex min-h-[13.5rem] flex-col justify-between overflow-hidden rounded-card border border-border-subtle bg-background p-6 transition hover:border-foreground"
         >
-          <div className="relative z-10 max-w-[62%]">
+          <div className="relative z-10 max-w-[70%] sm:max-w-[62%]">
             <h3 className="text-base font-semibold">{item.label}</h3>
             <p className="mt-1.5 text-sm text-neutral-500">{item.blurb}</p>
           </div>

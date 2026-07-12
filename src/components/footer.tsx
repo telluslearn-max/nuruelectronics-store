@@ -5,7 +5,7 @@ export function Footer() {
   return (
     <footer className="border-t border-border-subtle">
       <div className="mx-auto w-full max-w-6xl px-4 py-12">
-        <div className="grid grid-cols-2 gap-8 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-8 sm:grid-cols-3">
           <div>
             <p className="text-lg font-semibold tracking-tight">NURU</p>
             <p className="mt-2 max-w-xs text-sm text-neutral-500">

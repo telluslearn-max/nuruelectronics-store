@@ -1,4 +1,6 @@
-const FAQS = [
+export type FaqItem = { q: string; a: string };
+
+export const DEFAULT_FAQS: FaqItem[] = [
   {
     q: "Do you deliver outside Nairobi?",
     a: "Yes — we ship countrywide across Kenya. Nairobi orders can arrive the same day; other areas typically take a few days depending on location.",
@@ -34,12 +36,26 @@ function ChevronIcon() {
   );
 }
 
-export function Faq() {
+export function Faq({ items = DEFAULT_FAQS }: { items?: FaqItem[] }) {
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: items.map((item) => ({
+      "@type": "Question",
+      name: item.q,
+      acceptedAnswer: { "@type": "Answer", text: item.a },
+    })),
+  };
+
   return (
     <div className="divide-y divide-border-subtle border-y border-border-subtle">
-      {FAQS.map((item) => (
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+      {items.map((item) => (
         <details key={item.q} className="group py-4">
-          <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-sm font-medium marker:content-none">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-sm font-medium marker:content-none [&::-webkit-details-marker]:hidden">
             {item.q}
             <ChevronIcon />
           </summary>

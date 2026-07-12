@@ -71,7 +71,10 @@ export function ProductOptions({ product }: { product: Product }) {
   return (
     <div>
       <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
-        <p className="text-lg text-neutral-700">{formatPrice(price.amount, price.currencyCode)}</p>
+        <p className="text-lg text-neutral-700">
+          {formatPrice(price.amount, price.currencyCode)}{" "}
+          <span className="text-xs font-normal text-neutral-400">excl. VAT</span>
+        </p>
         <span
           className={`text-sm font-medium ${
             selectedVariant?.availableForSale ? "text-accent" : "text-neutral-400"
@@ -173,7 +176,8 @@ export function ProductOptions({ product }: { product: Product }) {
             <div className="min-w-0">
               <p className="truncate text-sm font-medium">{product.title}</p>
               <p className="text-sm text-neutral-500">
-                {formatPrice(price.amount, price.currencyCode)}
+                {formatPrice(price.amount, price.currencyCode)}{" "}
+                <span className="text-xs text-neutral-400">excl. VAT</span>
               </p>
             </div>
             <div className="flex shrink-0 items-center gap-2">

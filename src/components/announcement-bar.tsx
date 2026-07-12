@@ -37,7 +37,7 @@ export function AnnouncementBar() {
         type="button"
         aria-label="Dismiss announcement"
         onClick={dismiss}
-        className="shrink-0 text-neutral-400 transition hover:text-surface-dark-foreground"
+        className="-m-2 flex h-9 w-9 shrink-0 items-center justify-center p-2 text-neutral-400 transition hover:text-surface-dark-foreground"
       >
         &times;
       </button>

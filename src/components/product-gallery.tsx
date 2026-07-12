@@ -30,7 +30,7 @@ export function ProductGallery({
       </div>
 
       {images.length > 1 && (
-        <div className="mt-4 grid grid-cols-5 gap-3">
+        <div className="mt-4 grid grid-cols-4 gap-2 sm:grid-cols-5 sm:gap-3">
           {images.map((image, index) => (
             <button
               key={image.url}

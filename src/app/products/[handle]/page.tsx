@@ -1,15 +1,24 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Faq } from "@/components/faq";
+import { BuyersGuide } from "@/components/buyers-guide";
+import { BuyItWith } from "@/components/buy-it-with";
+import { Faq, type FaqItem } from "@/components/faq";
 import { ProductCompareTable } from "@/components/product-compare-table";
 import { ProductGallery } from "@/components/product-gallery";
 import { ProductOptions } from "@/components/product-options";
 import { ProductSpecs } from "@/components/product-specs";
+import { OriginGuide } from "@/components/origin-guide";
 import { RelatedCategories } from "@/components/related-categories";
 import { categoryForProductType, getRelatedCategories } from "@/lib/categories";
+import { ecosystemTagForProduct } from "@/lib/collections";
+import { getBuyersGuide } from "@/lib/buyers-guides";
+import { getOriginOptionValues, hasEsimOnlyWarranty } from "@/lib/origin-options";
 import { getProductByHandle, getProducts } from "@/lib/shopify";
 import type { Product } from "@/lib/shopify/types";
+import { buildSpecsGuide } from "@/lib/spec-glossary";
+
+const WHATSAPP_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER;
 
 async function getRelatedProducts(product: Product): Promise<Product[]> {
   const collectionTag = product.tags.find((tag) => tag.startsWith("collection-"));
@@ -20,6 +29,25 @@ async function getRelatedProducts(product: Product): Promise<Product[]> {
     includeSpecs: true,
   });
   return products.filter((p) => p.handle !== product.handle).slice(0, 4);
+}
+
+/**
+ * Cross-sell products for a related category, scoped to the anchor product's
+ * own brand ecosystem when it has one (an iPhone's "pairs with" wearable
+ * should be an Apple Watch, not a Galaxy Watch). Falls back to the
+ * unscoped category query when the brand doesn't stock that category, so
+ * generic/third-party categories (chargers, accessories) still populate.
+ */
+async function getEcosystemScopedCategoryProducts(categoryQuery: string, ecosystemTag: string | undefined) {
+  if (ecosystemTag) {
+    const scoped = await getProducts({
+      searchTerm: `(${categoryQuery}) AND tag:${ecosystemTag}`,
+      sortKey: "BEST_SELLING",
+      first: 8,
+    });
+    if (scoped.products.length > 0) return scoped;
+  }
+  return getProducts({ searchTerm: categoryQuery, sortKey: "BEST_SELLING", first: 8 });
 }
 
 type ProductPageProps = {
@@ -61,12 +89,25 @@ export default async function ProductPage({ params }: ProductPageProps) {
   const price = product.priceRange.minVariantPrice;
   const category = categoryForProductType(product.productType);
   const relatedEdges = category ? getRelatedCategories(category.slug) : [];
+  const ecosystemTag = ecosystemTagForProduct(product.tags);
+  const specsGuide = buildSpecsGuide(product.specs ?? []);
+  // Apple encodes this as a "Warranty" option (with SIM/eSIM/FaceTime text);
+  // Samsung encodes the same Africa-vs-Dubai distinction as a bare "Source"
+  // option with no SIM/eSIM claims, since that isn't confirmed for
+  // Samsung's imported stock. OriginGuide renders whichever facts exist.
+  const originOption = getOriginOptionValues(product.options);
+  // No product is manually tagged "esim" yet, so trigger the eSIM setup
+  // guide off real signals instead: an "eSIM Only" warranty-option value,
+  // or simply being an iPhone — every iPhone 13 and later supports eSIM,
+  // not just the units this catalog imports as eSIM-only.
+  const supportsEsim = hasEsimOnlyWarranty(product.options) || product.tags.includes("iphone");
+  const buyersGuide = getBuyersGuide(supportsEsim ? [...product.tags, "esim"] : product.tags);
 
   const [related, relatedCategoryPages] = await Promise.all([
     getRelatedProducts(product),
     Promise.all(
       relatedEdges.map((edge) =>
-        getProducts({ searchTerm: edge.category.query, sortKey: "BEST_SELLING", first: 8 }),
+        getEcosystemScopedCategoryProducts(edge.category.query, ecosystemTag),
       ),
     ),
   ]);
@@ -79,6 +120,41 @@ export default async function ProductPage({ params }: ProductPageProps) {
       products: relatedCategoryPages[i]?.products ?? [],
     }))
     .filter((entry) => entry.products.length > 0);
+
+  // Reuses the same mesh cross-sell data already fetched above — one real
+  // product per related category, not a fabricated "frequently bought" claim.
+  const bundleExtras = relatedCategories.map((rc) => rc.products[0]).filter((p): p is Product => Boolean(p));
+
+  // Contextual to this exact product — points at the WhatsApp button and
+  // options picker actually on this page, rather than sending shoppers
+  // elsewhere for something they're already looking at.
+  const hasVariants = product.options.some((option) => option.values.length > 1);
+  const productFaqs: FaqItem[] = [
+    {
+      q: "Is this genuine and covered by warranty?",
+      a: "Yes — every product we sell is checked for authenticity before it ships and comes with manufacturer warranty.",
+    },
+    {
+      q: "How fast can I get this delivered?",
+      a: "Same-day delivery in Nairobi, with countrywide shipping available across Kenya.",
+    },
+    ...(WHATSAPP_NUMBER
+      ? [
+          {
+            q: "Can I order this via WhatsApp instead?",
+            a: "Yes — use the WhatsApp button above to order this exact item directly, no checkout required.",
+          },
+        ]
+      : []),
+    ...(hasVariants
+      ? [
+          {
+            q: "Can I pick a different color or storage?",
+            a: "Use the options above to choose the configuration you want before adding to cart.",
+          },
+        ]
+      : []),
+  ];
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "Product",
@@ -164,7 +240,25 @@ export default async function ProductPage({ params }: ProductPageProps) {
         </div>
       </div>
 
+      {originOption && <OriginGuide optionName={originOption.optionName} values={originOption.values} />}
+
+      {buyersGuide && <BuyersGuide guide={buyersGuide} />}
+
+      <BuyItWith current={product} extras={bundleExtras} />
+
       <ProductSpecs specs={product.specs ?? []} />
+
+      {specsGuide.length > 0 && (
+        <section className="mt-16">
+          <h2 className="text-title">Understanding the specs</h2>
+          <p className="mt-2 text-neutral-500">
+            What these numbers actually mean for how you&apos;ll use it.
+          </p>
+          <div className="mt-6">
+            <Faq items={specsGuide} />
+          </div>
+        </section>
+      )}
 
       {related.length > 0 && (
         <section className="mt-16">
@@ -183,7 +277,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
       <section className="mt-16">
         <h2 className="text-title">Common questions</h2>
         <div className="mt-6">
-          <Faq />
+          <Faq items={productFaqs} />
         </div>
       </section>
     </div>

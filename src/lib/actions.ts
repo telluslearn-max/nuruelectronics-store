@@ -47,6 +47,14 @@ export async function addItem(variantId: string, quantity: number = 1): Promise<
   return addToCartInShopify(cartId, [{ merchandiseId: variantId, quantity }]);
 }
 
+export async function addItems(lines: { variantId: string; quantity: number }[]): Promise<Cart> {
+  const cartId = await getOrCreateCartId();
+  return addToCartInShopify(
+    cartId,
+    lines.map((line) => ({ merchandiseId: line.variantId, quantity: line.quantity })),
+  );
+}
+
 export async function updateItemQuantity(lineId: string, quantity: number): Promise<Cart> {
   const cartId = await getOrCreateCartId();
   if (quantity <= 0) {

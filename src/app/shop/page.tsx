@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { CollectionTiles } from "@/components/category-tiles";
 import { FeatureCarousel } from "@/components/feature-carousel";
 import { HelpActions } from "@/components/help-actions";
@@ -89,9 +90,14 @@ export default async function ShopPage() {
       )}
 
       <section className="mt-16">
-        <SectionHeading eyebrow="Shop by brand" title="Find your favorite brand" />
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-baseline sm:justify-between">
+          <SectionHeading eyebrow="Shop by brand" title="Find your favorite brand" />
+          <Link href="/ecosystem" className="shrink-0 text-sm font-medium text-accent hover:opacity-80">
+            View all brands &rarr;
+          </Link>
+        </div>
         <div className="mt-6">
-          <CollectionTiles items={ecosystems} basePath="/ecosystem" />
+          <CollectionTiles items={ecosystems.filter((e) => e.featured)} basePath="/ecosystem" />
         </div>
       </section>
 

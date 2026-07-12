@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { categories } from "@/lib/categories";
-import { ecosystems, kits } from "@/lib/collections";
+import { getFeaturedEcosystems, kits } from "@/lib/collections";
 import { useCart } from "./cart/cart-context";
 import { SearchBox } from "./search-box";
 
@@ -94,7 +94,10 @@ export function Nav({
       id: "ecosystems",
       label: "Shop by Brand",
       href: "/ecosystem",
-      panelItems: ecosystems.map((e) => ({ href: `/ecosystem/${e.slug}`, label: e.label })),
+      panelItems: [
+        ...getFeaturedEcosystems().map((e) => ({ href: `/ecosystem/${e.slug}`, label: e.label })),
+        { href: "/ecosystem", label: "View all brands →" },
+      ],
     },
     {
       id: "kits",
@@ -166,41 +169,50 @@ export function Nav({
       ref={headerRef}
       className="sticky top-0 z-40 border-b border-border-subtle bg-background/80 backdrop-blur"
     >
-      <div className="mx-auto flex max-w-6xl items-center gap-2 px-4 py-4 sm:gap-4">
-        <button
-          type="button"
-          aria-label="Open menu"
-          aria-expanded={mobileOpen}
-          aria-controls="mobile-nav-drawer"
-          onClick={() => setMobileOpen(true)}
-          className="shrink-0 rounded-control border border-border-subtle p-2 transition hover:border-foreground md:hidden"
-        >
-          <HamburgerIcon />
-        </button>
-        <Link href="/" className="shrink-0 text-lg font-semibold tracking-tight">
-          NURU
-        </Link>
-        <SearchBox />
-        {authEnabled && (
-          <Link
-            href={customerName ? "/account" : "/api/auth/login"}
-            className="shrink-0 whitespace-nowrap text-sm font-medium text-neutral-600 transition hover:text-foreground"
+      <div className="mx-auto max-w-6xl px-4 py-4">
+        <div className="flex items-center gap-2 sm:gap-4">
+          <button
+            type="button"
+            aria-label="Open menu"
+            aria-expanded={mobileOpen}
+            aria-controls="mobile-nav-drawer"
+            onClick={() => setMobileOpen(true)}
+            className="shrink-0 rounded-control border border-border-subtle p-2 transition hover:border-foreground md:hidden"
           >
-            {customerName ? customerName.split(" ")[0] : "Sign in"}
+            <HamburgerIcon />
+          </button>
+          <Link href="/" className="shrink-0 text-lg font-semibold tracking-tight">
+            NURU
           </Link>
-        )}
-        <button
-          onClick={openCart}
-          aria-label={`Open cart${itemCount > 0 ? `, ${itemCount} items` : ""}`}
-          className="relative shrink-0 rounded-control border border-border-subtle px-4 py-2 text-sm font-medium transition hover:border-foreground"
-        >
-          Cart
-          {itemCount > 0 && (
-            <span className="ml-2 inline-flex h-5 w-5 items-center justify-center rounded-control bg-accent text-xs text-accent-foreground">
-              {itemCount}
-            </span>
-          )}
-        </button>
+          <div className="hidden min-w-0 flex-1 sm:block">
+            <SearchBox />
+          </div>
+          <div className="ml-auto flex shrink-0 items-center gap-2 sm:ml-0 sm:gap-4">
+            {authEnabled && (
+              <Link
+                href={customerName ? "/account" : "/api/auth/login"}
+                className="shrink-0 whitespace-nowrap text-sm font-medium text-neutral-600 transition hover:text-foreground"
+              >
+                {customerName ? customerName.split(" ")[0] : "Sign in"}
+              </Link>
+            )}
+            <button
+              onClick={openCart}
+              aria-label={`Open cart${itemCount > 0 ? `, ${itemCount} items` : ""}`}
+              className="relative shrink-0 rounded-control border border-border-subtle px-4 py-2 text-sm font-medium transition hover:border-foreground"
+            >
+              Cart
+              {itemCount > 0 && (
+                <span className="ml-2 inline-flex h-5 w-5 items-center justify-center rounded-control bg-accent text-xs text-accent-foreground">
+                  {itemCount}
+                </span>
+              )}
+            </button>
+          </div>
+        </div>
+        <div className="mt-3 sm:hidden">
+          <SearchBox />
+        </div>
       </div>
 
       {/* Desktop: flat bar with hover/click mega-menu dropdowns */}

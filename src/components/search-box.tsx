@@ -92,7 +92,7 @@ export function SearchBox() {
           aria-controls="search-suggestions"
           aria-activedescendant={activeIndex >= 0 ? `suggestion-${activeIndex}` : undefined}
           autoComplete="off"
-          className="w-full rounded-control border border-border-subtle bg-background px-4 py-2 text-sm focus:border-foreground focus:outline-none"
+          className="w-full rounded-control border border-border-subtle bg-background px-4 py-2.5 text-sm focus:border-foreground focus:outline-none"
         />
       </form>
 
