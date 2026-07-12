@@ -36,6 +36,7 @@ export function CollectionPage({
   relatedCategories,
   categoryNav,
   breadcrumb,
+  categoryGuide,
 }: {
   title: string;
   blurb: string;
@@ -55,6 +56,8 @@ export function CollectionPage({
   categoryNav?: ReactNode;
   /** Breadcrumb trail shown above the title. */
   breadcrumb?: ReactNode;
+  /** Long-form buying guide, shown after the product listing — category pages only. */
+  categoryGuide?: ReactNode;
 }) {
   const itemListJsonLd = {
     "@context": "https://schema.org",
@@ -131,6 +134,8 @@ export function CollectionPage({
           sort={sort}
         />
       </div>
+
+      {categoryGuide}
 
       <RelatedCategories title={title} items={relatedCategories ?? []} />
     </div>

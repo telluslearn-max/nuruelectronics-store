@@ -1,8 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Breadcrumb } from "@/components/breadcrumb";
+import { CategoryGuide } from "@/components/category-guide";
 import { chipClass, CollectionPage } from "@/components/collection-page";
 import { getCategory, getRelatedCategories } from "@/lib/categories";
+import { getCategoryGuide } from "@/lib/category-guides";
 import { getProducts } from "@/lib/shopify";
 import type { Product } from "@/lib/shopify/types";
 
@@ -50,6 +53,7 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
         : undefined;
 
   const relatedEdges = getRelatedCategories(category.slug);
+  const guide = getCategoryGuide(category.slug);
 
   // When browsing the whole category (no group filter), pull one best-seller
   // per line instead of ranking across all of them — otherwise a single
@@ -117,6 +121,8 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
       groupChips={groupChips}
       flagshipProducts={flagshipPage.products}
       relatedCategories={relatedCategories}
+      breadcrumb={<Breadcrumb items={[{ label: "Home", href: "/" }, { label: category.label }]} />}
+      categoryGuide={guide && <CategoryGuide guide={guide} />}
     />
   );
 }

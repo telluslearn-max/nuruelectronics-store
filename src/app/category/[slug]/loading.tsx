@@ -13,6 +13,7 @@ export default function Loading() {
           </div>
         ))}
       </div>
+      <div className="mt-16 h-64 animate-pulse rounded-card bg-neutral-100" />
     </div>
   );
 }

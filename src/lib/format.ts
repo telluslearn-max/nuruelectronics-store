@@ -1,3 +1,8 @@
+export function truncate(text: string, maxLength: number) {
+  if (text.length <= maxLength) return text;
+  return `${text.slice(0, maxLength - 1).trimEnd()}…`;
+}
+
 export function formatPrice(amount: string, currencyCode: string) {
   const value = Number(amount);
   const isWhole = Number.isInteger(value);

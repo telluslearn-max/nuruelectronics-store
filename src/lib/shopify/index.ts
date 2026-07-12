@@ -160,18 +160,21 @@ export async function getProducts(
   };
 }
 
-export async function getAllProductHandles(): Promise<string[]> {
+export async function getAllProductHandles(): Promise<{ handle: string; updatedAt?: string }[]> {
   if (!isShopifyConfigured) {
-    return mockProducts.map((p) => p.handle);
+    // Mock catalog has no updatedAt — sitemap.ts falls back to a manual revision date for these.
+    return mockProducts.map((p) => ({ handle: p.handle }));
   }
-  const handles: string[] = [];
+  const handles: { handle: string; updatedAt?: string }[] = [];
   let after: string | undefined;
   // Cap the loop defensively; the catalog is ~80 products today.
   for (let page = 0; page < 10; page++) {
     const data = await shopifyFetch<{
-      products: PaginatedConnection<{ handle: string }>;
+      products: PaginatedConnection<{ handle: string; updatedAt: string }>;
     }>(getProductHandlesQuery, { after }, { revalidate: 3600 });
-    handles.push(...data.products.edges.map((edge) => edge.node.handle));
+    handles.push(
+      ...data.products.edges.map((edge) => ({ handle: edge.node.handle, updatedAt: edge.node.updatedAt })),
+    );
     if (!data.products.pageInfo.hasNextPage || !data.products.pageInfo.endCursor) break;
     after = data.products.pageInfo.endCursor;
   }

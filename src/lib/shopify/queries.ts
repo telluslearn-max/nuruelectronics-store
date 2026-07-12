@@ -130,6 +130,7 @@ export const getProductHandlesQuery = /* GraphQL */ `
       edges {
         node {
           handle
+          updatedAt
         }
       }
       pageInfo {

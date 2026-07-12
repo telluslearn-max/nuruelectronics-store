@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { Breadcrumb } from "@/components/breadcrumb";
 import { CollectionPage } from "@/components/collection-page";
 import { getKit } from "@/lib/collections";
 import { getProducts } from "@/lib/shopify";
@@ -58,6 +59,11 @@ export default async function KitPage({ params, searchParams }: KitPageProps) {
       sort={sort}
       sortSlug={sortSlug}
       buildHref={(sort) => buildHref(kit.slug, sort)}
+      breadcrumb={
+        <Breadcrumb
+          items={[{ label: "Home", href: "/" }, { label: "Kits", href: "/kit" }, { label: kit.label }]}
+        />
+      }
     />
   );
 }
