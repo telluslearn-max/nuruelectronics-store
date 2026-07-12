@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { categories } from "@/lib/categories";
 
+const SUPPORT_EMAIL = process.env.NEXT_PUBLIC_SUPPORT_EMAIL;
+
 export function Footer() {
   return (
     <footer className="border-t border-border-subtle">
@@ -34,11 +36,13 @@ export function Footer() {
                   Help & Support
                 </Link>
               </li>
-              <li>
-                <a href="mailto:hello@example.com" className="hover:text-foreground">
-                  Contact us
-                </a>
-              </li>
+              {SUPPORT_EMAIL && (
+                <li>
+                  <a href={`mailto:${SUPPORT_EMAIL}`} className="hover:text-foreground">
+                    Contact us
+                  </a>
+                </li>
+              )}
               <li>
                 <Link href="/search" className="hover:text-foreground">
                   Search

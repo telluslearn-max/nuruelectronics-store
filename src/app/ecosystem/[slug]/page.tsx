@@ -20,11 +20,15 @@ function buildHref(slug: string, category?: string, sort?: string) {
   return `/ecosystem/${slug}${qs ? `?${qs}` : ""}`;
 }
 
-export async function generateMetadata({ params }: EcosystemPageProps): Promise<Metadata> {
+export async function generateMetadata({ params, searchParams }: EcosystemPageProps): Promise<Metadata> {
   const { slug } = await params;
+  const { category } = await searchParams;
   const ecosystem = getEcosystem(slug);
   if (!ecosystem) return {};
-  return { title: ecosystem.label, description: ecosystem.blurb };
+  // A category filter is a genuinely different product set, so it gets its
+  // own canonical; sort only reorders that same set, so it's always dropped.
+  const canonical = category ? `/ecosystem/${slug}?category=${category}` : `/ecosystem/${slug}`;
+  return { title: ecosystem.label, description: ecosystem.blurb, alternates: { canonical } };
 }
 
 export default async function EcosystemPage({ params, searchParams }: EcosystemPageProps) {

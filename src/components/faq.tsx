@@ -14,6 +14,10 @@ export const DEFAULT_FAQS: FaqItem[] = [
     a: "Yes — every product page has a WhatsApp ordering option if you'd rather message us directly than check out online.",
   },
   {
+    q: "Do displayed prices include VAT?",
+    a: "Prices shown on the site exclude VAT — it's calculated and added at checkout, in line with Kenyan tax requirements.",
+  },
+  {
     q: "What if I'm not sure what to buy?",
     a: "Message us on WhatsApp from the Shop page and we'll help you find the right product for your budget and needs.",
   },

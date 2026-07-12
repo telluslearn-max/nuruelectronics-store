@@ -26,9 +26,7 @@ export function CollectionTiles({
             <p className="text-sm font-medium">{item.label}</p>
             <p className="mt-1 text-xs text-neutral-500">{item.blurb}</p>
           </div>
-          <span className="text-xs font-medium text-accent">
-            Shop now <span aria-hidden="true">&rarr;</span>
-          </span>
+          <span className="text-xs font-medium text-accent">Shop now</span>
         </Link>
       ))}
     </div>

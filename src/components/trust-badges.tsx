@@ -23,7 +23,7 @@ const BADGES = [
   },
   {
     title: "100% Genuine Products",
-    body: "Every item verified authentic before it ships.",
+    body: "Every product checked before it ships.",
     icon: (
       <>
         <path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z" />
@@ -33,7 +33,7 @@ const BADGES = [
   },
   {
     title: "Manufacturer Warranty",
-    body: "Backed by official warranty on every purchase.",
+    body: "Backed by manufacturer warranty on every purchase.",
     icon: (
       <>
         <path d="M12 2l8 3v6c0 5-3.4 8.5-8 11-4.6-2.5-8-6-8-11V5l8-3z" />

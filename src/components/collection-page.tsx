@@ -4,6 +4,7 @@ import { FeatureCarousel } from "@/components/feature-carousel";
 import { ProductList } from "@/components/product-list";
 import { RelatedCategories, type RelatedCategoryEntry } from "@/components/related-categories";
 import { SectionHeading } from "@/components/section-heading";
+import { SITE_URL } from "@/lib/site";
 import type { Product } from "@/lib/shopify/types";
 
 const SORTS = [
@@ -62,7 +63,7 @@ export function CollectionPage({
     itemListElement: products.map((product, index) => ({
       "@type": "ListItem",
       position: index + 1,
-      url: `https://www.nuruelectronics.com/products/${product.handle}`,
+      url: `${SITE_URL}/products/${product.handle}`,
       name: product.title,
     })),
   };

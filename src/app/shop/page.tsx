@@ -17,6 +17,7 @@ export const metadata: Metadata = {
   title: "Shop",
   description:
     "Browse the full NURU catalog by category, brand, or need — genuine electronics with fast delivery across Kenya.",
+  alternates: { canonical: "/shop" },
 };
 
 const audioCategory = getCategory("audio");

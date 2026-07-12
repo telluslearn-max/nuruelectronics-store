@@ -16,6 +16,7 @@ export type ProductVariant = {
   availableForSale: boolean;
   price: Money;
   selectedOptions: { name: string; value: string }[];
+  sku?: string | null;
 };
 
 export type ProductSpec = {
@@ -31,6 +32,7 @@ export type Product = {
   descriptionHtml: string;
   availableForSale: boolean;
   productType: string;
+  vendor?: string;
   tags: string[];
   priceRange: {
     minVariantPrice: Money;

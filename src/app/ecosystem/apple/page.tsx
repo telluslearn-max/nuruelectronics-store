@@ -22,10 +22,13 @@ function buildHref(category?: string) {
   return category ? `/ecosystem/apple?category=${category}` : "/ecosystem/apple";
 }
 
-export const metadata: Metadata = {
-  title: ecosystem.label,
-  description: ecosystem.blurb,
-};
+export async function generateMetadata({ searchParams }: ApplePageProps): Promise<Metadata> {
+  const { category } = await searchParams;
+  // A category filter is a genuinely different product set, so it gets its
+  // own canonical — same rule as /ecosystem/[slug] and /category/[slug].
+  const canonical = category ? `/ecosystem/apple?category=${category}` : "/ecosystem/apple";
+  return { title: ecosystem.label, description: ecosystem.blurb, alternates: { canonical } };
+}
 
 function HeroProductCard({ product }: { product: Product }) {
   const price = product.priceRange.minVariantPrice;
@@ -51,7 +54,7 @@ function HeroProductCard({ product }: { product: Product }) {
         </div>
       )}
       <span className="mt-6 inline-flex w-fit items-center gap-1 text-sm font-medium text-accent">
-        Shop now <span aria-hidden="true">&rarr;</span>
+        Shop now
       </span>
     </Link>
   );

@@ -7,6 +7,7 @@ const productFragment = /* GraphQL */ `
     descriptionHtml
     availableForSale
     productType
+    vendor
     tags
     priceRange {
       minVariantPrice {
@@ -34,6 +35,7 @@ const productFragment = /* GraphQL */ `
           id
           title
           availableForSale
+          sku
           price {
             amount
             currencyCode

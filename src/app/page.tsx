@@ -54,9 +54,7 @@ function FeatureCard({ product }: { product: Product }) {
         <p className="mt-1 text-sm text-neutral-500">
           {formatPrice(price.amount, price.currencyCode)}
         </p>
-        <span className="mt-3 inline-block text-sm font-medium text-accent">
-          Buy <span aria-hidden="true">&rarr;</span>
-        </span>
+        <span className="mt-3 inline-block text-sm font-medium text-accent">Shop now</span>
       </div>
     </Link>
   );
@@ -109,7 +107,7 @@ export default async function HomePage() {
                   href={`/products/${hero.handle}`}
                   className="rounded-control bg-accent px-6 py-3 text-sm font-medium text-accent-foreground transition hover:opacity-90"
                 >
-                  Buy
+                  Shop now
                 </Link>
                 <Link
                   href="/category/phones"

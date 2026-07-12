@@ -20,7 +20,9 @@ export async function generateMetadata({ params }: KitPageProps): Promise<Metada
   const { slug } = await params;
   const kit = getKit(slug);
   if (!kit) return {};
-  return { title: kit.label, description: kit.blurb };
+  // Sort variants reorder the same product set rather than changing it, so
+  // they canonicalize back to the plain kit URL instead of self-referencing.
+  return { title: kit.label, description: kit.blurb, alternates: { canonical: `/kit/${slug}` } };
 }
 
 export default async function KitPage({ params, searchParams }: KitPageProps) {

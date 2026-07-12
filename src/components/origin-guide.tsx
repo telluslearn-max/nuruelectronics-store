@@ -25,7 +25,7 @@ const ROWS: { label: string; has: (col: Column) => boolean; render: (col: Column
     render: (col) =>
       col.serviceRegion === "East Africa"
         ? "Local East Africa service center"
-        : "Imported stock (commonly Dubai, may vary) — not tied to the local service center",
+        : "Imported stock (commonly Dubai, but not exclusively) — not tied to the local service center",
   },
   {
     label: "Condition",
@@ -73,8 +73,8 @@ export function OriginGuide({ optionName, values }: { optionName: string; values
       </div>
       <p className="mt-4 text-xs text-neutral-500">
         East Africa-sourced units are backed by a local service center for repairs. Imported units
-        are brand new and sealed, but are sourced from multiple markets (commonly Dubai, not
-        exclusively) shipment to shipment{hasFacetimeInfo ? " — SIM configuration and FaceTime support can differ by unit and, where restricted, can't be changed by region settings" : ""}. Message us on
+        are brand new and sealed, but are sourced from multiple markets (commonly Dubai, but not
+        exclusively), and can vary shipment to shipment{hasFacetimeInfo ? " — SIM configuration and FaceTime support can differ by unit and, where restricted, can't be changed by region settings" : ""}. Message us on
         WhatsApp before ordering an imported unit if this matters to you.
       </p>
       {hasFacetimeInfo && columns.some((col) => col.serviceRegion === "Imported") && (

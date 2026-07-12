@@ -31,7 +31,7 @@ export default function SupportPage() {
       <div className="mx-auto mt-16 max-w-2xl rounded-card bg-neutral-50 p-8 text-center">
         <h2 className="text-lg font-semibold">Our promise</h2>
         <p className="mt-2 text-sm text-neutral-500">
-          Every product we sell is checked for authenticity before it ships and comes with
+          Every product we sell is 100% genuine and checked before it ships, backed by
           manufacturer warranty. If anything&apos;s wrong with your order, message us on WhatsApp
           and we&apos;ll sort it out.
         </p>

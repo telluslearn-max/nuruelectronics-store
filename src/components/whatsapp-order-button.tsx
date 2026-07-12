@@ -1,5 +1,6 @@
+import { SITE_URL } from "@/lib/site";
+
 const WHATSAPP_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER;
-const SITE_URL = "https://www.nuruelectronics.com";
 
 function WhatsAppIcon({ className }: { className?: string }) {
   return (

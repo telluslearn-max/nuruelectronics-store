@@ -35,9 +35,6 @@ export function BentoGrid({ items, basePath }: { items: BentoItem[]; basePath: s
 
           <span className="relative z-10 mt-4 inline-flex w-fit items-center gap-1 text-sm font-medium text-accent">
             Shop now
-            <span aria-hidden="true" className="transition group-hover:translate-x-0.5">
-              &rarr;
-            </span>
           </span>
 
           <div

@@ -3,7 +3,7 @@
 import { useSyncExternalStore } from "react";
 
 const STORAGE_KEY = "nuru-announcement-dismissed";
-const MESSAGE = "Genuine electronics with manufacturer warranty, delivered fast across Kenya.";
+const MESSAGE = "100% genuine electronics, backed by manufacturer warranty — delivered fast across Kenya.";
 
 const listeners = new Set<() => void>();
 

@@ -6,6 +6,7 @@ import { ecosystems } from "@/lib/collections";
 export const metadata: Metadata = {
   title: "Shop by Brand",
   description: "Browse NURU's catalog by brand ecosystem.",
+  alternates: { canonical: "/ecosystem" },
 };
 
 export default function EcosystemIndexPage() {

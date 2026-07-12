@@ -8,6 +8,7 @@ import { getProducts } from "@/lib/shopify";
 export const metadata: Metadata = {
   title: "Shop by Need",
   description: "Curated bundles from NURU for every use case.",
+  alternates: { canonical: "/kit" },
 };
 
 export default async function KitIndexPage() {
@@ -42,7 +43,7 @@ export default async function KitIndexPage() {
                   href={`/kit/${kit.slug}`}
                   className="shrink-0 text-sm font-medium text-accent hover:opacity-80"
                 >
-                  Shop {kit.label} &rarr;
+                  Shop {kit.label}
                 </Link>
               </div>
               <ProductCarousel products={kit.products} />

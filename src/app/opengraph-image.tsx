@@ -32,7 +32,7 @@ export default function Image() {
           />
         </div>
         <div style={{ fontSize: 34, color: "#a1a1aa", marginTop: 16 }}>
-          Phones, laptops, audio, gaming &amp; appliances
+          Phones, laptops, audio, gaming, cameras &amp; appliances
         </div>
       </div>
     ),

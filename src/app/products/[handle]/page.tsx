@@ -17,6 +17,7 @@ import { getOriginOptionValues, hasEsimOnlyWarranty } from "@/lib/origin-options
 import { getProductByHandle, getProducts } from "@/lib/shopify";
 import type { Product } from "@/lib/shopify/types";
 import { buildSpecsGuide } from "@/lib/spec-glossary";
+import { SITE_URL } from "@/lib/site";
 
 const WHATSAPP_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER;
 
@@ -70,6 +71,7 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
   return {
     title: product.title,
     description,
+    alternates: { canonical: `/products/${handle}` },
     openGraph: {
       title: product.title,
       description,
@@ -132,7 +134,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
   const productFaqs: FaqItem[] = [
     {
       q: "Is this genuine and covered by warranty?",
-      a: "Yes — every product we sell is checked for authenticity before it ships and comes with manufacturer warranty.",
+      a: "Yes — every product we sell is 100% genuine and checked before it ships, backed by manufacturer warranty.",
     },
     {
       q: "How fast can I get this delivered?",
@@ -155,14 +157,20 @@ export default async function ProductPage({ params }: ProductPageProps) {
         ]
       : []),
   ];
+  const productUrl = `${SITE_URL}/products/${product.handle}`;
+  const sku = product.variants.find((v) => v.sku)?.sku;
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "Product",
     name: product.title,
     description: product.description,
     image: product.images.map((image) => image.url),
+    url: productUrl,
+    ...(product.vendor ? { brand: { "@type": "Brand", name: product.vendor } } : {}),
+    ...(sku ? { sku } : {}),
     offers: {
       "@type": "Offer",
+      url: productUrl,
       price: price.amount,
       priceCurrency: price.currencyCode,
       availability: product.availableForSale
@@ -174,14 +182,14 @@ export default async function ProductPage({ params }: ProductPageProps) {
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",
     itemListElement: [
-      { "@type": "ListItem", position: 1, name: "Home", item: "https://www.nuruelectronics.com" },
+      { "@type": "ListItem", position: 1, name: "Home", item: SITE_URL },
       ...(category
         ? [
             {
               "@type": "ListItem",
               position: 2,
               name: category.label,
-              item: `https://www.nuruelectronics.com/category/${category.slug}`,
+              item: `${SITE_URL}/category/${category.slug}`,
             },
           ]
         : []),

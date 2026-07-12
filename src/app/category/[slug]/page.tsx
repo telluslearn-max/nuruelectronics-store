@@ -19,11 +19,16 @@ function buildHref(slug: string, group?: string, sort?: string) {
   return `/category/${slug}${qs ? `?${qs}` : ""}`;
 }
 
-export async function generateMetadata({ params }: CategoryPageProps): Promise<Metadata> {
+export async function generateMetadata({ params, searchParams }: CategoryPageProps): Promise<Metadata> {
   const { slug } = await params;
+  const { group } = await searchParams;
   const category = getCategory(slug);
   if (!category) return {};
-  return { title: category.label, description: category.blurb };
+  // A group filter is a genuinely different product set, so it gets its own
+  // canonical; sort only reorders that same set, so it's always dropped.
+  const activeGroup = category.groups?.find((g) => g.slug === group);
+  const canonical = activeGroup ? `/category/${slug}?group=${activeGroup.slug}` : `/category/${slug}`;
+  return { title: category.label, description: category.blurb, alternates: { canonical } };
 }
 
 export default async function CategoryPage({ params, searchParams }: CategoryPageProps) {

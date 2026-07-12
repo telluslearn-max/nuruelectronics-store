@@ -147,7 +147,7 @@ export function CartDrawer() {
               <span>Subtotal</span>
               <span className="font-medium">
                 {formatPrice(cart.cost.subtotalAmount.amount, cart.cost.subtotalAmount.currencyCode)}{" "}
-                <span className="text-xs font-normal text-neutral-400">excl. VAT</span>
+                <span className="text-xs font-normal text-neutral-400" title="VAT is calculated and added at checkout.">excl. VAT</span>
               </span>
             </div>
             <a

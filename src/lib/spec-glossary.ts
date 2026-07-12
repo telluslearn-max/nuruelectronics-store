@@ -19,6 +19,13 @@ export const SPEC_GLOSSARY: Record<string, string> = {
   frequency_response: "The range of pitches an audio device can reproduce. A wider range generally means more detail at both the low and high end.",
   output_power: "How much power a charger or power bank delivers — match this to your device's fast-charging spec to actually charge at full speed.",
   capacity: "How much charge a power bank holds, or how much a battery-powered device can store — higher capacity means more charges or longer runtime before needing a recharge.",
+  sensor: "The size and type of the camera's image sensor. A larger sensor gathers more light, which generally means better low-light shots and more control over depth of field, independent of megapixel count.",
+  polar_pattern: "Which directions a microphone picks up sound from. Cardioid patterns focus on what's in front (good for solo voice or interviews), while omnidirectional patterns capture everything around the mic evenly.",
+  dimensions: "The physical size of the device. Matters for whether it fits your bag, desk, or the space you have for it — check this against where you actually plan to put or carry it.",
+  weight: "How heavy the device is. Matters most for anything you'll hold, wear, or carry for long stretches — lighter isn't always better if it trades off battery or build quality.",
+  material: "What the device or accessory is made from. Affects durability, grip, and how premium it feels — metal and glass typically wear differently than plastic or silicone over time.",
+  energy_rating: "The appliance's energy-efficiency rating. A higher rating uses less electricity for the same job, which adds up in running cost over the life of the appliance — worth weighing against the upfront price.",
+  included_in_box: "Exactly what ships with the device out of the box. Check this before buying if you're assuming a charger, cable, or case is included — some devices sell these separately.",
 };
 
 /** Builds Faq-style Q&As only for the specs this specific product actually has, in the same order as its specs list. */
