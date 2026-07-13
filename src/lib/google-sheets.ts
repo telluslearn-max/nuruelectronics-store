@@ -30,6 +30,9 @@ const OTHER_EXPENSES_LABEL = "Other expenses";
 const PERSONNEL_LABEL = "Personnel";
 const SOFTWARE_LABEL = "Software Subscriptions";
 const TOKENS_LABEL = "Tokens";
+const TOTAL_REVENUE_LABEL = "TOTAL REVENUE";
+const TOTAL_EXPENSES_LABEL = "TOTAL EXPENSES";
+const PROFIT_LABEL = "PROFIT (LOSS)";
 
 export type SheetLayout = {
   monthColumns: Map<string, number>; // month name -> 0-based column index
@@ -41,6 +44,9 @@ export type SheetLayout = {
   sgaSoftwareRow: number | null;
   sgaOtherRow: number | null;
   otherExpensesRow: number | null;
+  totalRevenueRow: number | null;
+  totalExpensesRow: number | null;
+  profitRow: number | null;
 };
 
 function getSheetsClient() {
@@ -81,6 +87,9 @@ export async function locateSheetLayout(): Promise<SheetLayout> {
     sgaSoftwareRow: null,
     sgaOtherRow: null,
     otherExpensesRow: null,
+    totalRevenueRow: null,
+    totalExpensesRow: null,
+    profitRow: null,
   };
 
   let currentSection: "cogs" | "sga" | null = null;
@@ -114,6 +123,9 @@ export async function locateSheetLayout(): Promise<SheetLayout> {
         layout.otherExpensesRow = rowIndex;
         currentSection = null;
       }
+      if (cell === TOTAL_REVENUE_LABEL) layout.totalRevenueRow = rowIndex;
+      if (cell === TOTAL_EXPENSES_LABEL) layout.totalExpensesRow = rowIndex;
+      if (cell === PROFIT_LABEL) layout.profitRow = rowIndex;
     }
   }
 
@@ -159,6 +171,9 @@ export async function writePnlToSheet(pnl: PnlResult): Promise<void> {
     [layout.sgaSoftwareRow, pnl.sgaSoftware],
     [layout.sgaOtherRow, pnl.sgaOther],
     [layout.otherExpensesRow, pnl.otherExpenses],
+    [layout.totalRevenueRow, pnl.totalRevenue],
+    [layout.totalExpensesRow, pnl.totalExpenses],
+    [layout.profitRow, pnl.profit],
   ];
 
   const cellUpdates: { row: number; col: number; value: number }[] = [];
