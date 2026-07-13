@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "./prisma";
 import { requireAdminSession } from "./admin-auth";
 import { generateAccessToken, mintDocumentNumber } from "./documents";
+import { ACCOUNTS, cashAccountForMethod, postJournalEntry } from "./ledger";
 import { getShopifyOrderById } from "./shopify/admin-api";
 import { sendDeliveryNoteEmail as sendDeliveryNoteEmailMessage, sendEstimateEmail as sendEstimateEmailMessage, sendInvoiceEmail as sendInvoiceEmailMessage, sendReceiptEmail as sendReceiptEmailMessage } from "./email";
 import { renderDeliveryNotePdf, renderEstimatePdf, renderInvoicePdf, renderReceiptPdf } from "./pdf/render";
@@ -176,7 +177,7 @@ export async function createInvoiceFromEstimate(estimateId: string): Promise<voi
 
   await prisma.$transaction(async (tx) => {
     const number = await mintDocumentNumber(tx, "invoice");
-    await tx.invoice.create({
+    const invoice = await tx.invoice.create({
       data: {
         number,
         orderId: estimate.orderId,
@@ -187,6 +188,16 @@ export async function createInvoiceFromEstimate(estimateId: string): Promise<voi
         total: estimate.total,
         issuedAt: new Date(),
       },
+    });
+    await postJournalEntry(tx, {
+      date: invoice.issuedAt ?? invoice.createdAt,
+      description: `Invoice ${invoice.number} issued`,
+      sourceType: "invoice",
+      sourceId: invoice.id,
+      lines: [
+        { accountCode: ACCOUNTS.ACCOUNTS_RECEIVABLE, debit: Number(invoice.total) },
+        { accountCode: ACCOUNTS.SALES_REVENUE, credit: Number(invoice.total) },
+      ],
     });
   });
 
@@ -209,7 +220,7 @@ export async function createInvoice(orderId: string, formData: FormData): Promis
 
   await prisma.$transaction(async (tx) => {
     const number = await mintDocumentNumber(tx, "invoice");
-    await tx.invoice.create({
+    const invoice = await tx.invoice.create({
       data: {
         number,
         orderId,
@@ -221,6 +232,16 @@ export async function createInvoice(orderId: string, formData: FormData): Promis
         dueAt,
         issuedAt: new Date(),
       },
+    });
+    await postJournalEntry(tx, {
+      date: invoice.issuedAt ?? invoice.createdAt,
+      description: `Invoice ${invoice.number} issued`,
+      sourceType: "invoice",
+      sourceId: invoice.id,
+      lines: [
+        { accountCode: ACCOUNTS.ACCOUNTS_RECEIVABLE, debit: Number(invoice.total) },
+        { accountCode: ACCOUNTS.SALES_REVENUE, credit: Number(invoice.total) },
+      ],
     });
   });
 
@@ -268,7 +289,7 @@ export async function recordPayment(invoiceId: string, formData: FormData): Prom
 
   await prisma.$transaction(async (tx) => {
     const number = await mintDocumentNumber(tx, "receipt");
-    await tx.receipt.create({
+    const receipt = await tx.receipt.create({
       data: { number, invoiceId, amount: amount.toFixed(2), method, reference, paidAt },
     });
 
@@ -279,6 +300,17 @@ export async function recordPayment(invoiceId: string, formData: FormData): Prom
         amountPaid: newAmountPaid.toFixed(2),
         status: nextInvoiceStatus(invoice.total.toString(), newAmountPaid),
       },
+    });
+
+    await postJournalEntry(tx, {
+      date: paidAt,
+      description: `Receipt ${receipt.number} against invoice`,
+      sourceType: "receipt",
+      sourceId: receipt.id,
+      lines: [
+        { accountCode: cashAccountForMethod(method), debit: amount },
+        { accountCode: ACCOUNTS.ACCOUNTS_RECEIVABLE, credit: amount },
+      ],
     });
   });
 
