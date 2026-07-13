@@ -157,7 +157,7 @@ export default async function AdminOrderHubPage({ params }: { params: Promise<{ 
                   Send email
                 </button>
               </form>
-              {order.invoice.status !== "paid" && order.invoice.status !== "void" && (
+              {order.invoice.status !== "paid" && order.invoice.status !== "void" && Number(order.invoice.amountPaid) === 0 && (
                 <form action={voidInvoice.bind(null, order.invoice.id)}>
                   <button type="submit" className="underline hover:text-foreground">
                     Void

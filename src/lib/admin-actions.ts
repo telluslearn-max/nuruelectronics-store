@@ -333,10 +333,30 @@ export async function sendReceiptEmail(receiptId: string): Promise<void> {
 
 export async function voidInvoice(invoiceId: string): Promise<void> {
   await requireAdminSession();
-  const invoice = await prisma.invoice.update({
-    where: { id: invoiceId },
-    data: { status: "void", voidedAt: new Date() },
+  const invoice = await prisma.invoice.findUniqueOrThrow({ where: { id: invoiceId } });
+
+  if (Number(invoice.amountPaid) > 0) {
+    throw new Error(
+      "Can't void an invoice that has received payments — this system has no refund/credit-note concept yet. Contact your accountant for how to handle it.",
+    );
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.invoice.update({ where: { id: invoiceId }, data: { status: "void", voidedAt: new Date() } });
+    // Reverses the Dr Accounts Receivable / Cr Sales Revenue posted when the invoice was issued,
+    // so a voided invoice no longer shows as phantom revenue or a phantom receivable.
+    await postJournalEntry(tx, {
+      date: new Date(),
+      description: `Invoice ${invoice.number} voided`,
+      sourceType: "invoice_void",
+      sourceId: invoice.id,
+      lines: [
+        { accountCode: ACCOUNTS.SALES_REVENUE, debit: Number(invoice.total) },
+        { accountCode: ACCOUNTS.ACCOUNTS_RECEIVABLE, credit: Number(invoice.total) },
+      ],
+    });
   });
+
   revalidatePath(`/admin/orders/${invoice.orderId}`);
 }
 
