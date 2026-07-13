@@ -60,12 +60,20 @@ export default async function AccountPage({
             {customer.email ? ` · ${customer.email}` : ""}
           </p>
         </div>
-        <a
-          href="/api/auth/logout"
-          className="shrink-0 rounded-control border border-border-subtle px-4 py-2 text-sm font-medium transition hover:border-foreground"
-        >
-          Log out
-        </a>
+        <div className="flex shrink-0 gap-3">
+          <Link
+            href="/account/documents"
+            className="rounded-control border border-border-subtle px-4 py-2 text-sm font-medium transition hover:border-foreground"
+          >
+            My Documents
+          </Link>
+          <a
+            href="/api/auth/logout"
+            className="rounded-control border border-border-subtle px-4 py-2 text-sm font-medium transition hover:border-foreground"
+          >
+            Log out
+          </a>
+        </div>
       </div>
 
       {error && (
