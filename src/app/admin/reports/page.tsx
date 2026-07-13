@@ -8,6 +8,7 @@ const REPORTS = [
   { href: "/admin/reports/cash-book", label: "Cash Book" },
   { href: "/admin/reports/creditors", label: "Creditors Ledger" },
   { href: "/admin/reports/fixed-assets", label: "Fixed Asset Register" },
+  { href: "/admin/reports/payroll", label: "Payroll Register" },
 ];
 
 export default async function AdminReportsPage() {

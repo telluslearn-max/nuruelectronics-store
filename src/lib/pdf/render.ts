@@ -1,10 +1,23 @@
 import "server-only";
 import { renderToBuffer } from "@react-pdf/renderer";
-import type { Customer, DeliveryNote, Estimate, Invoice, Order, OrderItem, Receipt } from "@prisma/client";
+import type {
+  Customer,
+  DeliveryNote,
+  Employee,
+  Estimate,
+  Invoice,
+  Order,
+  OrderItem,
+  PayRun,
+  Payslip,
+  PayslipDeduction,
+  Receipt,
+} from "@prisma/client";
 import { EstimateDocument } from "./estimate-document";
 import { InvoiceDocument } from "./invoice-document";
 import { ReceiptDocument } from "./receipt-document";
 import { DeliveryNoteDocument } from "./delivery-note-document";
+import { PayslipDocument } from "./payslip-document";
 
 export async function renderEstimatePdf(
   estimate: Estimate,
@@ -30,4 +43,13 @@ export async function renderReceiptPdf(receipt: Receipt, invoice: Invoice, custo
 
 export async function renderDeliveryNotePdf(note: DeliveryNote, order: Order, items: OrderItem[]): Promise<Buffer> {
   return renderToBuffer(DeliveryNoteDocument({ note, order, items }));
+}
+
+export async function renderPayslipPdf(
+  payslip: Payslip,
+  employee: Employee,
+  deductions: PayslipDeduction[],
+  payRun: PayRun,
+): Promise<Buffer> {
+  return renderToBuffer(PayslipDocument({ payslip, employee, deductions, payRun }));
 }

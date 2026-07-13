@@ -2,7 +2,7 @@ import "server-only";
 import { Resend } from "resend";
 import { formatPrice } from "./format";
 import { SITE_URL } from "./site";
-import type { Customer, DeliveryNote, Estimate, Invoice, Receipt } from "@prisma/client";
+import type { Customer, DeliveryNote, Employee, Estimate, Invoice, Payslip, Receipt } from "@prisma/client";
 
 const apiKey = process.env.RESEND_API_KEY;
 const from = process.env.DOCUMENT_EMAIL_FROM;
@@ -81,5 +81,16 @@ export async function sendDeliveryNoteEmail(note: DeliveryNote, customer: Custom
     html: `<p>Hi ${customer.name ?? ""},</p><p>Please find attached delivery note ${note.number}.</p>`,
     pdfBuffer,
     filename: `${note.number}.pdf`,
+  });
+}
+
+export async function sendPayslipEmail(payslip: Payslip, employee: Employee, pdfBuffer: Buffer): Promise<void> {
+  if (!employee.email) throw new Error("Employee has no email on file.");
+  await sendDocumentEmail({
+    to: employee.email,
+    subject: `Payslip ${payslip.number} from NURU`,
+    html: `<p>Hi ${employee.name},</p><p>Please find your payslip ${payslip.number} attached.</p>`,
+    pdfBuffer,
+    filename: `${payslip.number}.pdf`,
   });
 }
