@@ -216,14 +216,21 @@ model DocumentSequence {
 // Expenses — feeds the P&L's Expenses side and the Ledger
 // ---------------------------------------------------------------------------
 
+enum ExpensePaymentSource {
+  cash
+  mpesa
+  petty_cash
+}
+
 model Expense {
-  id          String          @id @default(cuid())
+  id          String               @id @default(cuid())
   date        DateTime
   category    ExpenseCategory
   subcategory String
-  amount      Decimal         @db.Decimal(10, 2)
+  amount      Decimal              @db.Decimal(10, 2)
   description String?
-  createdAt   DateTime        @default(now())
+  paidFrom    ExpensePaymentSource
+  createdAt   DateTime             @default(now())
 }
 
 // ---------------------------------------------------------------------------
