@@ -1,5 +1,10 @@
 import "server-only";
-import { getOrderByIdQuery, getOrdersQuery } from "./admin-queries";
+import {
+  getOrderByIdQuery,
+  getOrdersQuery,
+  getVariantInventoryInfoQuery,
+  inventoryAdjustQuantitiesMutation,
+} from "./admin-queries";
 
 const domain = process.env.SHOPIFY_STORE_DOMAIN;
 const adminToken = process.env.SHOPIFY_ADMIN_API_ACCESS_TOKEN;
@@ -130,4 +135,47 @@ export async function getShopifyPaidOrderTotals(
     amount: order.currentTotalPriceSet.shopMoney.amount,
     currencyCode: order.currentTotalPriceSet.shopMoney.currencyCode,
   }));
+}
+
+/**
+ * Decrements a Shopify variant's tracked inventory by `quantity` at its first
+ * tracked location — used only for the optional manual-sale inventory sync
+ * (§15), which needs the `write_inventory` scope in addition to
+ * `read_orders`. Throws on any failure (unmapped variant, untracked
+ * inventory, missing location, or a Shopify user error) so the caller can
+ * decide whether to surface or swallow it; this function never partially
+ * "succeeds" silently.
+ */
+export async function decrementVariantInventory(variantId: string, quantity: number): Promise<void> {
+  if (!isShopifyAdminConfigured) {
+    throw new Error("Shopify Admin API isn't configured.");
+  }
+
+  const info = await shopifyAdminFetch<{
+    productVariant: {
+      id: string;
+      inventoryItem: { id: string; inventoryLevels: Connection<{ location: { id: string } }> } | null;
+    } | null;
+  }>(getVariantInventoryInfoQuery, { id: variantId });
+
+  const inventoryItemId = info.productVariant?.inventoryItem?.id;
+  const locationId = info.productVariant?.inventoryItem?.inventoryLevels.edges[0]?.node.location.id;
+  if (!inventoryItemId || !locationId) {
+    throw new Error(`Variant ${variantId} has no tracked inventory item/location to adjust.`);
+  }
+
+  const data = await shopifyAdminFetch<{
+    inventoryAdjustQuantities: { userErrors: { field: string[]; message: string }[] };
+  }>(inventoryAdjustQuantitiesMutation, {
+    input: {
+      reason: "correction",
+      name: "available",
+      changes: [{ inventoryItemId, locationId, delta: -Math.abs(quantity) }],
+    },
+  });
+
+  const userErrors = data.inventoryAdjustQuantities.userErrors;
+  if (userErrors.length > 0) {
+    throw new Error(`Shopify inventory adjustment failed: ${userErrors.map((e) => e.message).join("; ")}`);
+  }
 }

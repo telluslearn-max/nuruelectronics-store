@@ -6,17 +6,20 @@ import { prisma } from "./prisma";
 import { requireAdminSession } from "./admin-auth";
 import { generateAccessToken, mintDocumentNumber } from "./documents";
 import { ACCOUNTS, cashAccountForMethod, postJournalEntry } from "./ledger";
-import { getShopifyOrderById } from "./shopify/admin-api";
+import { decrementVariantInventory, getShopifyOrderById } from "./shopify/admin-api";
 import { sendDeliveryNoteEmail as sendDeliveryNoteEmailMessage, sendEstimateEmail as sendEstimateEmailMessage, sendInvoiceEmail as sendInvoiceEmailMessage, sendReceiptEmail as sendReceiptEmailMessage } from "./email";
 import { renderDeliveryNotePdf, renderEstimatePdf, renderInvoicePdf, renderReceiptPdf } from "./pdf/render";
 import type { PaymentMethod } from "@prisma/client";
 
-function parseLineItems(formData: FormData): { title: string; quantity: number; unitPrice: string; lineTotal: string }[] {
-  const items: { title: string; quantity: number; unitPrice: string; lineTotal: string }[] = [];
+function parseLineItems(
+  formData: FormData,
+): { title: string; quantity: number; unitPrice: string; lineTotal: string; variantId?: string }[] {
+  const items: { title: string; quantity: number; unitPrice: string; lineTotal: string; variantId?: string }[] = [];
   for (let i = 0; i < 20; i++) {
     const title = formData.get(`item_title_${i}`);
     const quantity = formData.get(`item_qty_${i}`);
     const unitPrice = formData.get(`item_price_${i}`);
+    const variantId = String(formData.get(`item_variant_${i}`) ?? "").trim() || undefined;
     if (!title || String(title).trim() === "") continue;
     const qty = Number(quantity) || 0;
     const price = Number(unitPrice) || 0;
@@ -26,6 +29,7 @@ function parseLineItems(formData: FormData): { title: string; quantity: number; 
       quantity: qty,
       unitPrice: price.toFixed(2),
       lineTotal: (qty * price).toFixed(2),
+      variantId,
     });
   }
   return items;
@@ -38,6 +42,7 @@ export async function createManualOrder(formData: FormData): Promise<void> {
   const name = String(formData.get("name") ?? "").trim() || null;
   const phone = String(formData.get("phone") ?? "").trim() || null;
   const note = String(formData.get("note") ?? "").trim() || null;
+  const deductInventory = formData.get("deductInventory") === "on";
   const items = parseLineItems(formData);
 
   if (!email || items.length === 0) {
@@ -60,6 +65,21 @@ export async function createManualOrder(formData: FormData): Promise<void> {
       },
     });
   });
+
+  // Best-effort only — the order itself is already committed above. A failed
+  // Shopify inventory adjustment here (unmapped variant, no write_inventory
+  // scope, network error, etc.) shouldn't undo a real recorded sale; the
+  // owner can always correct Shopify's stock count by hand if this fails.
+  if (deductInventory) {
+    for (const item of items) {
+      if (!item.variantId) continue;
+      try {
+        await decrementVariantInventory(item.variantId, item.quantity);
+      } catch (error) {
+        console.error(`Inventory sync failed for variant ${item.variantId}:`, error);
+      }
+    }
+  }
 
   revalidatePath("/admin");
   redirect(`/admin/orders/${order.id}`);

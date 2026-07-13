@@ -56,11 +56,16 @@ export default async function NewManualOrderPage() {
 
         <div>
           <p className="text-sm font-medium">Line items</p>
+          <p className="mt-1 text-xs text-neutral-500">
+            Shopify Variant ID is optional — fill it in (and check the box below) if this item should also deduct
+            from Shopify&apos;s own stock count.
+          </p>
           <div className="mt-2 space-y-2">
             <div className="grid grid-cols-12 gap-2 text-xs text-neutral-500">
-              <span className="col-span-7">Title</span>
+              <span className="col-span-5">Title</span>
               <span className="col-span-2">Qty</span>
-              <span className="col-span-3">Unit price (KES)</span>
+              <span className="col-span-2">Unit price (KES)</span>
+              <span className="col-span-3">Shopify Variant ID</span>
             </div>
             {Array.from({ length: LINE_ITEM_ROWS }).map((_, i) => (
               <div key={i} className="grid grid-cols-12 gap-2">
@@ -68,7 +73,7 @@ export default async function NewManualOrderPage() {
                   name={`item_title_${i}`}
                   type="text"
                   placeholder="Product / description"
-                  className="col-span-7 rounded-control border border-border-subtle px-3 py-2 text-sm outline-none focus:border-foreground"
+                  className="col-span-5 rounded-control border border-border-subtle px-3 py-2 text-sm outline-none focus:border-foreground"
                 />
                 <input
                   name={`item_qty_${i}`}
@@ -83,11 +88,24 @@ export default async function NewManualOrderPage() {
                   type="number"
                   min={0}
                   step="0.01"
+                  className="col-span-2 rounded-control border border-border-subtle px-3 py-2 text-sm outline-none focus:border-foreground"
+                />
+                <input
+                  name={`item_variant_${i}`}
+                  type="text"
+                  placeholder="gid://shopify/ProductVariant/…"
                   className="col-span-3 rounded-control border border-border-subtle px-3 py-2 text-sm outline-none focus:border-foreground"
                 />
               </div>
             ))}
           </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <input id="deductInventory" name="deductInventory" type="checkbox" className="h-4 w-4" />
+          <label htmlFor="deductInventory" className="text-sm">
+            Deduct from Shopify inventory for line items with a Variant ID
+          </label>
         </div>
 
         <div>
