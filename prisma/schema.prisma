@@ -1,0 +1,396 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------------------------
+// Shared enums
+// ---------------------------------------------------------------------------
+
+enum OrderSource {
+  shopify
+  manual
+}
+
+enum EstimateStatus {
+  draft
+  sent
+  accepted
+  declined
+  expired
+}
+
+enum InvoiceStatus {
+  draft
+  sent
+  partially_paid
+  paid
+  void
+}
+
+enum DeliveryStatus {
+  pending
+  delivered
+}
+
+enum PaymentMethod {
+  cash
+  mpesa
+}
+
+// Sequence key for human-readable document numbers (EST-2026-0001, etc).
+enum DocumentType {
+  estimate
+  invoice
+  receipt
+  delivery_note
+  bill
+  payslip
+}
+
+enum ExpenseCategory {
+  cogs
+  sga
+  other
+}
+
+enum AccountType {
+  asset
+  liability
+  equity
+  revenue
+  expense
+}
+
+enum BillStatus {
+  unpaid
+  partially_paid
+  paid
+}
+
+enum PettyCashEntryType {
+  expense
+  replenishment
+}
+
+enum PayRunStatus {
+  draft
+  finalized
+}
+
+// ---------------------------------------------------------------------------
+// Customers & Orders (Shopify or manual/WhatsApp)
+// ---------------------------------------------------------------------------
+
+model Customer {
+  id                String   @id @default(cuid())
+  email             String   @unique
+  name              String?
+  phone             String?
+  shopifyCustomerId String?
+  createdAt         DateTime @default(now())
+
+  orders Order[]
+}
+
+model Order {
+  id               String      @id @default(cuid())
+  source           OrderSource
+  shopifyOrderId   String?     @unique
+  shopifyOrderName String?
+  currencyCode     String      @default("KES")
+  note             String?
+  createdAt        DateTime    @default(now())
+
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id])
+
+  items        OrderItem[]
+  estimates    Estimate[]
+  invoice      Invoice?
+  deliveryNote DeliveryNote?
+}
+
+model OrderItem {
+  id        String  @id @default(cuid())
+  orderId   String
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  title     String
+  variantId String?
+  quantity  Int
+  unitPrice Decimal @db.Decimal(10, 2)
+  lineTotal Decimal @db.Decimal(10, 2)
+}
+
+// ---------------------------------------------------------------------------
+// Estimates (quotes) — revisable, public accept/decline via accessToken
+// ---------------------------------------------------------------------------
+
+model Estimate {
+  id            String         @id @default(cuid())
+  number        String         @unique
+  orderId       String
+  order         Order          @relation(fields: [orderId], references: [id])
+  status        EstimateStatus @default(draft)
+  validUntil    DateTime
+  accessToken   String         @unique
+  subtotal      Decimal        @db.Decimal(10, 2)
+  taxTotal      Decimal        @default(0) @db.Decimal(10, 2)
+  shippingTotal Decimal        @default(0) @db.Decimal(10, 2)
+  discountTotal Decimal        @default(0) @db.Decimal(10, 2)
+  total         Decimal        @db.Decimal(10, 2)
+  sentAt        DateTime?
+  respondedAt   DateTime?
+  createdAt     DateTime       @default(now())
+}
+
+// ---------------------------------------------------------------------------
+// Invoices — one per order, tracks running balance across receipts
+// ---------------------------------------------------------------------------
+
+model Invoice {
+  id            String        @id @default(cuid())
+  number        String        @unique
+  orderId       String        @unique
+  order         Order         @relation(fields: [orderId], references: [id])
+  status        InvoiceStatus @default(draft)
+  subtotal      Decimal       @db.Decimal(10, 2)
+  taxTotal      Decimal       @default(0) @db.Decimal(10, 2)
+  shippingTotal Decimal       @default(0) @db.Decimal(10, 2)
+  discountTotal Decimal       @default(0) @db.Decimal(10, 2)
+  total         Decimal       @db.Decimal(10, 2)
+  amountPaid    Decimal       @default(0) @db.Decimal(10, 2)
+  dueAt         DateTime?
+  issuedAt      DateTime?
+  sentAt        DateTime?
+  voidedAt      DateTime?
+  createdAt     DateTime      @default(now())
+
+  receipts Receipt[]
+}
+
+model Receipt {
+  id        String        @id @default(cuid())
+  number    String        @unique
+  invoiceId String
+  invoice   Invoice       @relation(fields: [invoiceId], references: [id])
+  amount    Decimal       @db.Decimal(10, 2)
+  method    PaymentMethod
+  reference String?
+  paidAt    DateTime
+  createdAt DateTime      @default(now())
+}
+
+// ---------------------------------------------------------------------------
+// Delivery notes — one per order, no split shipments
+// ---------------------------------------------------------------------------
+
+model DeliveryNote {
+  id              String         @id @default(cuid())
+  number          String         @unique
+  orderId         String         @unique
+  order           Order          @relation(fields: [orderId], references: [id])
+  status          DeliveryStatus @default(pending)
+  recipientName   String
+  recipientPhone  String?
+  deliveryAddress String
+  deliveryMethod  String?
+  receivedBy      String?
+  deliveredAt     DateTime?
+  createdAt       DateTime       @default(now())
+}
+
+// One row per (type, year); atomically incremented in a transaction to mint numbers.
+model DocumentSequence {
+  type  DocumentType
+  year  Int
+  value Int          @default(0)
+
+  @@id([type, year])
+}
+
+// ---------------------------------------------------------------------------
+// Expenses — feeds the P&L's Expenses side and the Ledger
+// ---------------------------------------------------------------------------
+
+model Expense {
+  id          String          @id @default(cuid())
+  date        DateTime
+  category    ExpenseCategory
+  subcategory String
+  amount      Decimal         @db.Decimal(10, 2)
+  description String?
+  createdAt   DateTime        @default(now())
+}
+
+// ---------------------------------------------------------------------------
+// General Ledger — Chart of Accounts + double-entry Journal
+// ---------------------------------------------------------------------------
+
+model Account {
+  id        String      @id @default(cuid())
+  code      String      @unique
+  name      String
+  type      AccountType
+  createdAt DateTime    @default(now())
+
+  journalLines JournalLine[]
+}
+
+model JournalEntry {
+  id          String   @id @default(cuid())
+  date        DateTime
+  description String
+  sourceType  String?
+  sourceId    String?
+  createdAt   DateTime @default(now())
+
+  lines JournalLine[]
+}
+
+model JournalLine {
+  id             String       @id @default(cuid())
+  journalEntryId String
+  journalEntry   JournalEntry @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
+  accountId      String
+  account        Account      @relation(fields: [accountId], references: [id])
+  debit          Decimal      @default(0) @db.Decimal(10, 2)
+  credit         Decimal      @default(0) @db.Decimal(10, 2)
+
+  @@index([accountId])
+  @@index([journalEntryId])
+}
+
+// ---------------------------------------------------------------------------
+// Petty Cash Book
+// ---------------------------------------------------------------------------
+
+model PettyCashFund {
+  id          String   @id @default(cuid())
+  name        String   @default("Shop Petty Cash")
+  floatAmount Decimal  @db.Decimal(10, 2)
+  createdAt   DateTime @default(now())
+
+  entries PettyCashEntry[]
+}
+
+model PettyCashEntry {
+  id          String             @id @default(cuid())
+  fundId      String
+  fund        PettyCashFund      @relation(fields: [fundId], references: [id])
+  type        PettyCashEntryType
+  amount      Decimal            @db.Decimal(10, 2)
+  description String
+  date        DateTime
+  createdAt   DateTime           @default(now())
+}
+
+// ---------------------------------------------------------------------------
+// Creditors Ledger — Suppliers, Bills, Payments
+// ---------------------------------------------------------------------------
+
+model Supplier {
+  id        String   @id @default(cuid())
+  name      String
+  email     String?
+  phone     String?
+  createdAt DateTime @default(now())
+
+  bills Bill[]
+}
+
+model Bill {
+  id          String     @id @default(cuid())
+  number      String     @unique
+  supplierId  String
+  supplier    Supplier   @relation(fields: [supplierId], references: [id])
+  description String
+  amount      Decimal    @db.Decimal(10, 2)
+  amountPaid  Decimal    @default(0) @db.Decimal(10, 2)
+  status      BillStatus @default(unpaid)
+  billDate    DateTime
+  dueAt       DateTime?
+  createdAt   DateTime   @default(now())
+
+  payments SupplierPayment[]
+}
+
+model SupplierPayment {
+  id        String        @id @default(cuid())
+  billId    String
+  bill      Bill          @relation(fields: [billId], references: [id])
+  amount    Decimal       @db.Decimal(10, 2)
+  method    PaymentMethod
+  reference String?
+  paidAt    DateTime
+  createdAt DateTime      @default(now())
+}
+
+// ---------------------------------------------------------------------------
+// Fixed Asset Register
+// ---------------------------------------------------------------------------
+
+model FixedAsset {
+  id              String    @id @default(cuid())
+  name            String
+  category        String
+  purchaseDate    DateTime
+  purchaseCost    Decimal   @db.Decimal(10, 2)
+  salvageValue    Decimal   @default(0) @db.Decimal(10, 2)
+  usefulLifeYears Int
+  disposedAt      DateTime?
+  disposalValue   Decimal?  @db.Decimal(10, 2)
+  createdAt       DateTime  @default(now())
+}
+
+// ---------------------------------------------------------------------------
+// Payroll Register (record-keeping only — see compliance note in docs)
+// ---------------------------------------------------------------------------
+
+model Employee {
+  id        String   @id @default(cuid())
+  name      String
+  email     String?
+  phone     String?
+  role      String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  payslips Payslip[]
+}
+
+model PayRun {
+  id          String       @id @default(cuid())
+  periodStart DateTime
+  periodEnd   DateTime
+  status      PayRunStatus @default(draft)
+  createdAt   DateTime     @default(now())
+
+  payslips Payslip[]
+}
+
+model Payslip {
+  id         String    @id @default(cuid())
+  number     String    @unique
+  payRunId   String
+  payRun     PayRun    @relation(fields: [payRunId], references: [id])
+  employeeId String
+  employee   Employee  @relation(fields: [employeeId], references: [id])
+  grossPay   Decimal   @db.Decimal(10, 2)
+  netPay     Decimal   @db.Decimal(10, 2)
+  sentAt     DateTime?
+  createdAt  DateTime  @default(now())
+
+  deductions PayslipDeduction[]
+}
+
+model PayslipDeduction {
+  id        String  @id @default(cuid())
+  payslipId String
+  payslip   Payslip @relation(fields: [payslipId], references: [id], onDelete: Cascade)
+  type      String
+  amount    Decimal @db.Decimal(10, 2)
+}
