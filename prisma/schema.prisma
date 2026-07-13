@@ -310,17 +310,18 @@ model Supplier {
 }
 
 model Bill {
-  id          String     @id @default(cuid())
-  number      String     @unique
+  id          String          @id @default(cuid())
+  number      String          @unique
   supplierId  String
-  supplier    Supplier   @relation(fields: [supplierId], references: [id])
+  supplier    Supplier        @relation(fields: [supplierId], references: [id])
   description String
-  amount      Decimal    @db.Decimal(10, 2)
-  amountPaid  Decimal    @default(0) @db.Decimal(10, 2)
-  status      BillStatus @default(unpaid)
+  category    ExpenseCategory @default(cogs)
+  amount      Decimal         @db.Decimal(10, 2)
+  amountPaid  Decimal         @default(0) @db.Decimal(10, 2)
+  status      BillStatus      @default(unpaid)
   billDate    DateTime
   dueAt       DateTime?
-  createdAt   DateTime   @default(now())
+  createdAt   DateTime        @default(now())
 
   payments SupplierPayment[]
 }

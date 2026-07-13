@@ -4,7 +4,11 @@ import { requireAdminSession } from "@/lib/admin-auth";
 
 export const metadata: Metadata = { title: "Reports" };
 
-const REPORTS = [{ href: "/admin/reports/cash-book", label: "Cash Book" }];
+const REPORTS = [
+  { href: "/admin/reports/cash-book", label: "Cash Book" },
+  { href: "/admin/reports/creditors", label: "Creditors Ledger" },
+  { href: "/admin/reports/fixed-assets", label: "Fixed Asset Register" },
+];
 
 export default async function AdminReportsPage() {
   await requireAdminSession();

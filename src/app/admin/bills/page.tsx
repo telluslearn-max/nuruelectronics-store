@@ -1,0 +1,97 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import { requireAdminSession } from "@/lib/admin-auth";
+import { prisma } from "@/lib/prisma";
+import { formatPrice } from "@/lib/format";
+import { createBill } from "@/lib/creditor-actions";
+
+export const metadata: Metadata = { title: "Bills" };
+
+function formatDate(date: Date) {
+  return new Intl.DateTimeFormat("en-KE", { dateStyle: "medium" }).format(date);
+}
+
+const inputClass =
+  "rounded-control border border-border-subtle px-3 py-2 text-sm outline-none focus:border-foreground";
+const primaryButtonClass =
+  "rounded-control bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:opacity-90";
+
+export default async function AdminBillsPage() {
+  await requireAdminSession();
+
+  const [bills, suppliers] = await Promise.all([
+    prisma.bill.findMany({ orderBy: { billDate: "desc" }, include: { supplier: true } }),
+    prisma.supplier.findMany({ orderBy: { name: "asc" } }),
+  ]);
+
+  return (
+    <div>
+      <h2 className="text-lg font-medium">Bills</h2>
+
+      <details className="mt-6" open={suppliers.length > 0 && bills.length === 0}>
+        <summary className="cursor-pointer text-sm font-medium">New bill</summary>
+        {suppliers.length === 0 ? (
+          <p className="mt-3 text-sm text-neutral-500">
+            Add a <Link href="/admin/suppliers" className="underline hover:text-foreground">supplier</Link> first.
+          </p>
+        ) : (
+          <form action={createBill} className="mt-4 flex flex-wrap items-end gap-3">
+            <div>
+              <label className="block text-xs text-neutral-500">Supplier</label>
+              <select name="supplierId" required className={inputClass}>
+                {suppliers.map((supplier) => (
+                  <option key={supplier.id} value={supplier.id}>
+                    {supplier.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-neutral-500">Description</label>
+              <input type="text" name="description" required className={inputClass} />
+            </div>
+            <div>
+              <label className="block text-xs text-neutral-500">Category</label>
+              <select name="category" required className={inputClass}>
+                <option value="cogs">COGS</option>
+                <option value="sga">SG&amp;A</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-neutral-500">Amount</label>
+              <input type="number" step="0.01" name="amount" required className={inputClass} />
+            </div>
+            <div>
+              <label className="block text-xs text-neutral-500">Bill date</label>
+              <input type="date" name="billDate" required className={inputClass} />
+            </div>
+            <div>
+              <label className="block text-xs text-neutral-500">Due date</label>
+              <input type="date" name="dueAt" className={inputClass} />
+            </div>
+            <button type="submit" className={primaryButtonClass}>
+              Create bill
+            </button>
+          </form>
+        )}
+      </details>
+
+      <ul className="mt-6 space-y-3">
+        {bills.map((bill) => (
+          <li key={bill.id} className="rounded-card border border-border-subtle p-4 text-sm">
+            <Link href={`/admin/bills/${bill.id}`} className="flex flex-wrap items-center justify-between gap-2 hover:underline">
+              <span>
+                {bill.number} · {bill.supplier.name} · {formatDate(bill.billDate)}
+              </span>
+              <span className="text-neutral-500">
+                {bill.status} · {formatPrice(bill.amount.toString(), "KES")} paid {formatPrice(bill.amountPaid.toString(), "KES")}
+              </span>
+            </Link>
+          </li>
+        ))}
+        {bills.length === 0 && <p className="text-sm text-neutral-500">No bills yet.</p>}
+      </ul>
+    </div>
+  );
+}
