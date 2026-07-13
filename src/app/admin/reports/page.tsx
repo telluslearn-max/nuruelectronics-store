@@ -5,6 +5,7 @@ import { requireAdminSession } from "@/lib/admin-auth";
 export const metadata: Metadata = { title: "Reports" };
 
 const REPORTS = [
+  { href: "/admin/reports/pnl", label: "Profit & Loss (Google Sheet sync)" },
   { href: "/admin/reports/sales", label: "Sales Register" },
   { href: "/admin/reports/cash-book", label: "Cash Book" },
   { href: "/admin/reports/debtors", label: "Debtors Ledger" },
@@ -23,7 +24,6 @@ export default async function AdminReportsPage() {
   return (
     <div>
       <h2 className="text-lg font-medium">Reports</h2>
-      <p className="mt-2 text-neutral-500">The Google Sheet P&amp;L sync lands here too, once built.</p>
       <ul className="mt-6 space-y-2">
         {REPORTS.map((report) => (
           <li key={report.href}>
