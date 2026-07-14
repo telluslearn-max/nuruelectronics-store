@@ -13,6 +13,8 @@ function formatDate(dateString: string | Date) {
 export default async function AdminSalesRegisterPage() {
   await requireAdminSession();
 
+  let shopifyError: string | null = null;
+
   const [manualOrders, shopifyPage] = await Promise.all([
     prisma.order.findMany({
       where: { source: "manual" },
@@ -20,7 +22,10 @@ export default async function AdminSalesRegisterPage() {
       orderBy: { createdAt: "desc" },
     }),
     isShopifyAdminConfigured
-      ? getShopifyOrders({ first: 100 })
+      ? getShopifyOrders({ first: 100 }).catch((error: unknown) => {
+          shopifyError = error instanceof Error ? error.message : "Unknown error";
+          return { orders: [], hasNextPage: false, endCursor: null };
+        })
       : Promise.resolve({ orders: [], hasNextPage: false, endCursor: null }),
   ]);
 
@@ -52,6 +57,7 @@ export default async function AdminSalesRegisterPage() {
           Set SHOPIFY_ADMIN_API_ACCESS_TOKEN to include live Shopify orders here.
         </p>
       )}
+      {shopifyError && <p className="mt-2 text-sm text-red-600">Couldn&apos;t load Shopify orders: {shopifyError}</p>}
 
       <div className="mt-6 overflow-x-auto">
         <table className="w-full min-w-[560px] text-sm">

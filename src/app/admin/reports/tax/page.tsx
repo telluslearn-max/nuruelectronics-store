@@ -20,12 +20,19 @@ export default async function AdminTaxReportPage() {
   const from = startOfYear();
   const to = startOfNextYear();
 
+  let shopifyError: string | null = null;
+
   const [invoices, shopifyTax] = await Promise.all([
     prisma.invoice.findMany({
       where: { issuedAt: { gte: from, lt: to } },
       select: { number: true, taxTotal: true, issuedAt: true },
     }),
-    isShopifyAdminConfigured ? getShopifyTaxCollected(from, to) : Promise.resolve([]),
+    isShopifyAdminConfigured
+      ? getShopifyTaxCollected(from, to).catch((error: unknown) => {
+          shopifyError = error instanceof Error ? error.message : "Unknown error";
+          return [];
+        })
+      : Promise.resolve([]),
   ]);
 
   const ownTaxTotal = invoices.reduce((sum, invoice) => sum + Number(invoice.taxTotal), 0);
@@ -54,6 +61,9 @@ export default async function AdminTaxReportPage() {
             </>
           ) : (
             <p className="mt-1 text-sm text-neutral-500">Set SHOPIFY_ADMIN_API_ACCESS_TOKEN to include this.</p>
+          )}
+          {shopifyError && (
+            <p className="mt-1 text-sm text-red-600">Couldn&apos;t load Shopify tax data: {shopifyError}</p>
           )}
         </div>
       </div>

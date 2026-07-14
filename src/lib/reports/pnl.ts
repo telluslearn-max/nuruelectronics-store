@@ -86,9 +86,14 @@ export async function computePnl({
   }
 
   if (isShopifyAdminConfigured) {
-    const shopifyOrders = await getShopifyPaidOrderTotals(from, to);
-    for (const order of shopifyOrders) {
-      addTo(revenue, bucketKey(new Date(order.processedAt), granularity), Number(order.amount));
+    try {
+      const shopifyOrders = await getShopifyPaidOrderTotals(from, to);
+      for (const order of shopifyOrders) {
+        addTo(revenue, bucketKey(new Date(order.processedAt), granularity), Number(order.amount));
+      }
+    } catch {
+      // Shopify Admin API unavailable/misconfigured — fall back to Receipt-only
+      // revenue rather than failing the whole P&L (page, CSV export, and cron).
     }
   }
 
