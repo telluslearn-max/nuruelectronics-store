@@ -1,11 +1,12 @@
 "use server";
 
-import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "./prisma";
 import { requireAdminSession } from "./admin-auth";
 import { mintDocumentNumber } from "./documents";
 import { ACCOUNTS, cashAccountForMethod, postJournalEntry } from "./ledger";
+import { redirectWithError, redirectWithSuccess } from "./admin-feedback";
+import { logAdminAction } from "./audit-log";
 import type { ExpenseCategory, PaymentMethod } from "@prisma/client";
 
 export async function createSupplier(formData: FormData): Promise<void> {
@@ -14,10 +15,11 @@ export async function createSupplier(formData: FormData): Promise<void> {
   const name = String(formData.get("name") ?? "").trim();
   const email = String(formData.get("email") ?? "").trim() || null;
   const phone = String(formData.get("phone") ?? "").trim() || null;
-  if (!name) throw new Error("Supplier name is required.");
+  if (!name) redirectWithError("/admin/suppliers", "Supplier name is required.");
 
   await prisma.supplier.create({ data: { name, email, phone } });
   revalidatePath("/admin/suppliers");
+  redirectWithSuccess("/admin/suppliers", "Supplier added.");
 }
 
 function billExpenseAccount(category: ExpenseCategory): string {
@@ -38,7 +40,7 @@ export async function createBill(formData: FormData): Promise<void> {
   const dueAt = dueAtRaw ? new Date(dueAtRaw) : null;
 
   if (!supplierId || !description || amount <= 0) {
-    throw new Error("A supplier, description, and positive amount are required.");
+    redirectWithError("/admin/bills", "A supplier, description, and positive amount are required.");
   }
 
   const bill = await prisma.$transaction(async (tx) => {
@@ -60,7 +62,7 @@ export async function createBill(formData: FormData): Promise<void> {
   });
 
   revalidatePath("/admin/bills");
-  redirect(`/admin/bills/${bill.id}`);
+  redirectWithSuccess(`/admin/bills/${bill.id}`, "Bill created.");
 }
 
 function nextBillStatus(total: string, amountPaid: number): "partially_paid" | "paid" {
@@ -70,15 +72,17 @@ function nextBillStatus(total: string, amountPaid: number): "partially_paid" | "
 export async function recordSupplierPayment(billId: string, formData: FormData): Promise<void> {
   await requireAdminSession();
 
+  const bill = await prisma.bill.findUniqueOrThrow({ where: { id: billId } });
+
   const amount = Number(formData.get("amount") ?? 0) || 0;
   const method = String(formData.get("method")) as PaymentMethod;
   const reference = String(formData.get("reference") ?? "").trim() || null;
   const paidAtRaw = String(formData.get("paidAt") ?? "");
   const paidAt = paidAtRaw ? new Date(paidAtRaw) : new Date();
 
-  if (amount <= 0) throw new Error("Payment amount must be greater than zero.");
-
-  const bill = await prisma.bill.findUniqueOrThrow({ where: { id: billId } });
+  if (amount <= 0) {
+    redirectWithError(`/admin/bills/${billId}`, "Payment amount must be greater than zero.");
+  }
 
   await prisma.$transaction(async (tx) => {
     const payment = await tx.supplierPayment.create({
@@ -101,8 +105,20 @@ export async function recordSupplierPayment(billId: string, formData: FormData):
         { accountCode: cashAccountForMethod(method), credit: amount },
       ],
     });
+
+    await logAdminAction(
+      {
+        action: "bill.recordPayment",
+        entityType: "bill",
+        entityId: billId,
+        summary: `Recorded payment of ${amount.toFixed(2)} against bill ${bill.number}`,
+        metadata: { amount, method, reference },
+      },
+      tx,
+    );
   });
 
   revalidatePath(`/admin/bills/${billId}`);
   revalidatePath("/admin/bills");
+  redirectWithSuccess(`/admin/bills/${billId}`, "Payment recorded.");
 }

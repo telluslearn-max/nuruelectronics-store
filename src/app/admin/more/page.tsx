@@ -16,6 +16,7 @@ const LINKS = [
   { href: "/admin/payroll/employees", label: "Payroll" },
   { href: "/admin/accounts", label: "Chart of Accounts" },
   { href: "/admin/journal", label: "Journal" },
+  { href: "/admin/audit-log", label: "Audit Log" },
   { href: "/admin/settings", label: "Settings" },
 ];
 

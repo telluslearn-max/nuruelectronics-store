@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "./prisma";
 import { requireAdminSession } from "./admin-auth";
+import { redirectWithSuccess } from "./admin-feedback";
+import { logAdminAction } from "./audit-log";
 
 const SETTINGS_ID = "settings";
 
@@ -39,6 +41,13 @@ export async function updateSettings(formData: FormData): Promise<void> {
     create: { id: SETTINGS_ID, ...data },
     update: data,
   });
+  await logAdminAction({
+    action: "settings.update",
+    entityType: "settings",
+    entityId: SETTINGS_ID,
+    summary: "Updated business settings",
+  });
 
   revalidatePath("/admin/settings");
+  redirectWithSuccess("/admin/settings", "Settings saved.");
 }

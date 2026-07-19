@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { requireAdminSession } from "@/lib/admin-auth";
 import { createManualOrder } from "@/lib/admin-actions";
+import { FeedbackBanner } from "@/components/admin/feedback-banner";
 
 export const metadata: Metadata = {
   title: "New manual order",
@@ -8,13 +9,19 @@ export const metadata: Metadata = {
 
 const LINE_ITEM_ROWS = 8;
 
-export default async function NewManualOrderPage() {
+export default async function NewManualOrderPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>;
+}) {
   await requireAdminSession();
+  const { error } = await searchParams;
 
   return (
     <div>
       <h2 className="text-lg font-medium">New manual order</h2>
       <p className="mt-2 text-neutral-500">For WhatsApp or other off-platform sales.</p>
+      <FeedbackBanner error={error} />
 
       <form action={createManualOrder} className="mt-8 max-w-2xl space-y-6">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">

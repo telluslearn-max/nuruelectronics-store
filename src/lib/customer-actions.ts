@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "./prisma";
 import { requireAdminSession } from "./admin-auth";
+import { redirectWithError, redirectWithSuccess } from "./admin-feedback";
 
 export async function updateCustomer(customerId: string, formData: FormData): Promise<void> {
   await requireAdminSession();
@@ -12,12 +13,12 @@ export async function updateCustomer(customerId: string, formData: FormData): Pr
   const phone = String(formData.get("phone") ?? "").trim() || null;
 
   if (!email) {
-    throw new Error("Email is required.");
+    redirectWithError(`/admin/customers/${customerId}`, "Email is required.");
   }
 
   const existing = await prisma.customer.findUnique({ where: { email } });
   if (existing && existing.id !== customerId) {
-    throw new Error("Another customer already uses that email.");
+    redirectWithError(`/admin/customers/${customerId}`, "Another customer already uses that email.");
   }
 
   await prisma.customer.update({
@@ -27,4 +28,5 @@ export async function updateCustomer(customerId: string, formData: FormData): Pr
 
   revalidatePath("/admin/customers");
   revalidatePath(`/admin/customers/${customerId}`);
+  redirectWithSuccess(`/admin/customers/${customerId}`, "Customer updated.");
 }

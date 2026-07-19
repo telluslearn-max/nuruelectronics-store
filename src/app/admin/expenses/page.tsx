@@ -5,6 +5,7 @@ import { formatPrice } from "@/lib/format";
 import { createExpense } from "@/lib/expense-actions";
 import { parsePage, type PageSearchParams } from "@/lib/pagination";
 import { PaginationControls } from "@/components/admin/pagination-controls";
+import { FeedbackBanner } from "@/components/admin/feedback-banner";
 
 export const metadata: Metadata = { title: "Expenses" };
 
@@ -20,10 +21,11 @@ const primaryButtonClass =
 export default async function AdminExpensesPage({
   searchParams,
 }: {
-  searchParams: Promise<PageSearchParams>;
+  searchParams: Promise<PageSearchParams & { success?: string; error?: string }>;
 }) {
   await requireAdminSession();
   const resolvedSearchParams = await searchParams;
+  const { success, error } = resolvedSearchParams;
   const { page, skip, take } = parsePage(resolvedSearchParams);
 
   const [expenses, totalCount] = await Promise.all([
@@ -34,6 +36,7 @@ export default async function AdminExpensesPage({
   return (
     <div>
       <h2 className="text-lg font-medium">Expenses</h2>
+      <FeedbackBanner success={success} error={error} />
       <p className="mt-2 text-neutral-500">
         Feeds the Expenses side of the P&amp;L (COGS / SG&amp;A / Other) and the Cash Book.
       </p>

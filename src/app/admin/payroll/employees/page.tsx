@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { createEmployee } from "@/lib/payroll-actions";
 import { parsePage, type PageSearchParams } from "@/lib/pagination";
 import { PaginationControls } from "@/components/admin/pagination-controls";
+import { FeedbackBanner } from "@/components/admin/feedback-banner";
 
 export const metadata: Metadata = { title: "Employees" };
 
@@ -16,10 +17,11 @@ const primaryButtonClass =
 export default async function AdminEmployeesPage({
   searchParams,
 }: {
-  searchParams: Promise<PageSearchParams>;
+  searchParams: Promise<PageSearchParams & { success?: string; error?: string }>;
 }) {
   await requireAdminSession();
   const resolvedSearchParams = await searchParams;
+  const { success, error } = resolvedSearchParams;
   const { page, skip, take } = parsePage(resolvedSearchParams);
 
   const [employees, totalCount] = await Promise.all([
@@ -35,6 +37,7 @@ export default async function AdminEmployeesPage({
           Pay runs
         </Link>
       </div>
+      <FeedbackBanner success={success} error={error} />
 
       <details className="mt-6">
         <summary className="cursor-pointer text-sm font-medium">Add employee</summary>

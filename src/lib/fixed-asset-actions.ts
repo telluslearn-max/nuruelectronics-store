@@ -5,6 +5,8 @@ import { prisma } from "./prisma";
 import { requireAdminSession } from "./admin-auth";
 import { ACCOUNTS, cashAccountForMethod, postJournalEntry } from "./ledger";
 import { getAccumulatedDepreciation, postMonthlyDepreciation } from "./depreciation";
+import { redirectWithError, redirectWithSuccess } from "./admin-feedback";
+import { logAdminAction } from "./audit-log";
 import type { PaymentMethod } from "@prisma/client";
 
 export async function createFixedAsset(formData: FormData): Promise<void> {
@@ -19,7 +21,7 @@ export async function createFixedAsset(formData: FormData): Promise<void> {
   const paidFrom = String(formData.get("paidFrom")) as PaymentMethod;
 
   if (!name || purchaseCost <= 0 || usefulLifeYears <= 0) {
-    throw new Error("A name, positive purchase cost, and useful life are required.");
+    redirectWithError("/admin/assets", "A name, positive purchase cost, and useful life are required.");
   }
 
   await prisma.$transaction(async (tx) => {
@@ -39,6 +41,7 @@ export async function createFixedAsset(formData: FormData): Promise<void> {
   });
 
   revalidatePath("/admin/assets");
+  redirectWithSuccess("/admin/assets", "Fixed asset added.");
 }
 
 export async function disposeFixedAsset(assetId: string, formData: FormData): Promise<void> {
@@ -72,9 +75,21 @@ export async function disposeFixedAsset(assetId: string, formData: FormData): Pr
       sourceId: asset.id,
       lines,
     });
+
+    await logAdminAction(
+      {
+        action: "fixedAsset.dispose",
+        entityType: "fixedAsset",
+        entityId: assetId,
+        summary: `Disposed fixed asset ${asset.name} for ${disposalValue.toFixed(2)}`,
+        metadata: { disposalValue, accumulated, cost },
+      },
+      tx,
+    );
   });
 
   revalidatePath("/admin/assets");
+  redirectWithSuccess("/admin/assets", "Fixed asset disposed.");
 }
 
 export async function runMonthlyDepreciation(): Promise<void> {
@@ -82,4 +97,5 @@ export async function runMonthlyDepreciation(): Promise<void> {
   await postMonthlyDepreciation();
   revalidatePath("/admin/assets");
   revalidatePath("/admin/reports/fixed-assets");
+  redirectWithSuccess("/admin/assets", "Monthly depreciation posted.");
 }

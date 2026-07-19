@@ -6,6 +6,7 @@ import { createPayRun } from "@/lib/payroll-actions";
 import { StatusPill } from "@/components/admin/status-pill";
 import { parsePage, type PageSearchParams } from "@/lib/pagination";
 import { PaginationControls } from "@/components/admin/pagination-controls";
+import { FeedbackBanner } from "@/components/admin/feedback-banner";
 
 export const metadata: Metadata = { title: "Pay Runs" };
 
@@ -21,10 +22,11 @@ const primaryButtonClass =
 export default async function AdminPayRunsPage({
   searchParams,
 }: {
-  searchParams: Promise<PageSearchParams>;
+  searchParams: Promise<PageSearchParams & { success?: string; error?: string }>;
 }) {
   await requireAdminSession();
   const resolvedSearchParams = await searchParams;
+  const { success, error } = resolvedSearchParams;
   const { page, skip, take } = parsePage(resolvedSearchParams);
 
   const [payRuns, totalCount] = await Promise.all([
@@ -40,6 +42,7 @@ export default async function AdminPayRunsPage({
   return (
     <div>
       <h2 className="text-lg font-medium">Pay Runs</h2>
+      <FeedbackBanner success={success} error={error} />
 
       <details className="mt-6" open={payRuns.length === 0}>
         <summary className="cursor-pointer text-sm font-medium">New pay run</summary>

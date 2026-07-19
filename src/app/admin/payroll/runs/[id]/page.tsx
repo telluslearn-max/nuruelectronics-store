@@ -4,6 +4,7 @@ import { requireAdminSession } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
 import { formatPrice } from "@/lib/format";
 import { addPayslip, finalizePayRun, sendPayslipEmail } from "@/lib/payroll-actions";
+import { FeedbackBanner } from "@/components/admin/feedback-banner";
 
 export const metadata: Metadata = { title: "Pay Run" };
 
@@ -20,9 +21,16 @@ const secondaryButtonClass =
 
 const DEDUCTION_ROWS = 4;
 
-export default async function AdminPayRunDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function AdminPayRunDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ success?: string; error?: string }>;
+}) {
   await requireAdminSession();
   const { id } = await params;
+  const { success, error } = await searchParams;
 
   const payRun = await prisma.payRun.findUnique({
     where: { id },
@@ -38,6 +46,7 @@ export default async function AdminPayRunDetailPage({ params }: { params: Promis
       <h2 className="text-lg font-medium">
         Pay run: {formatDate(payRun.periodStart)} – {formatDate(payRun.periodEnd)}
       </h2>
+      <FeedbackBanner success={success} error={error} />
       <p className="mt-1 text-sm text-neutral-500">
         Record-keeping only — gross pay and each deduction amount are entered by you or your accountant; this
         system does not compute statutory deductions.

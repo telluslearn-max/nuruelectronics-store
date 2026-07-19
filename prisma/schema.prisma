@@ -440,3 +440,20 @@ model Settings {
   documentNumberPrefixPayslip      String?
   updatedAt                        DateTime @updatedAt
 }
+
+// ---------------------------------------------------------------------------
+// Audit log — destructive/financial admin actions only
+// ---------------------------------------------------------------------------
+
+model AdminAuditLog {
+  id         String   @id @default(cuid())
+  action     String
+  entityType String?
+  entityId   String?
+  summary    String
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([entityType, entityId])
+}

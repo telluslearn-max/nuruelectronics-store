@@ -8,6 +8,7 @@ import { parsePage, type PageSearchParams } from "@/lib/pagination";
 import { PaginationControls } from "@/components/admin/pagination-controls";
 import { BulkSelectionBar } from "@/components/admin/bulk-selection-bar";
 import { ConfirmSubmitButton } from "@/components/admin/confirm-submit-button";
+import { FeedbackBanner } from "@/components/admin/feedback-banner";
 import { bulkDeleteDocuments, bulkEmailDocuments } from "@/lib/admin-actions";
 
 export const metadata: Metadata = { title: "Documents" };
@@ -126,11 +127,11 @@ async function loadRows(
 export default async function AdminDocumentsPage({
   searchParams,
 }: {
-  searchParams: Promise<PageSearchParams & { type?: string; status?: string }>;
+  searchParams: Promise<PageSearchParams & { type?: string; status?: string; success?: string; error?: string }>;
 }) {
   await requireAdminSession();
   const resolvedSearchParams = await searchParams;
-  const { type: rawType, status: rawStatus } = resolvedSearchParams;
+  const { type: rawType, status: rawStatus, success, error } = resolvedSearchParams;
   const type: DocType = isDocType(rawType) ? rawType : "invoice";
   const statusOptions = STATUS_OPTIONS_BY_TYPE[type];
   const status = rawStatus && statusOptions.includes(rawStatus) ? rawStatus : undefined;
@@ -142,6 +143,7 @@ export default async function AdminDocumentsPage({
   return (
     <div className="relative pb-24">
       <h2 className="text-lg font-medium">Documents</h2>
+      <FeedbackBanner success={success} error={error} />
 
       <div className="mt-4 flex gap-6 border-b border-border-subtle text-sm">
         {TABS.map((tab) => (

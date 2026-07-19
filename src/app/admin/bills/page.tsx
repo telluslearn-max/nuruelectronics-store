@@ -8,6 +8,7 @@ import { createBill } from "@/lib/creditor-actions";
 import { StatusPill } from "@/components/admin/status-pill";
 import { parsePage, type PageSearchParams } from "@/lib/pagination";
 import { PaginationControls } from "@/components/admin/pagination-controls";
+import { FeedbackBanner } from "@/components/admin/feedback-banner";
 
 export const metadata: Metadata = { title: "Bills" };
 
@@ -29,10 +30,11 @@ function isBillStatus(value: string | undefined): value is BillStatus {
 export default async function AdminBillsPage({
   searchParams,
 }: {
-  searchParams: Promise<PageSearchParams & { status?: string }>;
+  searchParams: Promise<PageSearchParams & { status?: string; success?: string; error?: string }>;
 }) {
   await requireAdminSession();
   const resolvedSearchParams = await searchParams;
+  const { success, error } = resolvedSearchParams;
   const { page, skip, take } = parsePage(resolvedSearchParams);
   const statusFilter = isBillStatus(resolvedSearchParams.status) ? resolvedSearchParams.status : undefined;
   const where: Prisma.BillWhereInput = statusFilter ? { status: statusFilter } : {};
@@ -46,6 +48,7 @@ export default async function AdminBillsPage({
   return (
     <div>
       <h2 className="text-lg font-medium">Bills</h2>
+      <FeedbackBanner success={success} error={error} />
 
       <details className="mt-6" open={suppliers.length > 0 && bills.length === 0}>
         <summary className="cursor-pointer text-sm font-medium">New bill</summary>

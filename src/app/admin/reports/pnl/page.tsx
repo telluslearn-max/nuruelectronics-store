@@ -4,6 +4,7 @@ import { computePnl } from "@/lib/reports/pnl";
 import { isGoogleSheetsConfigured } from "@/lib/google-sheets";
 import { formatPrice } from "@/lib/format";
 import { syncPnlNow } from "@/lib/pnl-actions";
+import { FeedbackBanner } from "@/components/admin/feedback-banner";
 
 export const metadata: Metadata = { title: "Profit & Loss" };
 
@@ -33,7 +34,7 @@ const ROW_DEFS: [string, keyof Awaited<ReturnType<typeof computePnl>>][] = [
 export default async function AdminPnlPage({
   searchParams,
 }: {
-  searchParams: Promise<{ month?: string }>;
+  searchParams: Promise<{ month?: string; success?: string; error?: string }>;
 }) {
   await requireAdminSession();
 
@@ -44,12 +45,13 @@ export default async function AdminPnlPage({
     granularity: "monthly",
   });
 
-  const { month: monthParam } = await searchParams;
+  const { month: monthParam, success, error } = await searchParams;
   const selectedBucket = monthParam && pnl.buckets.includes(monthParam) ? monthParam : pnl.buckets[now.getMonth()];
 
   return (
     <div>
       <h2 className="text-lg font-medium">Profit &amp; Loss — {now.getFullYear()}</h2>
+      <FeedbackBanner success={success} error={error} />
       <p className="mt-2 text-neutral-500">
         Cash-basis (revenue recognized when received, not when invoiced) — matches the format of the shared Google
         Sheet template. This is deliberately different from the accrual{" "}

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { requireAdminSession } from "@/lib/admin-auth";
 import { getSettings } from "@/lib/settings";
 import { updateSettings } from "@/lib/settings-actions";
+import { FeedbackBanner } from "@/components/admin/feedback-banner";
 
 export const metadata: Metadata = { title: "Settings" };
 
@@ -19,13 +20,19 @@ const PREFIX_FIELDS: { name: string; label: string; placeholder: string }[] = [
   { name: "documentNumberPrefixPayslip", label: "Payslip prefix", placeholder: "PAY" },
 ];
 
-export default async function AdminSettingsPage() {
+export default async function AdminSettingsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ success?: string; error?: string }>;
+}) {
   await requireAdminSession();
   const settings = await getSettings();
+  const { success, error } = await searchParams;
 
   return (
     <div>
       <h2 className="text-lg font-medium">Settings</h2>
+      <FeedbackBanner success={success} error={error} />
       <p className="mt-2 text-neutral-500">
         Company details used on PDFs and emails, and overrides for document number prefixes.
       </p>

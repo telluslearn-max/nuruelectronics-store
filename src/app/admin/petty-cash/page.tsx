@@ -5,6 +5,7 @@ import { formatPrice } from "@/lib/format";
 import { createPettyCashFund, replenishPettyCash } from "@/lib/petty-cash-actions";
 import { parsePage, type PageSearchParams } from "@/lib/pagination";
 import { PaginationControls } from "@/components/admin/pagination-controls";
+import { FeedbackBanner } from "@/components/admin/feedback-banner";
 
 export const metadata: Metadata = { title: "Petty Cash" };
 
@@ -20,10 +21,11 @@ const primaryButtonClass =
 export default async function AdminPettyCashPage({
   searchParams,
 }: {
-  searchParams: Promise<PageSearchParams>;
+  searchParams: Promise<PageSearchParams & { success?: string; error?: string }>;
 }) {
   await requireAdminSession();
   const resolvedSearchParams = await searchParams;
+  const { success, error } = resolvedSearchParams;
   const { page, skip, take } = parsePage(resolvedSearchParams);
 
   const fund = await prisma.pettyCashFund.findFirst();
@@ -32,6 +34,7 @@ export default async function AdminPettyCashPage({
     return (
       <div>
         <h2 className="text-lg font-medium">Petty Cash</h2>
+        <FeedbackBanner success={success} error={error} />
         <p className="mt-2 text-neutral-500">No petty cash fund yet — set one up with its starting float.</p>
         <form action={createPettyCashFund} className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
@@ -69,6 +72,7 @@ export default async function AdminPettyCashPage({
   return (
     <div>
       <h2 className="text-lg font-medium">{fund.name}</h2>
+      <FeedbackBanner success={success} error={error} />
       <p className="mt-2 text-neutral-500">
         Float {formatPrice(fund.floatAmount.toString(), "KES")} · Current balance {formatPrice(balance.toFixed(2), "KES")}
       </p>

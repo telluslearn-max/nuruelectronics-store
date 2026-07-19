@@ -9,7 +9,25 @@ import { ACCOUNTS, cashAccountForMethod, postJournalEntry } from "./ledger";
 import { decrementVariantInventory, getShopifyOrderById } from "./shopify/admin-api";
 import { sendDeliveryNoteEmail as sendDeliveryNoteEmailMessage, sendEstimateEmail as sendEstimateEmailMessage, sendInvoiceEmail as sendInvoiceEmailMessage, sendReceiptEmail as sendReceiptEmailMessage } from "./email";
 import { renderDeliveryNotePdf, renderEstimatePdf, renderInvoicePdf, renderReceiptPdf } from "./pdf/render";
+import { redirectWithError, redirectWithSuccess } from "./admin-feedback";
+import { logAdminAction } from "./audit-log";
 import type { PaymentMethod } from "@prisma/client";
+
+/**
+ * Thrown by the "Silent" variant of an action that's also used by the bulk
+ * runner (bulkRunPerType) — the bulk path just wants a plain throw to catch
+ * and count as skipped, but the single-item public action needs the
+ * redirect target to show the failure as an inline banner instead of
+ * crashing to the error boundary.
+ */
+class ActionGuardError extends Error {
+  constructor(
+    message: string,
+    public redirectPath: string,
+  ) {
+    super(message);
+  }
+}
 
 function parseLineItems(
   formData: FormData,
@@ -46,7 +64,7 @@ export async function createManualOrder(formData: FormData): Promise<void> {
   const items = parseLineItems(formData);
 
   if (!email || items.length === 0) {
-    throw new Error("A customer email and at least one line item are required.");
+    redirectWithError("/admin/orders/new", "A customer email and at least one line item are required.");
   }
 
   const order = await prisma.$transaction(async (tx) => {
@@ -82,7 +100,7 @@ export async function createManualOrder(formData: FormData): Promise<void> {
   }
 
   revalidatePath("/admin/orders");
-  redirect(`/admin/orders/${order.id}`);
+  redirectWithSuccess(`/admin/orders/${order.id}`, "Order created.");
 }
 
 /** Imports a live Shopify order into our own Order/OrderItem tables on first use, so it can carry documents. Idempotent on shopifyOrderId. */
@@ -96,12 +114,12 @@ export async function importShopifyOrder(shopifyOrderId: string): Promise<void> 
 
   const shopifyOrder = await getShopifyOrderById(shopifyOrderId);
   if (!shopifyOrder) {
-    throw new Error("Shopify order not found.");
+    redirectWithError("/admin/orders", "Shopify order not found.");
   }
 
   const email = shopifyOrder.customer?.email?.toLowerCase() ?? null;
   if (!email) {
-    throw new Error("This Shopify order has no customer email on file.");
+    redirectWithError("/admin/orders", "This Shopify order has no customer email on file.");
   }
 
   const order = await prisma.$transaction(async (tx) => {
@@ -132,7 +150,7 @@ export async function importShopifyOrder(shopifyOrderId: string): Promise<void> 
   });
 
   revalidatePath("/admin/orders");
-  redirect(`/admin/orders/${order.id}`);
+  redirectWithSuccess(`/admin/orders/${order.id}`, "Order imported from Shopify.");
 }
 
 function sumItems(items: { lineTotal: unknown }[]): number {
@@ -171,7 +189,7 @@ export async function createEstimate(orderId: string, formData: FormData): Promi
   });
 
   revalidatePath(`/admin/orders/${orderId}`);
-  redirect(`/admin/orders/${orderId}`);
+  redirectWithSuccess(`/admin/orders/${orderId}`, "Estimate created.");
 }
 
 export async function updateEstimate(estimateId: string, formData: FormData): Promise<void> {
@@ -182,7 +200,7 @@ export async function updateEstimate(estimateId: string, formData: FormData): Pr
   });
 
   if (estimate.status !== "draft" && estimate.status !== "sent") {
-    throw new Error("Can't edit an estimate the customer has already responded to.");
+    redirectWithError(`/admin/orders/${estimate.orderId}`, "Can't edit an estimate the customer has already responded to.");
   }
 
   const validUntil = new Date(String(formData.get("validUntil")));
@@ -207,25 +225,38 @@ export async function updateEstimate(estimateId: string, formData: FormData): Pr
   });
 
   revalidatePath(`/admin/orders/${estimate.orderId}`);
-  redirect(`/admin/orders/${estimate.orderId}`);
+  redirectWithSuccess(`/admin/orders/${estimate.orderId}`, "Estimate updated.");
+}
+
+async function deleteEstimateSilent(estimateId: string): Promise<{ orderId: string; number: string }> {
+  const estimate = await prisma.estimate.findUniqueOrThrow({ where: { id: estimateId } });
+
+  await prisma.estimate.delete({ where: { id: estimateId } });
+  await logAdminAction({
+    action: "estimate.delete",
+    entityType: "estimate",
+    entityId: estimateId,
+    summary: `Deleted estimate ${estimate.number}`,
+  });
+
+  revalidatePath(`/admin/orders/${estimate.orderId}`);
+  return { orderId: estimate.orderId, number: estimate.number };
 }
 
 export async function deleteEstimate(estimateId: string): Promise<void> {
   await requireAdminSession();
-  const estimate = await prisma.estimate.findUniqueOrThrow({ where: { id: estimateId } });
-
-  await prisma.estimate.delete({ where: { id: estimateId } });
-
-  revalidatePath(`/admin/orders/${estimate.orderId}`);
+  const { orderId } = await deleteEstimateSilent(estimateId);
+  redirectWithSuccess(`/admin/orders/${orderId}`, "Estimate deleted.");
 }
 
-export async function sendEstimateEmail(estimateId: string): Promise<void> {
-  await requireAdminSession();
+async function sendEstimateEmailSilent(estimateId: string): Promise<{ orderId: string }> {
   const estimate = await prisma.estimate.findUniqueOrThrow({
     where: { id: estimateId },
     include: { order: { include: { customer: true, items: true } } },
   });
-  if (!estimate.order.customer.email) throw new Error("Customer has no email on file.");
+  if (!estimate.order.customer.email) {
+    throw new ActionGuardError("Customer has no email on file.", `/admin/orders/${estimate.orderId}`);
+  }
 
   const pdfBuffer = await renderEstimatePdf(estimate, estimate.order, estimate.order.customer, estimate.order.items);
   await sendEstimateEmailMessage(estimate, estimate.order.customer, pdfBuffer);
@@ -236,6 +267,18 @@ export async function sendEstimateEmail(estimateId: string): Promise<void> {
   });
 
   revalidatePath(`/admin/orders/${estimate.orderId}`);
+  return { orderId: estimate.orderId };
+}
+
+export async function sendEstimateEmail(estimateId: string): Promise<void> {
+  await requireAdminSession();
+  try {
+    const { orderId } = await sendEstimateEmailSilent(estimateId);
+    redirectWithSuccess(`/admin/orders/${orderId}`, "Estimate emailed.");
+  } catch (error) {
+    if (error instanceof ActionGuardError) redirectWithError(error.redirectPath, error.message);
+    throw error;
+  }
 }
 
 export async function createInvoiceFromEstimate(estimateId: string): Promise<void> {
@@ -270,7 +313,7 @@ export async function createInvoiceFromEstimate(estimateId: string): Promise<voi
   });
 
   revalidatePath(`/admin/orders/${estimate.orderId}`);
-  redirect(`/admin/orders/${estimate.orderId}`);
+  redirectWithSuccess(`/admin/orders/${estimate.orderId}`, "Invoice created from estimate.");
 }
 
 export async function createInvoice(orderId: string, formData: FormData): Promise<void> {
@@ -316,7 +359,7 @@ export async function createInvoice(orderId: string, formData: FormData): Promis
   });
 
   revalidatePath(`/admin/orders/${orderId}`);
-  redirect(`/admin/orders/${orderId}`);
+  redirectWithSuccess(`/admin/orders/${orderId}`, "Invoice created.");
 }
 
 export async function updateInvoice(invoiceId: string, formData: FormData): Promise<void> {
@@ -327,10 +370,10 @@ export async function updateInvoice(invoiceId: string, formData: FormData): Prom
   });
 
   if (Number(invoice.amountPaid) > 0) {
-    throw new Error("Can't edit an invoice that has received payments.");
+    redirectWithError(`/admin/orders/${invoice.orderId}`, "Can't edit an invoice that has received payments.");
   }
   if (invoice.status !== "draft" && invoice.status !== "sent") {
-    throw new Error("Can't edit a voided invoice.");
+    redirectWithError(`/admin/orders/${invoice.orderId}`, "Can't edit a voided invoice.");
   }
 
   const taxTotal = Number(formData.get("taxTotal") ?? 0) || 0;
@@ -370,15 +413,17 @@ export async function updateInvoice(invoiceId: string, formData: FormData): Prom
   });
 
   revalidatePath(`/admin/orders/${invoice.orderId}`);
-  redirect(`/admin/orders/${invoice.orderId}`);
+  redirectWithSuccess(`/admin/orders/${invoice.orderId}`, "Invoice updated.");
 }
 
-export async function deleteInvoice(invoiceId: string): Promise<void> {
-  await requireAdminSession();
+async function deleteInvoiceSilent(invoiceId: string): Promise<{ orderId: string; number: string }> {
   const invoice = await prisma.invoice.findUniqueOrThrow({ where: { id: invoiceId } });
 
   if (Number(invoice.amountPaid) > 0) {
-    throw new Error("Can't delete an invoice that has received payments.");
+    throw new ActionGuardError(
+      "Can't delete an invoice that has received payments.",
+      `/admin/orders/${invoice.orderId}`,
+    );
   }
 
   await prisma.$transaction(async (tx) => {
@@ -388,17 +433,36 @@ export async function deleteInvoice(invoiceId: string): Promise<void> {
     await tx.journalEntry.deleteMany({ where: { sourceId: invoiceId } });
     await tx.invoice.delete({ where: { id: invoiceId } });
   });
+  await logAdminAction({
+    action: "invoice.delete",
+    entityType: "invoice",
+    entityId: invoiceId,
+    summary: `Deleted invoice ${invoice.number}`,
+  });
 
   revalidatePath(`/admin/orders/${invoice.orderId}`);
+  return { orderId: invoice.orderId, number: invoice.number };
 }
 
-export async function sendInvoiceEmail(invoiceId: string): Promise<void> {
+export async function deleteInvoice(invoiceId: string): Promise<void> {
   await requireAdminSession();
+  try {
+    const { orderId } = await deleteInvoiceSilent(invoiceId);
+    redirectWithSuccess(`/admin/orders/${orderId}`, "Invoice deleted.");
+  } catch (error) {
+    if (error instanceof ActionGuardError) redirectWithError(error.redirectPath, error.message);
+    throw error;
+  }
+}
+
+async function sendInvoiceEmailSilent(invoiceId: string): Promise<{ orderId: string }> {
   const invoice = await prisma.invoice.findUniqueOrThrow({
     where: { id: invoiceId },
     include: { order: { include: { customer: true, items: true } } },
   });
-  if (!invoice.order.customer.email) throw new Error("Customer has no email on file.");
+  if (!invoice.order.customer.email) {
+    throw new ActionGuardError("Customer has no email on file.", `/admin/orders/${invoice.orderId}`);
+  }
 
   const pdfBuffer = await renderInvoicePdf(invoice, invoice.order, invoice.order.customer, invoice.order.items);
   await sendInvoiceEmailMessage(invoice, invoice.order.customer, pdfBuffer);
@@ -409,6 +473,18 @@ export async function sendInvoiceEmail(invoiceId: string): Promise<void> {
   });
 
   revalidatePath(`/admin/orders/${invoice.orderId}`);
+  return { orderId: invoice.orderId };
+}
+
+export async function sendInvoiceEmail(invoiceId: string): Promise<void> {
+  await requireAdminSession();
+  try {
+    const { orderId } = await sendInvoiceEmailSilent(invoiceId);
+    redirectWithSuccess(`/admin/orders/${orderId}`, "Invoice emailed.");
+  } catch (error) {
+    if (error instanceof ActionGuardError) redirectWithError(error.redirectPath, error.message);
+    throw error;
+  }
 }
 
 function nextInvoiceStatus(total: string, amountPaid: number): "sent" | "partially_paid" | "paid" {
@@ -420,15 +496,17 @@ function nextInvoiceStatus(total: string, amountPaid: number): "sent" | "partial
 export async function recordPayment(invoiceId: string, formData: FormData): Promise<void> {
   await requireAdminSession();
 
+  const invoice = await prisma.invoice.findUniqueOrThrow({ where: { id: invoiceId } });
+
   const amount = Number(formData.get("amount") ?? 0) || 0;
   const method = String(formData.get("method")) as PaymentMethod;
   const reference = String(formData.get("reference") ?? "").trim() || null;
   const paidAtRaw = String(formData.get("paidAt") ?? "");
   const paidAt = paidAtRaw ? new Date(paidAtRaw) : new Date();
 
-  if (amount <= 0) throw new Error("Payment amount must be greater than zero.");
-
-  const invoice = await prisma.invoice.findUniqueOrThrow({ where: { id: invoiceId } });
+  if (amount <= 0) {
+    redirectWithError(`/admin/orders/${invoice.orderId}`, "Payment amount must be greater than zero.");
+  }
 
   await prisma.$transaction(async (tx) => {
     const number = await mintDocumentNumber(tx, "receipt");
@@ -455,9 +533,21 @@ export async function recordPayment(invoiceId: string, formData: FormData): Prom
         { accountCode: ACCOUNTS.ACCOUNTS_RECEIVABLE, credit: amount },
       ],
     });
+
+    await logAdminAction(
+      {
+        action: "invoice.recordPayment",
+        entityType: "invoice",
+        entityId: invoiceId,
+        summary: `Recorded payment of ${amount.toFixed(2)} against invoice ${invoice.number}`,
+        metadata: { amount, method, reference },
+      },
+      tx,
+    );
   });
 
   revalidatePath(`/admin/orders/${invoice.orderId}`);
+  redirectWithSuccess(`/admin/orders/${invoice.orderId}`, "Payment recorded.");
 }
 
 export async function sendReceiptEmail(receiptId: string): Promise<void> {
@@ -466,12 +556,15 @@ export async function sendReceiptEmail(receiptId: string): Promise<void> {
     where: { id: receiptId },
     include: { invoice: { include: { order: { include: { customer: true } } } } },
   });
-  if (!receipt.invoice.order.customer.email) throw new Error("Customer has no email on file.");
+  if (!receipt.invoice.order.customer.email) {
+    redirectWithError(`/admin/orders/${receipt.invoice.orderId}`, "Customer has no email on file.");
+  }
 
   const pdfBuffer = await renderReceiptPdf(receipt, receipt.invoice, receipt.invoice.order.customer);
   await sendReceiptEmailMessage(receipt, receipt.invoice.order.customer, pdfBuffer);
 
   revalidatePath(`/admin/orders/${receipt.invoice.orderId}`);
+  redirectWithSuccess(`/admin/orders/${receipt.invoice.orderId}`, "Receipt emailed.");
 }
 
 export async function voidInvoice(invoiceId: string): Promise<void> {
@@ -479,7 +572,8 @@ export async function voidInvoice(invoiceId: string): Promise<void> {
   const invoice = await prisma.invoice.findUniqueOrThrow({ where: { id: invoiceId } });
 
   if (Number(invoice.amountPaid) > 0) {
-    throw new Error(
+    redirectWithError(
+      `/admin/orders/${invoice.orderId}`,
       "Can't void an invoice that has received payments — this system has no refund/credit-note concept yet. Contact your accountant for how to handle it.",
     );
   }
@@ -498,9 +592,19 @@ export async function voidInvoice(invoiceId: string): Promise<void> {
         { accountCode: ACCOUNTS.ACCOUNTS_RECEIVABLE, credit: Number(invoice.total) },
       ],
     });
+    await logAdminAction(
+      {
+        action: "invoice.void",
+        entityType: "invoice",
+        entityId: invoiceId,
+        summary: `Voided invoice ${invoice.number}`,
+      },
+      tx,
+    );
   });
 
   revalidatePath(`/admin/orders/${invoice.orderId}`);
+  redirectWithSuccess(`/admin/orders/${invoice.orderId}`, "Invoice voided.");
 }
 
 export async function updateDeliveryNote(deliveryNoteId: string, formData: FormData): Promise<void> {
@@ -508,7 +612,7 @@ export async function updateDeliveryNote(deliveryNoteId: string, formData: FormD
   const deliveryNote = await prisma.deliveryNote.findUniqueOrThrow({ where: { id: deliveryNoteId } });
 
   if (deliveryNote.status !== "pending") {
-    throw new Error("Can't edit a delivery note that's already marked delivered.");
+    redirectWithError(`/admin/orders/${deliveryNote.orderId}`, "Can't edit a delivery note that's already marked delivered.");
   }
 
   const recipientName = String(formData.get("recipientName") ?? "").trim();
@@ -517,7 +621,7 @@ export async function updateDeliveryNote(deliveryNoteId: string, formData: FormD
   const deliveryMethod = String(formData.get("deliveryMethod") ?? "").trim() || null;
 
   if (!recipientName || !deliveryAddress) {
-    throw new Error("Recipient name and delivery address are required.");
+    redirectWithError(`/admin/orders/${deliveryNote.orderId}`, "Recipient name and delivery address are required.");
   }
 
   await prisma.deliveryNote.update({
@@ -526,20 +630,40 @@ export async function updateDeliveryNote(deliveryNoteId: string, formData: FormD
   });
 
   revalidatePath(`/admin/orders/${deliveryNote.orderId}`);
-  redirect(`/admin/orders/${deliveryNote.orderId}`);
+  redirectWithSuccess(`/admin/orders/${deliveryNote.orderId}`, "Delivery note updated.");
+}
+
+async function deleteDeliveryNoteSilent(deliveryNoteId: string): Promise<{ orderId: string; number: string }> {
+  const deliveryNote = await prisma.deliveryNote.findUniqueOrThrow({ where: { id: deliveryNoteId } });
+
+  if (deliveryNote.status !== "pending") {
+    throw new ActionGuardError(
+      "Can't delete a delivery note that's already marked delivered.",
+      `/admin/orders/${deliveryNote.orderId}`,
+    );
+  }
+
+  await prisma.deliveryNote.delete({ where: { id: deliveryNoteId } });
+  await logAdminAction({
+    action: "deliveryNote.delete",
+    entityType: "deliveryNote",
+    entityId: deliveryNoteId,
+    summary: `Deleted delivery note ${deliveryNote.number}`,
+  });
+
+  revalidatePath(`/admin/orders/${deliveryNote.orderId}`);
+  return { orderId: deliveryNote.orderId, number: deliveryNote.number };
 }
 
 export async function deleteDeliveryNote(deliveryNoteId: string): Promise<void> {
   await requireAdminSession();
-  const deliveryNote = await prisma.deliveryNote.findUniqueOrThrow({ where: { id: deliveryNoteId } });
-
-  if (deliveryNote.status !== "pending") {
-    throw new Error("Can't delete a delivery note that's already marked delivered.");
+  try {
+    const { orderId } = await deleteDeliveryNoteSilent(deliveryNoteId);
+    redirectWithSuccess(`/admin/orders/${orderId}`, "Delivery note deleted.");
+  } catch (error) {
+    if (error instanceof ActionGuardError) redirectWithError(error.redirectPath, error.message);
+    throw error;
   }
-
-  await prisma.deliveryNote.delete({ where: { id: deliveryNoteId } });
-
-  revalidatePath(`/admin/orders/${deliveryNote.orderId}`);
 }
 
 export async function createDeliveryNote(orderId: string, formData: FormData): Promise<void> {
@@ -551,7 +675,7 @@ export async function createDeliveryNote(orderId: string, formData: FormData): P
   const deliveryMethod = String(formData.get("deliveryMethod") ?? "").trim() || null;
 
   if (!recipientName || !deliveryAddress) {
-    throw new Error("Recipient name and delivery address are required.");
+    redirectWithError(`/admin/orders/${orderId}/delivery-note/new`, "Recipient name and delivery address are required.");
   }
 
   await prisma.$transaction(async (tx) => {
@@ -562,7 +686,7 @@ export async function createDeliveryNote(orderId: string, formData: FormData): P
   });
 
   revalidatePath(`/admin/orders/${orderId}`);
-  redirect(`/admin/orders/${orderId}`);
+  redirectWithSuccess(`/admin/orders/${orderId}`, "Delivery note created.");
 }
 
 export async function markDelivered(deliveryNoteId: string, formData: FormData): Promise<void> {
@@ -575,20 +699,34 @@ export async function markDelivered(deliveryNoteId: string, formData: FormData):
   });
 
   revalidatePath(`/admin/orders/${note.orderId}`);
+  redirectWithSuccess(`/admin/orders/${note.orderId}`, "Marked as delivered.");
 }
 
-export async function sendDeliveryNoteEmail(deliveryNoteId: string): Promise<void> {
-  await requireAdminSession();
+async function sendDeliveryNoteEmailSilent(deliveryNoteId: string): Promise<{ orderId: string }> {
   const note = await prisma.deliveryNote.findUniqueOrThrow({
     where: { id: deliveryNoteId },
     include: { order: { include: { customer: true, items: true } } },
   });
-  if (!note.order.customer.email) throw new Error("Customer has no email on file.");
+  if (!note.order.customer.email) {
+    throw new ActionGuardError("Customer has no email on file.", `/admin/orders/${note.orderId}`);
+  }
 
   const pdfBuffer = await renderDeliveryNotePdf(note, note.order, note.order.items);
   await sendDeliveryNoteEmailMessage(note, note.order.customer, pdfBuffer);
 
   revalidatePath(`/admin/orders/${note.orderId}`);
+  return { orderId: note.orderId };
+}
+
+export async function sendDeliveryNoteEmail(deliveryNoteId: string): Promise<void> {
+  await requireAdminSession();
+  try {
+    const { orderId } = await sendDeliveryNoteEmailSilent(deliveryNoteId);
+    redirectWithSuccess(`/admin/orders/${orderId}`, "Delivery note emailed.");
+  } catch (error) {
+    if (error instanceof ActionGuardError) redirectWithError(error.redirectPath, error.message);
+    throw error;
+  }
 }
 
 export type BulkDocumentType = "invoice" | "estimate" | "delivery-note";
@@ -603,7 +741,11 @@ export type BulkDocumentType = "invoice" | "estimate" | "delivery-note";
 async function bulkRunPerType(
   type: BulkDocumentType,
   ids: string[],
-  runners: { invoice: (id: string) => Promise<void>; estimate: (id: string) => Promise<void>; "delivery-note": (id: string) => Promise<void> },
+  runners: {
+    invoice: (id: string) => Promise<unknown>;
+    estimate: (id: string) => Promise<unknown>;
+    "delivery-note": (id: string) => Promise<unknown>;
+  },
 ): Promise<{ succeeded: number; skipped: number }> {
   let succeeded = 0;
   for (const id of ids) {
@@ -621,26 +763,32 @@ export async function bulkDeleteDocuments(type: BulkDocumentType, formData: Form
   await requireAdminSession();
   const ids = formData.getAll("ids").map(String);
 
-  await bulkRunPerType(type, ids, {
-    invoice: deleteInvoice,
-    estimate: deleteEstimate,
-    "delivery-note": deleteDeliveryNote,
+  const { succeeded, skipped } = await bulkRunPerType(type, ids, {
+    invoice: deleteInvoiceSilent,
+    estimate: deleteEstimateSilent,
+    "delivery-note": deleteDeliveryNoteSilent,
   });
 
   revalidatePath("/admin/documents");
-  redirect(`/admin/documents?type=${type}`);
+  redirectWithSuccess(
+    `/admin/documents?type=${type}`,
+    `Deleted ${succeeded} document(s)${skipped > 0 ? `, skipped ${skipped} ineligible` : ""}.`,
+  );
 }
 
 export async function bulkEmailDocuments(type: BulkDocumentType, formData: FormData): Promise<void> {
   await requireAdminSession();
   const ids = formData.getAll("ids").map(String);
 
-  await bulkRunPerType(type, ids, {
-    invoice: sendInvoiceEmail,
-    estimate: sendEstimateEmail,
-    "delivery-note": sendDeliveryNoteEmail,
+  const { succeeded, skipped } = await bulkRunPerType(type, ids, {
+    invoice: sendInvoiceEmailSilent,
+    estimate: sendEstimateEmailSilent,
+    "delivery-note": sendDeliveryNoteEmailSilent,
   });
 
   revalidatePath("/admin/documents");
-  redirect(`/admin/documents?type=${type}`);
+  redirectWithSuccess(
+    `/admin/documents?type=${type}`,
+    `Emailed ${succeeded} document(s)${skipped > 0 ? `, skipped ${skipped}` : ""}.`,
+  );
 }

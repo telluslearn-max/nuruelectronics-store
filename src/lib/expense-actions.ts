@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "./prisma";
 import { requireAdminSession } from "./admin-auth";
 import { ACCOUNTS, postJournalEntry } from "./ledger";
+import { redirectWithError, redirectWithSuccess } from "./admin-feedback";
 import type { ExpenseCategory, ExpensePaymentSource } from "@prisma/client";
 
 const EXPENSE_ACCOUNT_BY_SUBCATEGORY: Record<string, string> = {
@@ -34,12 +35,14 @@ export async function createExpense(formData: FormData): Promise<void> {
   const paidFrom = String(formData.get("paidFrom")) as ExpensePaymentSource;
 
   if (!subcategory || amount <= 0) {
-    throw new Error("A subcategory and a positive amount are required.");
+    redirectWithError("/admin/expenses", "A subcategory and a positive amount are required.");
   }
 
   if (paidFrom === "petty_cash") {
     const fund = await prisma.pettyCashFund.findFirst();
-    if (!fund) throw new Error("Create a petty cash fund first before recording petty cash expenses.");
+    if (!fund) {
+      redirectWithError("/admin/expenses", "Create a petty cash fund first before recording petty cash expenses.");
+    }
 
     await prisma.$transaction(async (tx) => {
       const expense = await tx.expense.create({
@@ -79,4 +82,5 @@ export async function createExpense(formData: FormData): Promise<void> {
 
   revalidatePath("/admin/expenses");
   revalidatePath("/admin/petty-cash");
+  redirectWithSuccess("/admin/expenses", "Expense recorded.");
 }

@@ -5,6 +5,7 @@ import { formatPrice } from "@/lib/format";
 import { createManualJournalEntry } from "@/lib/ledger-actions";
 import { parsePage, type PageSearchParams } from "@/lib/pagination";
 import { PaginationControls } from "@/components/admin/pagination-controls";
+import { FeedbackBanner } from "@/components/admin/feedback-banner";
 
 export const metadata: Metadata = { title: "Journal" };
 
@@ -22,10 +23,11 @@ const LINE_ROWS = 6;
 export default async function AdminJournalPage({
   searchParams,
 }: {
-  searchParams: Promise<PageSearchParams>;
+  searchParams: Promise<PageSearchParams & { success?: string; error?: string }>;
 }) {
   await requireAdminSession();
   const resolvedSearchParams = await searchParams;
+  const { success, error } = resolvedSearchParams;
   const { page, skip, take } = parsePage(resolvedSearchParams, 50);
 
   const [entries, totalCount, accounts] = await Promise.all([
@@ -42,6 +44,7 @@ export default async function AdminJournalPage({
   return (
     <div>
       <h2 className="text-lg font-medium">Journal</h2>
+      <FeedbackBanner success={success} error={error} />
       <p className="mt-2 text-neutral-500">
         Most entries post automatically from invoices, receipts, and other business events. Use the form below only
         for adjustments.

@@ -1,6 +1,5 @@
 "use server";
 
-import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "./prisma";
 import { requireAdminSession } from "./admin-auth";
@@ -8,6 +7,8 @@ import { mintDocumentNumber } from "./documents";
 import { ACCOUNTS, cashAccountForMethod, postJournalEntry } from "./ledger";
 import { renderPayslipPdf } from "./pdf/render";
 import { sendPayslipEmail as sendPayslipEmailMessage } from "./email";
+import { redirectWithError, redirectWithSuccess } from "./admin-feedback";
+import { logAdminAction } from "./audit-log";
 import type { PaymentMethod } from "@prisma/client";
 
 export async function createEmployee(formData: FormData): Promise<void> {
@@ -17,10 +18,11 @@ export async function createEmployee(formData: FormData): Promise<void> {
   const email = String(formData.get("email") ?? "").trim() || null;
   const phone = String(formData.get("phone") ?? "").trim() || null;
   const role = String(formData.get("role") ?? "").trim() || null;
-  if (!name) throw new Error("Employee name is required.");
+  if (!name) redirectWithError("/admin/payroll/employees", "Employee name is required.");
 
   await prisma.employee.create({ data: { name, email, phone, role } });
   revalidatePath("/admin/payroll/employees");
+  redirectWithSuccess("/admin/payroll/employees", "Employee added.");
 }
 
 export async function createPayRun(formData: FormData): Promise<void> {
@@ -29,12 +31,12 @@ export async function createPayRun(formData: FormData): Promise<void> {
   const periodStart = new Date(String(formData.get("periodStart") ?? ""));
   const periodEnd = new Date(String(formData.get("periodEnd") ?? ""));
   if (Number.isNaN(periodStart.getTime()) || Number.isNaN(periodEnd.getTime())) {
-    throw new Error("A valid period start and end are required.");
+    redirectWithError("/admin/payroll/runs", "A valid period start and end are required.");
   }
 
   const payRun = await prisma.payRun.create({ data: { periodStart, periodEnd } });
   revalidatePath("/admin/payroll/runs");
-  redirect(`/admin/payroll/runs/${payRun.id}`);
+  redirectWithSuccess(`/admin/payroll/runs/${payRun.id}`, "Pay run created.");
 }
 
 function parseDeductions(formData: FormData): { type: string; amount: number }[] {
@@ -57,8 +59,12 @@ export async function addPayslip(payRunId: string, formData: FormData): Promise<
   const totalDeductions = deductions.reduce((sum, d) => sum + d.amount, 0);
   const netPay = grossPay - totalDeductions;
 
-  if (!employeeId || grossPay <= 0) throw new Error("An employee and a positive gross pay are required.");
-  if (netPay < 0) throw new Error("Deductions cannot exceed gross pay.");
+  if (!employeeId || grossPay <= 0) {
+    redirectWithError(`/admin/payroll/runs/${payRunId}`, "An employee and a positive gross pay are required.");
+  }
+  if (netPay < 0) {
+    redirectWithError(`/admin/payroll/runs/${payRunId}`, "Deductions cannot exceed gross pay.");
+  }
 
   await prisma.$transaction(async (tx) => {
     const number = await mintDocumentNumber(tx, "payslip");
@@ -75,6 +81,7 @@ export async function addPayslip(payRunId: string, formData: FormData): Promise<
   });
 
   revalidatePath(`/admin/payroll/runs/${payRunId}`);
+  redirectWithSuccess(`/admin/payroll/runs/${payRunId}`, "Payslip added.");
 }
 
 export async function finalizePayRun(payRunId: string, formData: FormData): Promise<void> {
@@ -85,7 +92,9 @@ export async function finalizePayRun(payRunId: string, formData: FormData): Prom
     where: { id: payRunId },
     include: { payslips: { include: { deductions: true } } },
   });
-  if (payRun.payslips.length === 0) throw new Error("Add at least one payslip before finalizing.");
+  if (payRun.payslips.length === 0) {
+    redirectWithError(`/admin/payroll/runs/${payRunId}`, "Add at least one payslip before finalizing.");
+  }
 
   await prisma.$transaction(async (tx) => {
     for (const payslip of payRun.payslips) {
@@ -105,9 +114,20 @@ export async function finalizePayRun(payRunId: string, formData: FormData): Prom
       });
     }
     await tx.payRun.update({ where: { id: payRunId }, data: { status: "finalized" } });
+    await logAdminAction(
+      {
+        action: "payRun.finalize",
+        entityType: "payRun",
+        entityId: payRunId,
+        summary: `Finalized pay run ${payRunId.slice(0, 8)} (${payRun.payslips.length} payslip(s))`,
+        metadata: { paidFrom, payslipCount: payRun.payslips.length },
+      },
+      tx,
+    );
   });
 
   revalidatePath(`/admin/payroll/runs/${payRunId}`);
+  redirectWithSuccess(`/admin/payroll/runs/${payRunId}`, "Pay run finalized.");
 }
 
 export async function sendPayslipEmail(payslipId: string): Promise<void> {
@@ -116,11 +136,14 @@ export async function sendPayslipEmail(payslipId: string): Promise<void> {
     where: { id: payslipId },
     include: { employee: true, deductions: true, payRun: true },
   });
-  if (!payslip.employee.email) throw new Error("Employee has no email on file.");
+  if (!payslip.employee.email) {
+    redirectWithError(`/admin/payroll/runs/${payslip.payRunId}`, "Employee has no email on file.");
+  }
 
   const pdfBuffer = await renderPayslipPdf(payslip, payslip.employee, payslip.deductions, payslip.payRun);
   await sendPayslipEmailMessage(payslip, payslip.employee, pdfBuffer);
 
   await prisma.payslip.update({ where: { id: payslipId }, data: { sentAt: new Date() } });
   revalidatePath(`/admin/payroll/runs/${payslip.payRunId}`);
+  redirectWithSuccess(`/admin/payroll/runs/${payslip.payRunId}`, "Payslip emailed.");
 }

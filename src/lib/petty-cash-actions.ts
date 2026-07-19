@@ -4,16 +4,17 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "./prisma";
 import { requireAdminSession } from "./admin-auth";
 import { ACCOUNTS, postJournalEntry } from "./ledger";
+import { redirectWithError, redirectWithSuccess } from "./admin-feedback";
 
 export async function createPettyCashFund(formData: FormData): Promise<void> {
   await requireAdminSession();
 
   const name = String(formData.get("name") ?? "Shop Petty Cash").trim() || "Shop Petty Cash";
   const floatAmount = Number(formData.get("floatAmount") ?? 0) || 0;
-  if (floatAmount <= 0) throw new Error("Float amount must be greater than zero.");
+  if (floatAmount <= 0) redirectWithError("/admin/petty-cash", "Float amount must be greater than zero.");
 
   const existing = await prisma.pettyCashFund.findFirst();
-  if (existing) throw new Error("A petty cash fund already exists.");
+  if (existing) redirectWithError("/admin/petty-cash", "A petty cash fund already exists.");
 
   await prisma.$transaction(async (tx) => {
     const fund = await tx.pettyCashFund.create({ data: { name, floatAmount: floatAmount.toFixed(2) } });
@@ -39,13 +40,14 @@ export async function createPettyCashFund(formData: FormData): Promise<void> {
   });
 
   revalidatePath("/admin/petty-cash");
+  redirectWithSuccess("/admin/petty-cash", "Petty cash fund created.");
 }
 
 export async function replenishPettyCash(fundId: string, formData: FormData): Promise<void> {
   await requireAdminSession();
 
   const amount = Number(formData.get("amount") ?? 0) || 0;
-  if (amount <= 0) throw new Error("Replenishment amount must be greater than zero.");
+  if (amount <= 0) redirectWithError("/admin/petty-cash", "Replenishment amount must be greater than zero.");
 
   await prisma.$transaction(async (tx) => {
     const entry = await tx.pettyCashEntry.create({
@@ -64,4 +66,5 @@ export async function replenishPettyCash(fundId: string, formData: FormData): Pr
   });
 
   revalidatePath("/admin/petty-cash");
+  redirectWithSuccess("/admin/petty-cash", "Petty cash replenished.");
 }

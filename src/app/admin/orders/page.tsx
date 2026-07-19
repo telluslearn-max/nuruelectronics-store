@@ -7,6 +7,7 @@ import { formatPrice } from "@/lib/format";
 import { importShopifyOrder } from "@/lib/admin-actions";
 import { parsePage, type PageSearchParams } from "@/lib/pagination";
 import { PaginationControls } from "@/components/admin/pagination-controls";
+import { FeedbackBanner } from "@/components/admin/feedback-banner";
 
 export const metadata: Metadata = {
   title: "Orders",
@@ -19,10 +20,11 @@ function formatDate(dateString: string | Date) {
 export default async function AdminOrdersPage({
   searchParams,
 }: {
-  searchParams: Promise<PageSearchParams>;
+  searchParams: Promise<PageSearchParams & { success?: string; error?: string }>;
 }) {
   await requireAdminSession();
   const resolvedSearchParams = await searchParams;
+  const { success, error } = resolvedSearchParams;
   const { page, skip, take } = parsePage(resolvedSearchParams);
 
   let shopifyError: string | null = null;
@@ -61,6 +63,7 @@ export default async function AdminOrdersPage({
           + New manual order
         </Link>
       </div>
+      <FeedbackBanner success={success} error={error} />
 
       <div className="mt-6">
         <h3 className="text-sm font-medium text-neutral-500">Manual / WhatsApp orders</h3>

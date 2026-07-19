@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { requireAdminSession } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
 import { updateCustomer } from "@/lib/customer-actions";
+import { FeedbackBanner } from "@/components/admin/feedback-banner";
 
 export const metadata: Metadata = { title: "Customer" };
 
@@ -16,9 +17,16 @@ function formatDate(date: Date) {
   return new Intl.DateTimeFormat("en-KE", { dateStyle: "medium" }).format(date);
 }
 
-export default async function AdminCustomerDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function AdminCustomerDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ success?: string; error?: string }>;
+}) {
   await requireAdminSession();
   const { id } = await params;
+  const { success, error } = await searchParams;
 
   const customer = await prisma.customer.findUnique({
     where: { id },
@@ -35,6 +43,7 @@ export default async function AdminCustomerDetailPage({ params }: { params: Prom
   return (
     <div>
       <h2 className="text-lg font-medium">{customer.name ?? customer.email}</h2>
+      <FeedbackBanner success={success} error={error} />
 
       <details className="mt-6" open>
         <summary className="cursor-pointer text-sm font-medium">Contact details</summary>

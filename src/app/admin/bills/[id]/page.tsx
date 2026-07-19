@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { formatPrice } from "@/lib/format";
 import { recordSupplierPayment } from "@/lib/creditor-actions";
 import { StatusPill } from "@/components/admin/status-pill";
+import { FeedbackBanner } from "@/components/admin/feedback-banner";
 
 export const metadata: Metadata = { title: "Bill" };
 
@@ -18,9 +19,16 @@ const inputClass =
 const primaryButtonClass =
   "rounded-control bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:opacity-90";
 
-export default async function AdminBillDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function AdminBillDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ success?: string; error?: string }>;
+}) {
   await requireAdminSession();
   const { id } = await params;
+  const { success, error } = await searchParams;
 
   const bill = await prisma.bill.findUnique({
     where: { id },
@@ -32,6 +40,7 @@ export default async function AdminBillDetailPage({ params }: { params: Promise<
 
   return (
     <div>
+      <FeedbackBanner success={success} error={error} />
       <h2 className="text-lg font-medium">{bill.number}</h2>
       <p className="mt-1 text-sm text-neutral-500">
         {bill.supplier.name} · {bill.description} · Bill date {formatDate(bill.billDate)} · Due {formatDate(bill.dueAt)}

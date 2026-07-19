@@ -4,14 +4,22 @@ import { prisma } from "@/lib/prisma";
 import { requireAdminSession } from "@/lib/admin-auth";
 import { createDeliveryNote } from "@/lib/admin-actions";
 import { ScreenHeader, cardClass, cardLabelClass, inputClass, primaryButtonClass } from "../../_shared";
+import { FeedbackBanner } from "@/components/admin/feedback-banner";
 
 export const metadata: Metadata = {
   title: "Create delivery note",
 };
 
-export default async function NewDeliveryNotePage({ params }: { params: Promise<{ id: string }> }) {
+export default async function NewDeliveryNotePage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ error?: string }>;
+}) {
   await requireAdminSession();
   const { id } = await params;
+  const { error } = await searchParams;
 
   const order = await prisma.order.findUnique({
     where: { id },
@@ -24,6 +32,7 @@ export default async function NewDeliveryNotePage({ params }: { params: Promise<
   return (
     <div>
       <ScreenHeader backHref={`/admin/orders/${order.id}`} title="Create delivery note" />
+      <FeedbackBanner error={error} />
       <form action={createDeliveryNote.bind(null, order.id)} className="space-y-4">
         <div className={cardClass}>
           <p className={cardLabelClass}>Recipient</p>

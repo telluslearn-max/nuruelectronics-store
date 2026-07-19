@@ -6,6 +6,7 @@ import { requireAdminSession } from "@/lib/admin-auth";
 import { formatPrice } from "@/lib/format";
 import { StatusPill } from "@/components/admin/status-pill";
 import { ConfirmSubmitButton } from "@/components/admin/confirm-submit-button";
+import { FeedbackBanner } from "@/components/admin/feedback-banner";
 import {
   createInvoiceFromEstimate,
   deleteDeliveryNote,
@@ -38,9 +39,16 @@ export const metadata: Metadata = {
   title: "Order",
 };
 
-export default async function AdminOrderHubPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function AdminOrderHubPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ success?: string; error?: string }>;
+}) {
   await requireAdminSession();
   const { id } = await params;
+  const { success, error } = await searchParams;
 
   const order = await prisma.order.findUnique({
     where: { id },
@@ -66,6 +74,7 @@ export default async function AdminOrderHubPage({ params }: { params: Promise<{ 
 
   return (
     <div className="space-y-10">
+      <FeedbackBanner success={success} error={error} />
       <div>
         <h2 className="text-lg font-medium">
           {order.shopifyOrderName ?? `Manual order ${order.id.slice(0, 8)}`}
