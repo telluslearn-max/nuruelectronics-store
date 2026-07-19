@@ -30,7 +30,11 @@ const ROW_DEFS: [string, keyof Awaited<ReturnType<typeof computePnl>>][] = [
   ["PROFIT (LOSS)", "profit"],
 ];
 
-export default async function AdminPnlPage() {
+export default async function AdminPnlPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ month?: string }>;
+}) {
   await requireAdminSession();
 
   const now = new Date();
@@ -39,6 +43,9 @@ export default async function AdminPnlPage() {
     to: new Date(now.getFullYear() + 1, 0, 1),
     granularity: "monthly",
   });
+
+  const { month: monthParam } = await searchParams;
+  const selectedBucket = monthParam && pnl.buckets.includes(monthParam) ? monthParam : pnl.buckets[now.getMonth()];
 
   return (
     <div>
@@ -82,7 +89,51 @@ export default async function AdminPnlPage() {
         </p>
       )}
 
-      <div className="mt-6 overflow-x-auto">
+      <div className="sm:hidden">
+        <form method="GET" className="mt-4 flex items-end gap-3">
+          <div>
+            <label className="block text-xs text-neutral-500">Month</label>
+            <select
+              name="month"
+              defaultValue={selectedBucket}
+              className="w-full rounded-control border border-border-subtle px-3 py-2 text-sm outline-none focus:border-foreground"
+            >
+              {pnl.buckets.map((bucket) => (
+                <option key={bucket} value={bucket}>
+                  {monthLabel(bucket)} {now.getFullYear()}
+                </option>
+              ))}
+            </select>
+          </div>
+          <button
+            type="submit"
+            className="rounded-control border border-border-subtle px-4 py-2 text-sm font-medium hover:border-foreground"
+          >
+            View
+          </button>
+        </form>
+
+        <ul className="mt-4 space-y-2">
+          {ROW_DEFS.map(([label, key]) => {
+            const values = pnl[key] as Record<string, number>;
+            const value = values[selectedBucket] ?? 0;
+            const isTotalRow = label.startsWith("TOTAL") || label.startsWith("PROFIT");
+            return (
+              <li
+                key={label}
+                className={`flex items-center justify-between rounded-card border p-3 text-sm ${
+                  isTotalRow ? "border-foreground font-medium" : "border-border-subtle"
+                }`}
+              >
+                <span>{label}</span>
+                <span>{formatPrice(value.toFixed(2), "KES")}</span>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+
+      <div className="mt-6 hidden overflow-x-auto sm:block">
         <table className="w-full min-w-[720px] text-sm">
           <thead>
             <tr className="border-b border-border-subtle text-left text-xs text-neutral-500">

@@ -7,7 +7,7 @@ import { createEmployee } from "@/lib/payroll-actions";
 export const metadata: Metadata = { title: "Employees" };
 
 const inputClass =
-  "rounded-control border border-border-subtle px-3 py-2 text-sm outline-none focus:border-foreground";
+  "w-full rounded-control border border-border-subtle px-3 py-2 text-sm outline-none focus:border-foreground";
 const primaryButtonClass =
   "rounded-control bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:opacity-90";
 
@@ -27,7 +27,7 @@ export default async function AdminEmployeesPage() {
 
       <details className="mt-6">
         <summary className="cursor-pointer text-sm font-medium">Add employee</summary>
-        <form action={createEmployee} className="mt-4 flex flex-wrap items-end gap-3">
+        <form action={createEmployee} className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <label className="block text-xs text-neutral-500">Name</label>
             <input type="text" name="name" required className={inputClass} />
@@ -44,19 +44,26 @@ export default async function AdminEmployeesPage() {
             <label className="block text-xs text-neutral-500">Phone</label>
             <input type="text" name="phone" className={inputClass} />
           </div>
-          <button type="submit" className={primaryButtonClass}>
-            Save
-          </button>
+          <div className="sm:col-span-2">
+            <button type="submit" className={`${primaryButtonClass} w-full sm:w-auto`}>
+              Save
+            </button>
+          </div>
         </form>
       </details>
 
-      <ul className="mt-6 space-y-2">
+      <ul className="mt-6 space-y-3">
         {employees.map((employee) => (
-          <li key={employee.id} className="rounded-card border border-border-subtle p-3 text-sm">
-            {employee.name}
-            {employee.role && ` · ${employee.role}`}
-            {employee.email && ` · ${employee.email}`}
-            {!employee.active && " · inactive"}
+          <li key={employee.id} className="rounded-card border border-border-subtle p-4 text-sm">
+            <span className="block font-medium">
+              {employee.name}
+              {!employee.active && <span className="ml-2 text-xs font-normal text-neutral-500">(inactive)</span>}
+            </span>
+            {(employee.role || employee.email) && (
+              <span className="mt-1 block text-neutral-500">
+                {[employee.role, employee.email].filter(Boolean).join(" · ")}
+              </span>
+            )}
           </li>
         ))}
         {employees.length === 0 && <p className="text-sm text-neutral-500">No employees yet.</p>}

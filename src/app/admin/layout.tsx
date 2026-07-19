@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getAdminSession } from "@/lib/admin-auth";
+import { BottomNav } from "@/components/admin/bottom-nav";
 
 export const metadata: Metadata = {
   title: {
@@ -36,11 +37,11 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   }
 
   return (
-    <div className="mx-auto max-w-6xl px-6 py-10">
+    <div className="mx-auto max-w-6xl px-6 py-10 pb-24 sm:pb-10">
       <div className="flex items-start justify-between gap-4 border-b border-border-subtle pb-6">
         <div>
           <h1 className="text-title">Nuru Admin</h1>
-          <nav className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-sm text-neutral-600">
+          <nav className="mt-4 hidden flex-wrap gap-x-4 gap-y-2 text-sm text-neutral-600 sm:flex">
             {NAV_LINKS.map((link) => (
               <Link key={link.href} href={link.href} className="hover:text-foreground hover:underline">
                 {link.label}
@@ -56,6 +57,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         </a>
       </div>
       <div className="mt-8">{children}</div>
+      <BottomNav />
     </div>
   );
 }

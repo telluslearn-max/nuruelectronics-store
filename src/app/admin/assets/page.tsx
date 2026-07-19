@@ -13,7 +13,7 @@ function formatDate(date: Date | null) {
 }
 
 const inputClass =
-  "rounded-control border border-border-subtle px-3 py-2 text-sm outline-none focus:border-foreground";
+  "w-full rounded-control border border-border-subtle px-3 py-2 text-sm outline-none focus:border-foreground";
 const primaryButtonClass =
   "rounded-control bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:opacity-90";
 const secondaryButtonClass =
@@ -43,7 +43,7 @@ export default async function AdminFixedAssetsPage() {
 
       <details className="mt-6">
         <summary className="cursor-pointer text-sm font-medium">Add asset</summary>
-        <form action={createFixedAsset} className="mt-4 flex flex-wrap items-end gap-3">
+        <form action={createFixedAsset} className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <label className="block text-xs text-neutral-500">Name</label>
             <input type="text" name="name" required className={inputClass} />
@@ -75,9 +75,11 @@ export default async function AdminFixedAssetsPage() {
               <option value="mpesa">M-Pesa</option>
             </select>
           </div>
-          <button type="submit" className={primaryButtonClass}>
-            Save
-          </button>
+          <div className="flex items-end">
+            <button type="submit" className={`${primaryButtonClass} w-full sm:w-auto`}>
+              Save
+            </button>
+          </div>
         </form>
       </details>
 
@@ -86,13 +88,17 @@ export default async function AdminFixedAssetsPage() {
           const netBookValue = Number(asset.purchaseCost) - accumulated;
           return (
             <li key={asset.id} className="rounded-card border border-border-subtle p-4 text-sm">
-              <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center justify-between gap-3">
                 <span>
-                  {asset.name} · {asset.category} · Purchased {formatDate(asset.purchaseDate)}
+                  <span className="block font-medium">{asset.name}</span>
+                  <span className="mt-1 block text-neutral-500">
+                    {asset.category} · Purchased {formatDate(asset.purchaseDate)}
+                  </span>
                 </span>
-                <span className="text-neutral-500">
-                  Cost {formatPrice(asset.purchaseCost.toString(), "KES")} · Accum. dep.{" "}
-                  {formatPrice(accumulated.toFixed(2), "KES")} · NBV {formatPrice(netBookValue.toFixed(2), "KES")}
+                <span className="text-right text-neutral-500">
+                  <span className="block">Cost {formatPrice(asset.purchaseCost.toString(), "KES")}</span>
+                  <span className="block">Accum. dep. {formatPrice(accumulated.toFixed(2), "KES")}</span>
+                  <span className="block font-medium text-foreground">NBV {formatPrice(netBookValue.toFixed(2), "KES")}</span>
                 </span>
               </div>
               {asset.disposedAt ? (

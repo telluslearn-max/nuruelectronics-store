@@ -11,7 +11,7 @@ function formatDate(date: Date) {
 }
 
 const inputClass =
-  "rounded-control border border-border-subtle px-3 py-2 text-sm outline-none focus:border-foreground";
+  "w-full rounded-control border border-border-subtle px-3 py-2 text-sm outline-none focus:border-foreground";
 const primaryButtonClass =
   "rounded-control bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:opacity-90";
 
@@ -27,7 +27,7 @@ export default async function AdminPettyCashPage() {
       <div>
         <h2 className="text-lg font-medium">Petty Cash</h2>
         <p className="mt-2 text-neutral-500">No petty cash fund yet — set one up with its starting float.</p>
-        <form action={createPettyCashFund} className="mt-6 flex flex-wrap items-end gap-3">
+        <form action={createPettyCashFund} className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <label className="block text-xs text-neutral-500">Fund name</label>
             <input type="text" name="name" defaultValue="Shop Petty Cash" className={inputClass} />
@@ -36,9 +36,11 @@ export default async function AdminPettyCashPage() {
             <label className="block text-xs text-neutral-500">Starting float</label>
             <input type="number" step="0.01" name="floatAmount" required className={inputClass} />
           </div>
-          <button type="submit" className={primaryButtonClass}>
-            Create fund
-          </button>
+          <div className="sm:col-span-2">
+            <button type="submit" className={`${primaryButtonClass} w-full sm:w-auto`}>
+              Create fund
+            </button>
+          </div>
         </form>
       </div>
     );
@@ -58,14 +60,16 @@ export default async function AdminPettyCashPage() {
 
       <details className="mt-6">
         <summary className="cursor-pointer text-sm font-medium">Replenish float</summary>
-        <form action={replenishPettyCash.bind(null, fund.id)} className="mt-4 flex flex-wrap items-end gap-3">
+        <form action={replenishPettyCash.bind(null, fund.id)} className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <label className="block text-xs text-neutral-500">Amount</label>
             <input type="number" step="0.01" name="amount" required className={inputClass} />
           </div>
-          <button type="submit" className={primaryButtonClass}>
-            Replenish
-          </button>
+          <div className="flex items-end">
+            <button type="submit" className={`${primaryButtonClass} w-full sm:w-auto`}>
+              Replenish
+            </button>
+          </div>
         </form>
       </details>
 
@@ -76,11 +80,12 @@ export default async function AdminPettyCashPage() {
 
       <ul className="mt-4 space-y-2">
         {fund.entries.map((entry) => (
-          <li key={entry.id} className="flex flex-wrap items-center justify-between gap-2 rounded-card border border-border-subtle p-3 text-sm">
+          <li key={entry.id} className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-border-subtle p-4 text-sm">
             <span>
-              {formatDate(entry.date)} · {entry.description}
+              <span className="block font-medium">{entry.description}</span>
+              <span className="mt-1 block text-neutral-500">{formatDate(entry.date)}</span>
             </span>
-            <span className={entry.type === "replenishment" ? "text-neutral-500" : "text-neutral-800"}>
+            <span className="text-lg font-semibold">
               {entry.type === "replenishment" ? "+" : "-"}
               {formatPrice(entry.amount.toString(), "KES")}
             </span>

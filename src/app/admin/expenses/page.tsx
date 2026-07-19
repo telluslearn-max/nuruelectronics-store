@@ -11,7 +11,7 @@ function formatDate(date: Date) {
 }
 
 const inputClass =
-  "rounded-control border border-border-subtle px-3 py-2 text-sm outline-none focus:border-foreground";
+  "w-full rounded-control border border-border-subtle px-3 py-2 text-sm outline-none focus:border-foreground";
 const primaryButtonClass =
   "rounded-control bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:opacity-90";
 
@@ -29,7 +29,7 @@ export default async function AdminExpensesPage() {
 
       <details className="mt-6" open={expenses.length === 0}>
         <summary className="cursor-pointer text-sm font-medium">Record expense</summary>
-        <form action={createExpense} className="mt-4 flex flex-wrap items-end gap-3">
+        <form action={createExpense} className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <label className="block text-xs text-neutral-500">Date</label>
             <input type="date" name="date" required className={inputClass} />
@@ -68,21 +68,29 @@ export default async function AdminExpensesPage() {
             <label className="block text-xs text-neutral-500">Description</label>
             <input type="text" name="description" className={inputClass} />
           </div>
-          <button type="submit" className={primaryButtonClass}>
-            Save
-          </button>
+          <div className="sm:col-span-2">
+            <button type="submit" className={`${primaryButtonClass} w-full sm:w-auto`}>
+              Save
+            </button>
+          </div>
         </form>
       </details>
 
-      <ul className="mt-6 space-y-2">
+      <ul className="mt-6 space-y-3">
         {expenses.map((expense) => (
-          <li key={expense.id} className="flex flex-wrap items-center justify-between gap-2 rounded-card border border-border-subtle p-3 text-sm">
+          <li key={expense.id} className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-border-subtle p-4 text-sm">
             <span>
-              {formatDate(expense.date)} · {expense.category.toUpperCase()} · {expense.subcategory}
-              {expense.description ? ` · ${expense.description}` : ""}
+              <span className="block font-medium">
+                {expense.category.toUpperCase()} · {expense.subcategory}
+              </span>
+              <span className="mt-1 block text-neutral-500">
+                {formatDate(expense.date)}
+                {expense.description ? ` · ${expense.description}` : ""}
+              </span>
             </span>
-            <span className="text-neutral-500">
-              {formatPrice(expense.amount.toString(), "KES")} · {expense.paidFrom.replace("_", " ")}
+            <span className="text-right">
+              <span className="block text-lg font-semibold">{formatPrice(expense.amount.toString(), "KES")}</span>
+              <span className="block text-xs text-neutral-500">{expense.paidFrom.replace("_", " ")}</span>
             </span>
           </li>
         ))}

@@ -31,7 +31,30 @@ export default async function AdminCreditorsReportPage() {
       <h2 className="text-lg font-medium">Creditors Ledger</h2>
       <p className="mt-2 text-neutral-500">Outstanding payables by supplier, oldest due date first.</p>
 
-      <div className="mt-6 overflow-x-auto">
+      <ul className="mt-6 space-y-3 sm:hidden">
+        {outstanding.map((bill) => (
+          <li key={bill.id} className="rounded-card border border-border-subtle p-4 text-sm">
+            <Link href={`/admin/bills/${bill.id}`} className="flex items-center justify-between gap-3 hover:opacity-80">
+              <span>
+                <span className="block font-medium">{bill.supplier.name}</span>
+                <span className="mt-1 block text-neutral-500">
+                  {bill.number} · Due {formatDate(bill.dueAt)}
+                </span>
+              </span>
+              <span className="text-lg font-semibold">{formatPrice(bill.balance.toFixed(2), "KES")}</span>
+            </Link>
+          </li>
+        ))}
+        {outstanding.length === 0 && <p className="text-sm text-neutral-500">No outstanding bills.</p>}
+        {outstanding.length > 0 && (
+          <li className="flex justify-between rounded-card border border-foreground p-4 text-sm font-medium">
+            <span>Total outstanding</span>
+            <span>{formatPrice(total.toFixed(2), "KES")}</span>
+          </li>
+        )}
+      </ul>
+
+      <div className="mt-6 hidden overflow-x-auto sm:block">
         <table className="w-full min-w-[560px] text-sm">
           <thead>
             <tr className="border-b border-border-subtle text-left text-xs text-neutral-500">

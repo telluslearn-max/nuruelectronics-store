@@ -40,7 +40,30 @@ export default async function AdminCashBookPage() {
       <h2 className="text-lg font-medium">Cash Book</h2>
       <p className="mt-2 text-neutral-500">Cash on Hand and M-Pesa movements, in date order, with a running balance.</p>
 
-      <div className="mt-6 overflow-x-auto">
+      <ul className="mt-6 space-y-3 sm:hidden">
+        {rows.map((row) => (
+          <li key={row.id} className="rounded-card border border-border-subtle p-4 text-sm">
+            <div className="flex items-start justify-between gap-3">
+              <span>
+                <span className="block font-medium">{row.description}</span>
+                <span className="mt-1 block text-neutral-500">
+                  {row.account} · {formatDate(row.date)}
+                </span>
+              </span>
+              <span className="text-right">
+                {row.inflow > 0 && <span className="block text-green-700">+{formatPrice(row.inflow.toFixed(2), "KES")}</span>}
+                {row.outflow > 0 && <span className="block text-red-600">-{formatPrice(row.outflow.toFixed(2), "KES")}</span>}
+              </span>
+            </div>
+            <p className="mt-2 text-right text-xs text-neutral-500">
+              Balance {formatPrice(row.balance.toFixed(2), "KES")}
+            </p>
+          </li>
+        ))}
+        {rows.length === 0 && <p className="text-sm text-neutral-500">No cash movements yet.</p>}
+      </ul>
+
+      <div className="mt-6 hidden overflow-x-auto sm:block">
         <table className="w-full min-w-[640px] text-sm">
           <thead>
             <tr className="border-b border-border-subtle text-left text-xs text-neutral-500">

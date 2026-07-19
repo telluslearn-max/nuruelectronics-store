@@ -56,14 +56,15 @@ export default async function AdminOrdersPage() {
         <ul className="mt-3 space-y-3">
           {manualOrders.map((order) => (
             <li key={order.id} className="rounded-card border border-border-subtle p-4 text-sm">
-              <Link href={`/admin/orders/${order.id}`} className="flex flex-wrap items-center justify-between gap-2 hover:underline">
+              <Link href={`/admin/orders/${order.id}`} className="flex flex-wrap items-center justify-between gap-3 hover:opacity-80">
                 <span>
-                  {order.customer.name ?? order.customer.email} · {formatDate(order.createdAt)}
+                  <span className="block font-medium">{order.customer.name ?? order.customer.email}</span>
+                  <span className="mt-1 block text-neutral-500">{formatDate(order.createdAt)}</span>
                 </span>
-                <span className="text-neutral-500">
-                  {order.estimates.length > 0 && `${order.estimates.length} estimate(s)`}
-                  {order.invoice && ` · Invoice ${order.invoice.status}`}
-                  {order.deliveryNote && ` · Delivery ${order.deliveryNote.status}`}
+                <span className="text-right text-neutral-500">
+                  {order.estimates.length > 0 && <span className="block">{order.estimates.length} estimate(s)</span>}
+                  {order.invoice && <span className="block">Invoice {order.invoice.status}</span>}
+                  {order.deliveryNote && <span className="block">Delivery {order.deliveryNote.status}</span>}
                   {!order.invoice && order.estimates.length === 0 && !order.deliveryNote && "No documents yet"}
                 </span>
               </Link>
@@ -87,27 +88,33 @@ export default async function AdminOrdersPage() {
               const importedId = [...importedShopifyOrderIds].find(([sid]) => sid === shopifyOrder.id)?.[1];
               return (
                 <li key={shopifyOrder.id} className="rounded-card border border-border-subtle p-4 text-sm">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
                     <span>
-                      {shopifyOrder.name} · {shopifyOrder.customer?.displayName ?? "No customer"} ·{" "}
-                      {formatDate(shopifyOrder.processedAt)} ·{" "}
-                      {formatPrice(
-                        shopifyOrder.currentTotalPriceSet.shopMoney.amount,
-                        shopifyOrder.currentTotalPriceSet.shopMoney.currencyCode,
-                      )}{" "}
-                      · {shopifyOrder.displayFinancialStatus}
+                      <span className="block font-medium">{shopifyOrder.name}</span>
+                      <span className="mt-1 block text-neutral-500">
+                        {shopifyOrder.customer?.displayName ?? "No customer"} · {formatDate(shopifyOrder.processedAt)} ·{" "}
+                        {shopifyOrder.displayFinancialStatus}
+                      </span>
                     </span>
-                    {importedId ? (
-                      <Link href={`/admin/orders/${importedId}`} className="underline hover:text-foreground">
-                        View documents
-                      </Link>
-                    ) : (
-                      <form action={importShopifyOrder.bind(null, shopifyOrder.id)}>
-                        <button type="submit" className="underline hover:text-foreground">
-                          Create documents
-                        </button>
-                      </form>
-                    )}
+                    <span className="text-right">
+                      <span className="block text-lg font-semibold">
+                        {formatPrice(
+                          shopifyOrder.currentTotalPriceSet.shopMoney.amount,
+                          shopifyOrder.currentTotalPriceSet.shopMoney.currencyCode,
+                        )}
+                      </span>
+                      {importedId ? (
+                        <Link href={`/admin/orders/${importedId}`} className="mt-1 block underline hover:text-foreground">
+                          View documents
+                        </Link>
+                      ) : (
+                        <form action={importShopifyOrder.bind(null, shopifyOrder.id)}>
+                          <button type="submit" className="mt-1 underline hover:text-foreground">
+                            Create documents
+                          </button>
+                        </form>
+                      )}
+                    </span>
                   </div>
                 </li>
               );

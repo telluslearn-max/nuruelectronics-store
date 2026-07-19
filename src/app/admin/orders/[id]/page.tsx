@@ -445,7 +445,7 @@ export default async function AdminOrderHubPage({ params }: { params: Promise<{ 
                 <summary className="cursor-pointer font-medium">Record payment</summary>
                 <form
                   action={recordPayment.bind(null, order.invoice.id)}
-                  className="mt-3 flex flex-wrap items-end gap-3"
+                  className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2"
                 >
                   <div>
                     <label className="block text-xs text-neutral-500">Amount</label>
@@ -466,9 +466,11 @@ export default async function AdminOrderHubPage({ params }: { params: Promise<{ 
                     <label className="block text-xs text-neutral-500">Paid on</label>
                     <input type="date" name="paidAt" className={inputClass} />
                   </div>
-                  <button type="submit" className={primaryButtonClass}>
-                    Record payment
-                  </button>
+                  <div className="sm:col-span-2">
+                    <button type="submit" className={`${primaryButtonClass} w-full sm:w-auto`}>
+                      Record payment
+                    </button>
+                  </div>
                 </form>
               </details>
             )}
@@ -652,13 +654,13 @@ export default async function AdminOrderHubPage({ params }: { params: Promise<{ 
             {order.deliveryNote.status === "pending" && (
               <form
                 action={markDelivered.bind(null, order.deliveryNote.id)}
-                className="flex flex-wrap items-end gap-3"
+                className="grid grid-cols-1 gap-3 sm:flex sm:flex-wrap sm:items-end"
               >
-                <div>
+                <div className="sm:w-56">
                   <label className="block text-xs text-neutral-500">Received by</label>
                   <input type="text" name="receivedBy" className={inputClass} />
                 </div>
-                <button type="submit" className={secondaryButtonClass}>
+                <button type="submit" className={`${secondaryButtonClass} w-full sm:w-auto`}>
                   Mark delivered
                 </button>
               </form>

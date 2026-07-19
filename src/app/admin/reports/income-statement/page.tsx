@@ -40,14 +40,14 @@ export default async function AdminIncomeStatementPage({
         export.
       </p>
 
-      <form className="mt-4 flex flex-wrap items-end gap-3 text-sm">
+      <form className="mt-4 grid grid-cols-1 gap-3 text-sm sm:flex sm:flex-wrap sm:items-end">
         <div>
           <label className="block text-xs text-neutral-500">From</label>
           <input
             type="date"
             name="from"
             defaultValue={from.toISOString().slice(0, 10)}
-            className="rounded-control border border-border-subtle px-3 py-2 text-sm outline-none focus:border-foreground"
+            className="w-full rounded-control border border-border-subtle px-3 py-2 text-sm outline-none focus:border-foreground"
           />
         </div>
         <div>
@@ -56,12 +56,12 @@ export default async function AdminIncomeStatementPage({
             type="date"
             name="to"
             defaultValue={to.toISOString().slice(0, 10)}
-            className="rounded-control border border-border-subtle px-3 py-2 text-sm outline-none focus:border-foreground"
+            className="w-full rounded-control border border-border-subtle px-3 py-2 text-sm outline-none focus:border-foreground"
           />
         </div>
         <button
           type="submit"
-          className="rounded-control border border-border-subtle px-4 py-2 text-sm font-medium hover:border-foreground"
+          className="w-full rounded-control border border-border-subtle px-4 py-2 text-sm font-medium hover:border-foreground sm:w-auto"
         >
           Update
         </button>

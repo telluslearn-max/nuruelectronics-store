@@ -22,7 +22,31 @@ export default async function AdminPayrollRegisterPage() {
       <h2 className="text-lg font-medium">Payroll Register</h2>
       <p className="mt-2 text-neutral-500">All payslips across pay runs.</p>
 
-      <div className="mt-6 overflow-x-auto">
+      <ul className="mt-6 space-y-3 sm:hidden">
+        {payslips.map((payslip) => {
+          const totalDeductions = payslip.deductions.reduce((sum, d) => sum + Number(d.amount), 0);
+          return (
+            <li key={payslip.id} className="rounded-card border border-border-subtle p-4 text-sm">
+              <div className="flex items-center justify-between gap-3">
+                <span>
+                  <span className="block font-medium">{payslip.employee.name}</span>
+                  <span className="mt-1 block text-neutral-500">
+                    {payslip.number} · {formatDate(payslip.payRun.periodStart)} – {formatDate(payslip.payRun.periodEnd)}
+                  </span>
+                </span>
+                <span className="text-lg font-semibold">{formatPrice(payslip.netPay.toString(), "KES")}</span>
+              </div>
+              <p className="mt-2 text-xs text-neutral-500">
+                Gross {formatPrice(payslip.grossPay.toString(), "KES")} · Deductions{" "}
+                {formatPrice(totalDeductions.toFixed(2), "KES")}
+              </p>
+            </li>
+          );
+        })}
+        {payslips.length === 0 && <p className="text-sm text-neutral-500">No payslips yet.</p>}
+      </ul>
+
+      <div className="mt-6 hidden overflow-x-auto sm:block">
         <table className="w-full min-w-[720px] text-sm">
           <thead>
             <tr className="border-b border-border-subtle text-left text-xs text-neutral-500">

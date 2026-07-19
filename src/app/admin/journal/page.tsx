@@ -11,7 +11,7 @@ function formatDate(date: Date) {
 }
 
 const inputClass =
-  "rounded-control border border-border-subtle px-3 py-2 text-sm outline-none focus:border-foreground";
+  "w-full rounded-control border border-border-subtle px-3 py-2 text-sm outline-none focus:border-foreground";
 const primaryButtonClass =
   "rounded-control bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:opacity-90";
 
@@ -40,13 +40,13 @@ export default async function AdminJournalPage() {
       <ul className="mt-6 space-y-4">
         {entries.map((entry) => (
           <li key={entry.id} className="rounded-card border border-border-subtle p-4 text-sm">
-            <div className="flex justify-between">
+            <div className="flex flex-wrap justify-between gap-2">
               <span className="font-medium">{entry.description}</span>
               <span className="text-neutral-500">{formatDate(entry.date)}</span>
             </div>
             <ul className="mt-2 space-y-1">
               {entry.lines.map((line) => (
-                <li key={line.id} className="flex justify-between text-neutral-600">
+                <li key={line.id} className="flex flex-wrap justify-between gap-2 text-neutral-600">
                   <span>
                     {line.account.code} {line.account.name}
                   </span>
@@ -77,24 +77,36 @@ export default async function AdminJournalPage() {
           </div>
 
           <div>
-            <div className="grid grid-cols-12 gap-2 text-xs text-neutral-500">
+            <div className="hidden grid-cols-12 gap-2 text-xs text-neutral-500 sm:grid">
               <span className="col-span-6">Account</span>
               <span className="col-span-3">Debit</span>
               <span className="col-span-3">Credit</span>
             </div>
-            <div className="mt-2 space-y-2">
+            <div className="mt-2 space-y-3 sm:space-y-2">
               {Array.from({ length: LINE_ROWS }).map((_, i) => (
-                <div key={i} className="grid grid-cols-12 gap-2">
-                  <select name={`line_account_${i}`} className={`col-span-6 ${inputClass}`}>
-                    <option value=""></option>
+                <div key={i} className="grid grid-cols-1 gap-2 border-b border-border-subtle/60 pb-3 sm:grid-cols-12 sm:border-0 sm:pb-0">
+                  <select name={`line_account_${i}`} className={`sm:col-span-6 ${inputClass}`}>
+                    <option value="">Account</option>
                     {accounts.map((account) => (
                       <option key={account.id} value={account.code}>
                         {account.code} {account.name}
                       </option>
                     ))}
                   </select>
-                  <input type="number" step="0.01" name={`line_debit_${i}`} className={`col-span-3 ${inputClass}`} />
-                  <input type="number" step="0.01" name={`line_credit_${i}`} className={`col-span-3 ${inputClass}`} />
+                  <input
+                    type="number"
+                    step="0.01"
+                    name={`line_debit_${i}`}
+                    placeholder="Debit"
+                    className={`sm:col-span-3 ${inputClass}`}
+                  />
+                  <input
+                    type="number"
+                    step="0.01"
+                    name={`line_credit_${i}`}
+                    placeholder="Credit"
+                    className={`sm:col-span-3 ${inputClass}`}
+                  />
                 </div>
               ))}
             </div>

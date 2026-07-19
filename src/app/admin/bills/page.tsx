@@ -4,6 +4,7 @@ import { requireAdminSession } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
 import { formatPrice } from "@/lib/format";
 import { createBill } from "@/lib/creditor-actions";
+import { StatusPill } from "@/components/admin/status-pill";
 
 export const metadata: Metadata = { title: "Bills" };
 
@@ -12,7 +13,7 @@ function formatDate(date: Date) {
 }
 
 const inputClass =
-  "rounded-control border border-border-subtle px-3 py-2 text-sm outline-none focus:border-foreground";
+  "w-full rounded-control border border-border-subtle px-3 py-2 text-sm outline-none focus:border-foreground";
 const primaryButtonClass =
   "rounded-control bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:opacity-90";
 
@@ -35,7 +36,7 @@ export default async function AdminBillsPage() {
             Add a <Link href="/admin/suppliers" className="underline hover:text-foreground">supplier</Link> first.
           </p>
         ) : (
-          <form action={createBill} className="mt-4 flex flex-wrap items-end gap-3">
+          <form action={createBill} className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="block text-xs text-neutral-500">Supplier</label>
               <select name="supplierId" required className={inputClass}>
@@ -70,9 +71,11 @@ export default async function AdminBillsPage() {
               <label className="block text-xs text-neutral-500">Due date</label>
               <input type="date" name="dueAt" className={inputClass} />
             </div>
-            <button type="submit" className={primaryButtonClass}>
-              Create bill
-            </button>
+            <div className="sm:col-span-2">
+              <button type="submit" className={`${primaryButtonClass} w-full sm:w-auto`}>
+                Create bill
+              </button>
+            </div>
           </form>
         )}
       </details>
@@ -80,12 +83,20 @@ export default async function AdminBillsPage() {
       <ul className="mt-6 space-y-3">
         {bills.map((bill) => (
           <li key={bill.id} className="rounded-card border border-border-subtle p-4 text-sm">
-            <Link href={`/admin/bills/${bill.id}`} className="flex flex-wrap items-center justify-between gap-2 hover:underline">
+            <Link href={`/admin/bills/${bill.id}`} className="flex flex-wrap items-center justify-between gap-3 hover:opacity-80">
               <span>
-                {bill.number} · {bill.supplier.name} · {formatDate(bill.billDate)}
+                <span className="block font-medium">{bill.number}</span>
+                <span className="mt-1 flex items-center gap-2">
+                  <StatusPill status={bill.status} />
+                  <span className="text-neutral-500">{formatDate(bill.billDate)}</span>
+                </span>
               </span>
-              <span className="text-neutral-500">
-                {bill.status} · {formatPrice(bill.amount.toString(), "KES")} paid {formatPrice(bill.amountPaid.toString(), "KES")}
+              <span className="text-right">
+                <span className="block font-medium">{bill.supplier.name}</span>
+                <span className="mt-1 block text-lg font-semibold">{formatPrice(bill.amount.toString(), "KES")}</span>
+                <span className="block text-xs text-neutral-500">
+                  paid {formatPrice(bill.amountPaid.toString(), "KES")}
+                </span>
               </span>
             </Link>
           </li>
