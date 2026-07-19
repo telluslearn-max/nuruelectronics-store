@@ -26,15 +26,21 @@ export default async function AdminReceiptsPage() {
           <li key={receipt.id} className="rounded-card border border-border-subtle p-4 text-sm">
             <Link
               href={`/admin/orders/${receipt.invoice.orderId}`}
-              className="flex flex-wrap items-center justify-between gap-2 hover:underline"
+              className="flex flex-wrap items-center justify-between gap-3 hover:opacity-80"
             >
               <span>
-                {receipt.number} ·{" "}
-                {receipt.invoice.order.customer.name ?? receipt.invoice.order.customer.email} ·{" "}
-                {formatDate(receipt.paidAt)}
+                <span className="block font-medium">{receipt.number}</span>
+                <span className="mt-1 block text-neutral-500">
+                  {receipt.method === "mpesa" ? "M-Pesa" : "Cash"} · {formatDate(receipt.paidAt)}
+                </span>
               </span>
-              <span className="text-neutral-500">
-                {receipt.method} · {formatPrice(receipt.amount.toString(), receipt.invoice.order.currencyCode)}
+              <span className="text-right">
+                <span className="block font-medium">
+                  {receipt.invoice.order.customer.name ?? receipt.invoice.order.customer.email}
+                </span>
+                <span className="mt-1 block text-lg font-semibold">
+                  {formatPrice(receipt.amount.toString(), receipt.invoice.order.currencyCode)}
+                </span>
               </span>
             </Link>
           </li>

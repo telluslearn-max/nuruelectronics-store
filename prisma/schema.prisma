@@ -142,6 +142,7 @@ model Estimate {
   shippingTotal Decimal        @default(0) @db.Decimal(10, 2)
   discountTotal Decimal        @default(0) @db.Decimal(10, 2)
   total         Decimal        @db.Decimal(10, 2)
+  note          String?
   sentAt        DateTime?
   respondedAt   DateTime?
   createdAt     DateTime       @default(now())
@@ -163,6 +164,7 @@ model Invoice {
   discountTotal Decimal       @default(0) @db.Decimal(10, 2)
   total         Decimal       @db.Decimal(10, 2)
   amountPaid    Decimal       @default(0) @db.Decimal(10, 2)
+  note          String?
   dueAt         DateTime?
   issuedAt      DateTime?
   sentAt        DateTime?

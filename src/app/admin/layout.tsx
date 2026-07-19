@@ -12,10 +12,8 @@ export const metadata: Metadata = {
 
 const NAV_LINKS = [
   { href: "/admin", label: "Orders" },
-  { href: "/admin/estimates", label: "Estimates" },
-  { href: "/admin/invoices", label: "Invoices" },
+  { href: "/admin/documents", label: "Documents" },
   { href: "/admin/receipts", label: "Receipts" },
-  { href: "/admin/delivery-notes", label: "Delivery Notes" },
   { href: "/admin/expenses", label: "Expenses" },
   { href: "/admin/suppliers", label: "Suppliers" },
   { href: "/admin/bills", label: "Bills" },

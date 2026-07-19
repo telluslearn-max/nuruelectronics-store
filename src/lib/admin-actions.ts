@@ -146,6 +146,7 @@ export async function createEstimate(orderId: string, formData: FormData): Promi
   const taxTotal = Number(formData.get("taxTotal") ?? 0) || 0;
   const shippingTotal = Number(formData.get("shippingTotal") ?? 0) || 0;
   const discountTotal = Number(formData.get("discountTotal") ?? 0) || 0;
+  const note = String(formData.get("note") ?? "").trim() || null;
 
   const order = await prisma.order.findUniqueOrThrow({ where: { id: orderId }, include: { items: true } });
   const subtotal = sumItems(order.items);
@@ -164,6 +165,7 @@ export async function createEstimate(orderId: string, formData: FormData): Promi
         shippingTotal: shippingTotal.toFixed(2),
         discountTotal: discountTotal.toFixed(2),
         total: total.toFixed(2),
+        note,
       },
     });
   });
@@ -206,6 +208,7 @@ export async function createInvoiceFromEstimate(estimateId: string): Promise<voi
         shippingTotal: estimate.shippingTotal,
         discountTotal: estimate.discountTotal,
         total: estimate.total,
+        note: estimate.note,
         issuedAt: new Date(),
       },
     });
@@ -233,6 +236,7 @@ export async function createInvoice(orderId: string, formData: FormData): Promis
   const discountTotal = Number(formData.get("discountTotal") ?? 0) || 0;
   const dueAtRaw = String(formData.get("dueAt") ?? "");
   const dueAt = dueAtRaw ? new Date(dueAtRaw) : null;
+  const note = String(formData.get("note") ?? "").trim() || null;
 
   const order = await prisma.order.findUniqueOrThrow({ where: { id: orderId }, include: { items: true } });
   const subtotal = sumItems(order.items);
@@ -249,6 +253,7 @@ export async function createInvoice(orderId: string, formData: FormData): Promis
         shippingTotal: shippingTotal.toFixed(2),
         discountTotal: discountTotal.toFixed(2),
         total: total.toFixed(2),
+        note,
         dueAt,
         issuedAt: new Date(),
       },
