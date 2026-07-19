@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { requireAdminSession } from "@/lib/admin-auth";
-import { getAccountBalances } from "@/lib/reports/ledger-reports";
+import { getTrialBalance } from "@/lib/reports/trial-balance";
 import { formatPrice } from "@/lib/format";
 
 export const metadata: Metadata = { title: "Trial Balance" };
@@ -8,14 +8,22 @@ export const metadata: Metadata = { title: "Trial Balance" };
 export default async function AdminTrialBalancePage() {
   await requireAdminSession();
 
-  const rows = await getAccountBalances();
+  const rows = await getTrialBalance();
   const totalDebit = rows.reduce((sum, row) => sum + row.debit, 0);
   const totalCredit = rows.reduce((sum, row) => sum + row.credit, 0);
   const isBalanced = Math.abs(totalDebit - totalCredit) < 0.01;
 
   return (
     <div>
-      <h2 className="text-lg font-medium">Trial Balance</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-medium">Trial Balance</h2>
+        <a
+          href="/api/reports/trial-balance/csv"
+          className="rounded-control border border-border-subtle px-4 py-2 text-sm font-medium hover:border-foreground"
+        >
+          Export CSV
+        </a>
+      </div>
       <p className="mt-2 text-neutral-500">As of today. Total debits should equal total credits.</p>
 
       <ul className="mt-6 space-y-3 sm:hidden">

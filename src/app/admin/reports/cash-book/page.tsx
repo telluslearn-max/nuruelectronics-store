@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import { requireAdminSession } from "@/lib/admin-auth";
-import { prisma } from "@/lib/prisma";
 import { formatPrice } from "@/lib/format";
-import { ACCOUNTS } from "@/lib/ledger";
+import { getCashBook } from "@/lib/reports/cash-book";
 
 export const metadata: Metadata = { title: "Cash Book" };
 
@@ -13,31 +12,19 @@ function formatDate(date: Date) {
 export default async function AdminCashBookPage() {
   await requireAdminSession();
 
-  const lines = await prisma.journalLine.findMany({
-    where: { account: { code: { in: [ACCOUNTS.CASH, ACCOUNTS.MPESA] } } },
-    include: { account: true, journalEntry: true },
-    orderBy: { journalEntry: { date: "asc" } },
-  });
-
-  const rows = lines.reduce<
-    { id: string; date: Date; description: string; account: string; inflow: number; outflow: number; balance: number }[]
-  >((acc, line) => {
-    const previousBalance = acc.length > 0 ? acc[acc.length - 1].balance : 0;
-    acc.push({
-      id: line.id,
-      date: line.journalEntry.date,
-      description: line.journalEntry.description,
-      account: line.account.name,
-      inflow: Number(line.debit),
-      outflow: Number(line.credit),
-      balance: previousBalance + Number(line.debit) - Number(line.credit),
-    });
-    return acc;
-  }, []);
+  const rows = await getCashBook();
 
   return (
     <div>
-      <h2 className="text-lg font-medium">Cash Book</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-medium">Cash Book</h2>
+        <a
+          href="/api/reports/cash-book/csv"
+          className="rounded-control border border-border-subtle px-4 py-2 text-sm font-medium hover:border-foreground"
+        >
+          Export CSV
+        </a>
+      </div>
       <p className="mt-2 text-neutral-500">Cash on Hand and M-Pesa movements, in date order, with a running balance.</p>
 
       <ul className="mt-6 space-y-3 sm:hidden">

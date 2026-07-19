@@ -1,6 +1,7 @@
 import "server-only";
 import { prisma } from "../prisma";
 import { getShopifyPaidOrderTotals, isShopifyAdminConfigured } from "../shopify/admin-api";
+import { csvCell } from "./csv";
 
 export type PnlGranularity = "daily" | "monthly";
 
@@ -147,11 +148,6 @@ export async function computePnl({
     totalExpenses,
     profit,
   };
-}
-
-function csvCell(value: string | number): string {
-  const text = String(value);
-  return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 
 /** CSV matching the sheet's row/column layout — one row per metric, one column per bucket, plus a period total. */

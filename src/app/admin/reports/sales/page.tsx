@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { requireAdminSession } from "@/lib/admin-auth";
-import { prisma } from "@/lib/prisma";
-import { getShopifyOrders, isShopifyAdminConfigured } from "@/lib/shopify/admin-api";
+import { isShopifyAdminConfigured } from "@/lib/shopify/admin-api";
 import { formatPrice } from "@/lib/format";
+import { getSalesReport } from "@/lib/reports/sales";
 
 export const metadata: Metadata = { title: "Sales Register" };
 
@@ -13,44 +13,19 @@ function formatDate(dateString: string | Date) {
 export default async function AdminSalesRegisterPage() {
   await requireAdminSession();
 
-  let shopifyError: string | null = null;
-
-  const [manualOrders, shopifyPage] = await Promise.all([
-    prisma.order.findMany({
-      where: { source: "manual" },
-      include: { customer: true, items: true },
-      orderBy: { createdAt: "desc" },
-    }),
-    isShopifyAdminConfigured
-      ? getShopifyOrders({ first: 100 }).catch((error: unknown) => {
-          shopifyError = error instanceof Error ? error.message : "Unknown error";
-          return { orders: [], hasNextPage: false, endCursor: null };
-        })
-      : Promise.resolve({ orders: [], hasNextPage: false, endCursor: null }),
-  ]);
-
-  const rows = [
-    ...manualOrders.map((order) => ({
-      id: order.id,
-      date: order.createdAt,
-      customer: order.customer.name ?? order.customer.email,
-      source: "Manual",
-      total: order.items.reduce((sum, item) => sum + Number(item.lineTotal), 0),
-      currency: order.currencyCode,
-    })),
-    ...shopifyPage.orders.map((order) => ({
-      id: order.id,
-      date: new Date(order.processedAt),
-      customer: order.customer?.displayName ?? "—",
-      source: `Shopify ${order.name}`,
-      total: Number(order.currentTotalPriceSet.shopMoney.amount),
-      currency: order.currentTotalPriceSet.shopMoney.currencyCode,
-    })),
-  ].sort((a, b) => b.date.getTime() - a.date.getTime());
+  const { rows, shopifyError } = await getSalesReport();
 
   return (
     <div>
-      <h2 className="text-lg font-medium">Sales Register</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-medium">Sales Register</h2>
+        <a
+          href="/api/reports/sales/csv"
+          className="rounded-control border border-border-subtle px-4 py-2 text-sm font-medium hover:border-foreground"
+        >
+          Export CSV
+        </a>
+      </div>
       <p className="mt-2 text-neutral-500">Shopify and manual/WhatsApp orders, merged and in date order.</p>
       {!isShopifyAdminConfigured && (
         <p className="mt-2 text-sm text-neutral-500">

@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import { requireAdminSession } from "@/lib/admin-auth";
-import { prisma } from "@/lib/prisma";
 import { formatPrice } from "@/lib/format";
-import { getAccumulatedDepreciation } from "@/lib/depreciation";
+import { getFixedAssetsReport } from "@/lib/reports/fixed-assets-report";
 
 export const metadata: Metadata = { title: "Fixed Asset Register" };
 
@@ -14,18 +13,12 @@ function formatDate(date: Date | null) {
 export default async function AdminFixedAssetRegisterPage() {
   await requireAdminSession();
 
-  const assets = await prisma.fixedAsset.findMany({ orderBy: { purchaseDate: "asc" } });
-  const rows = await Promise.all(
-    assets.map(async (asset) => {
-      const accumulated = await getAccumulatedDepreciation(asset.id);
-      return { asset, accumulated, netBookValue: Number(asset.purchaseCost) - accumulated };
-    }),
-  );
+  const rows = await getFixedAssetsReport();
 
   const totals = rows.reduce(
     (acc, row) => ({
-      cost: acc.cost + Number(row.asset.purchaseCost),
-      accumulated: acc.accumulated + row.accumulated,
+      cost: acc.cost + row.purchaseCost,
+      accumulated: acc.accumulated + row.accumulatedDepreciation,
       netBookValue: acc.netBookValue + row.netBookValue,
     }),
     { cost: 0, accumulated: 0, netBookValue: 0 },
@@ -33,24 +26,32 @@ export default async function AdminFixedAssetRegisterPage() {
 
   return (
     <div>
-      <h2 className="text-lg font-medium">Fixed Asset Register</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-medium">Fixed Asset Register</h2>
+        <a
+          href="/api/reports/fixed-assets/csv"
+          className="rounded-control border border-border-subtle px-4 py-2 text-sm font-medium hover:border-foreground"
+        >
+          Export CSV
+        </a>
+      </div>
       <p className="mt-2 text-neutral-500">Cost, accumulated depreciation, and net book value, as of today.</p>
 
       <ul className="mt-6 space-y-3 sm:hidden">
-        {rows.map(({ asset, accumulated, netBookValue }) => (
-          <li key={asset.id} className="rounded-card border border-border-subtle p-4 text-sm">
+        {rows.map((row) => (
+          <li key={row.id} className="rounded-card border border-border-subtle p-4 text-sm">
             <div className="flex items-center justify-between gap-3">
               <span>
-                <span className="block font-medium">{asset.name}</span>
+                <span className="block font-medium">{row.name}</span>
                 <span className="mt-1 block text-neutral-500">
-                  {asset.category} · {formatDate(asset.purchaseDate)} · {asset.disposedAt ? "Disposed" : "In use"}
+                  {row.category} · {formatDate(row.purchaseDate)} · {row.disposedAt ? "Disposed" : "In use"}
                 </span>
               </span>
-              <span className="text-lg font-semibold">{formatPrice(netBookValue.toFixed(2), "KES")}</span>
+              <span className="text-lg font-semibold">{formatPrice(row.netBookValue.toFixed(2), "KES")}</span>
             </div>
             <p className="mt-2 text-xs text-neutral-500">
-              Cost {formatPrice(asset.purchaseCost.toString(), "KES")} · Accum. dep.{" "}
-              {formatPrice(accumulated.toFixed(2), "KES")}
+              Cost {formatPrice(row.purchaseCost.toFixed(2), "KES")} · Accum. dep.{" "}
+              {formatPrice(row.accumulatedDepreciation.toFixed(2), "KES")}
             </p>
           </li>
         ))}
@@ -82,16 +83,16 @@ export default async function AdminFixedAssetRegisterPage() {
             </tr>
           </thead>
           <tbody>
-            {rows.map(({ asset, accumulated, netBookValue }) => (
-              <tr key={asset.id} className="border-b border-border-subtle/60">
+            {rows.map((row) => (
+              <tr key={row.id} className="border-b border-border-subtle/60">
                 <td className="py-2">
-                  {asset.name} · {asset.category}
+                  {row.name} · {row.category}
                 </td>
-                <td className="py-2">{formatDate(asset.purchaseDate)}</td>
-                <td className="py-2 text-right">{formatPrice(asset.purchaseCost.toString(), "KES")}</td>
-                <td className="py-2 text-right">{formatPrice(accumulated.toFixed(2), "KES")}</td>
-                <td className="py-2 text-right">{formatPrice(netBookValue.toFixed(2), "KES")}</td>
-                <td className="py-2 text-neutral-500">{asset.disposedAt ? "Disposed" : "In use"}</td>
+                <td className="py-2">{formatDate(row.purchaseDate)}</td>
+                <td className="py-2 text-right">{formatPrice(row.purchaseCost.toFixed(2), "KES")}</td>
+                <td className="py-2 text-right">{formatPrice(row.accumulatedDepreciation.toFixed(2), "KES")}</td>
+                <td className="py-2 text-right">{formatPrice(row.netBookValue.toFixed(2), "KES")}</td>
+                <td className="py-2 text-neutral-500">{row.disposedAt ? "Disposed" : "In use"}</td>
               </tr>
             ))}
             {rows.length === 0 && (

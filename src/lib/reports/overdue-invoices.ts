@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "../prisma";
+import { rowsToCsv } from "./csv";
 
 export type OutstandingInvoice = {
   id: string;
@@ -38,4 +39,21 @@ export async function getOutstandingInvoices(): Promise<OutstandingInvoice[]> {
 export async function getOverdueInvoices(asOf: Date = new Date()): Promise<OutstandingInvoice[]> {
   const outstanding = await getOutstandingInvoices();
   return outstanding.filter((invoice) => invoice.dueAt !== null && invoice.dueAt < asOf);
+}
+
+export function outstandingInvoicesToCsv(rows: OutstandingInvoice[]): string {
+  const total = rows.reduce((sum, row) => sum + row.balance, 0);
+  return rowsToCsv(
+    ["Invoice", "Customer", "Status", "Due date", "Balance"],
+    [
+      ...rows.map((row) => [
+        row.number,
+        row.customerName,
+        row.status,
+        row.dueAt ? row.dueAt.toISOString().slice(0, 10) : "",
+        row.balance.toFixed(2),
+      ]),
+      ["", "", "", "Total", total.toFixed(2)],
+    ],
+  );
 }

@@ -17,7 +17,15 @@ export default async function AdminDebtorsReportPage() {
 
   return (
     <div>
-      <h2 className="text-lg font-medium">Debtors Ledger</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-medium">Debtors Ledger</h2>
+        <a
+          href="/api/reports/debtors/csv"
+          className="rounded-control border border-border-subtle px-4 py-2 text-sm font-medium hover:border-foreground"
+        >
+          Export CSV
+        </a>
+      </div>
       <p className="mt-2 text-neutral-500">Customers with an outstanding invoice balance, oldest first.</p>
 
       <ul className="mt-6 space-y-3 sm:hidden">

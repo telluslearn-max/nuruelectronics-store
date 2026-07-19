@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { requireAdminSession } from "@/lib/admin-auth";
-import { prisma } from "@/lib/prisma";
 import { formatPrice } from "@/lib/format";
+import { getOutstandingBills } from "@/lib/reports/creditors";
 
 export const metadata: Metadata = { title: "Creditors Ledger" };
 
@@ -14,21 +14,20 @@ function formatDate(date: Date | null) {
 export default async function AdminCreditorsReportPage() {
   await requireAdminSession();
 
-  const bills = await prisma.bill.findMany({
-    where: { status: { not: "paid" } },
-    include: { supplier: true },
-    orderBy: [{ dueAt: "asc" }, { billDate: "asc" }],
-  });
-
-  const outstanding = bills.map((bill) => ({
-    ...bill,
-    balance: Number(bill.amount) - Number(bill.amountPaid),
-  }));
+  const outstanding = await getOutstandingBills();
   const total = outstanding.reduce((sum, bill) => sum + bill.balance, 0);
 
   return (
     <div>
-      <h2 className="text-lg font-medium">Creditors Ledger</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-medium">Creditors Ledger</h2>
+        <a
+          href="/api/reports/creditors/csv"
+          className="rounded-control border border-border-subtle px-4 py-2 text-sm font-medium hover:border-foreground"
+        >
+          Export CSV
+        </a>
+      </div>
       <p className="mt-2 text-neutral-500">Outstanding payables by supplier, oldest due date first.</p>
 
       <ul className="mt-6 space-y-3 sm:hidden">
@@ -36,7 +35,7 @@ export default async function AdminCreditorsReportPage() {
           <li key={bill.id} className="rounded-card border border-border-subtle p-4 text-sm">
             <Link href={`/admin/bills/${bill.id}`} className="flex items-center justify-between gap-3 hover:opacity-80">
               <span>
-                <span className="block font-medium">{bill.supplier.name}</span>
+                <span className="block font-medium">{bill.supplierName}</span>
                 <span className="mt-1 block text-neutral-500">
                   {bill.number} · Due {formatDate(bill.dueAt)}
                 </span>
@@ -67,7 +66,7 @@ export default async function AdminCreditorsReportPage() {
           <tbody>
             {outstanding.map((bill) => (
               <tr key={bill.id} className="border-b border-border-subtle/60">
-                <td className="py-2">{bill.supplier.name}</td>
+                <td className="py-2">{bill.supplierName}</td>
                 <td className="py-2">
                   <Link href={`/admin/bills/${bill.id}`} className="underline hover:text-foreground">
                     {bill.number}
