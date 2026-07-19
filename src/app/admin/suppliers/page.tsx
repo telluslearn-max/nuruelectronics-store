@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { requireAdminSession } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
 import { createSupplier } from "@/lib/creditor-actions";
+import { parsePage, type PageSearchParams } from "@/lib/pagination";
+import { PaginationControls } from "@/components/admin/pagination-controls";
 
 export const metadata: Metadata = { title: "Suppliers" };
 
@@ -10,10 +12,19 @@ const inputClass =
 const primaryButtonClass =
   "rounded-control bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:opacity-90";
 
-export default async function AdminSuppliersPage() {
+export default async function AdminSuppliersPage({
+  searchParams,
+}: {
+  searchParams: Promise<PageSearchParams>;
+}) {
   await requireAdminSession();
+  const resolvedSearchParams = await searchParams;
+  const { page, skip, take } = parsePage(resolvedSearchParams);
 
-  const suppliers = await prisma.supplier.findMany({ orderBy: { name: "asc" } });
+  const [suppliers, totalCount] = await Promise.all([
+    prisma.supplier.findMany({ orderBy: { name: "asc" }, skip, take }),
+    prisma.supplier.count(),
+  ]);
 
   return (
     <div>
@@ -55,6 +66,13 @@ export default async function AdminSuppliersPage() {
         ))}
         {suppliers.length === 0 && <p className="text-sm text-neutral-500">No suppliers yet.</p>}
       </ul>
+      <PaginationControls
+        pathname="/admin/suppliers"
+        searchParams={resolvedSearchParams}
+        page={page}
+        pageSize={take}
+        totalCount={totalCount}
+      />
     </div>
   );
 }

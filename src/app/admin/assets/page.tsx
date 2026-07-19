@@ -4,6 +4,8 @@ import { prisma } from "@/lib/prisma";
 import { formatPrice } from "@/lib/format";
 import { getAccumulatedDepreciation } from "@/lib/depreciation";
 import { createFixedAsset, disposeFixedAsset, runMonthlyDepreciation } from "@/lib/fixed-asset-actions";
+import { parsePage, type PageSearchParams } from "@/lib/pagination";
+import { PaginationControls } from "@/components/admin/pagination-controls";
 
 export const metadata: Metadata = { title: "Fixed Assets" };
 
@@ -19,10 +21,19 @@ const primaryButtonClass =
 const secondaryButtonClass =
   "rounded-control border border-border-subtle px-4 py-2 text-sm font-medium transition hover:border-foreground";
 
-export default async function AdminFixedAssetsPage() {
+export default async function AdminFixedAssetsPage({
+  searchParams,
+}: {
+  searchParams: Promise<PageSearchParams>;
+}) {
   await requireAdminSession();
+  const resolvedSearchParams = await searchParams;
+  const { page, skip, take } = parsePage(resolvedSearchParams);
 
-  const assets = await prisma.fixedAsset.findMany({ orderBy: { purchaseDate: "desc" } });
+  const [assets, totalCount] = await Promise.all([
+    prisma.fixedAsset.findMany({ orderBy: { purchaseDate: "desc" }, skip, take }),
+    prisma.fixedAsset.count(),
+  ]);
   const withDepreciation = await Promise.all(
     assets.map(async (asset) => ({
       asset,
@@ -124,6 +135,13 @@ export default async function AdminFixedAssetsPage() {
         })}
         {assets.length === 0 && <p className="text-sm text-neutral-500">No fixed assets recorded yet.</p>}
       </ul>
+      <PaginationControls
+        pathname="/admin/assets"
+        searchParams={resolvedSearchParams}
+        page={page}
+        pageSize={take}
+        totalCount={totalCount}
+      />
     </div>
   );
 }

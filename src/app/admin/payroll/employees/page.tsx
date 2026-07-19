@@ -3,6 +3,8 @@ import Link from "next/link";
 import { requireAdminSession } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
 import { createEmployee } from "@/lib/payroll-actions";
+import { parsePage, type PageSearchParams } from "@/lib/pagination";
+import { PaginationControls } from "@/components/admin/pagination-controls";
 
 export const metadata: Metadata = { title: "Employees" };
 
@@ -11,10 +13,19 @@ const inputClass =
 const primaryButtonClass =
   "rounded-control bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:opacity-90";
 
-export default async function AdminEmployeesPage() {
+export default async function AdminEmployeesPage({
+  searchParams,
+}: {
+  searchParams: Promise<PageSearchParams>;
+}) {
   await requireAdminSession();
+  const resolvedSearchParams = await searchParams;
+  const { page, skip, take } = parsePage(resolvedSearchParams);
 
-  const employees = await prisma.employee.findMany({ orderBy: { name: "asc" } });
+  const [employees, totalCount] = await Promise.all([
+    prisma.employee.findMany({ orderBy: { name: "asc" }, skip, take }),
+    prisma.employee.count(),
+  ]);
 
   return (
     <div>
@@ -68,6 +79,13 @@ export default async function AdminEmployeesPage() {
         ))}
         {employees.length === 0 && <p className="text-sm text-neutral-500">No employees yet.</p>}
       </ul>
+      <PaginationControls
+        pathname="/admin/payroll/employees"
+        searchParams={resolvedSearchParams}
+        page={page}
+        pageSize={take}
+        totalCount={totalCount}
+      />
     </div>
   );
 }

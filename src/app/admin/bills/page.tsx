@@ -1,10 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import type { BillStatus, Prisma } from "@prisma/client";
 import { requireAdminSession } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
 import { formatPrice } from "@/lib/format";
 import { createBill } from "@/lib/creditor-actions";
 import { StatusPill } from "@/components/admin/status-pill";
+import { parsePage, type PageSearchParams } from "@/lib/pagination";
+import { PaginationControls } from "@/components/admin/pagination-controls";
 
 export const metadata: Metadata = { title: "Bills" };
 
@@ -17,11 +20,26 @@ const inputClass =
 const primaryButtonClass =
   "rounded-control bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:opacity-90";
 
-export default async function AdminBillsPage() {
-  await requireAdminSession();
+const STATUS_OPTIONS: BillStatus[] = ["unpaid", "partially_paid", "paid"];
 
-  const [bills, suppliers] = await Promise.all([
-    prisma.bill.findMany({ orderBy: { billDate: "desc" }, include: { supplier: true } }),
+function isBillStatus(value: string | undefined): value is BillStatus {
+  return value !== undefined && (STATUS_OPTIONS as string[]).includes(value);
+}
+
+export default async function AdminBillsPage({
+  searchParams,
+}: {
+  searchParams: Promise<PageSearchParams & { status?: string }>;
+}) {
+  await requireAdminSession();
+  const resolvedSearchParams = await searchParams;
+  const { page, skip, take } = parsePage(resolvedSearchParams);
+  const statusFilter = isBillStatus(resolvedSearchParams.status) ? resolvedSearchParams.status : undefined;
+  const where: Prisma.BillWhereInput = statusFilter ? { status: statusFilter } : {};
+
+  const [bills, totalCount, suppliers] = await Promise.all([
+    prisma.bill.findMany({ where, orderBy: { billDate: "desc" }, include: { supplier: true }, skip, take }),
+    prisma.bill.count({ where }),
     prisma.supplier.findMany({ orderBy: { name: "asc" } }),
   ]);
 
@@ -80,6 +98,23 @@ export default async function AdminBillsPage() {
         )}
       </details>
 
+      <form method="GET" className="mt-6 flex items-end gap-3">
+        <div>
+          <label className="block text-xs text-neutral-500">Status</label>
+          <select name="status" defaultValue={statusFilter ?? ""} className={inputClass}>
+            <option value="">All</option>
+            {STATUS_OPTIONS.map((status) => (
+              <option key={status} value={status}>
+                {status.replace("_", " ")}
+              </option>
+            ))}
+          </select>
+        </div>
+        <button type="submit" className="rounded-control border border-border-subtle px-4 py-2 text-sm font-medium hover:border-foreground">
+          Filter
+        </button>
+      </form>
+
       <ul className="mt-6 space-y-3">
         {bills.map((bill) => (
           <li key={bill.id} className="rounded-card border border-border-subtle p-4 text-sm">
@@ -103,6 +138,13 @@ export default async function AdminBillsPage() {
         ))}
         {bills.length === 0 && <p className="text-sm text-neutral-500">No bills yet.</p>}
       </ul>
+      <PaginationControls
+        pathname="/admin/bills"
+        searchParams={resolvedSearchParams}
+        page={page}
+        pageSize={take}
+        totalCount={totalCount}
+      />
     </div>
   );
 }

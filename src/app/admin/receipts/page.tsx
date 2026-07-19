@@ -3,6 +3,8 @@ import Link from "next/link";
 import { requireAdminSession } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
 import { formatPrice } from "@/lib/format";
+import { parsePage, type PageSearchParams } from "@/lib/pagination";
+import { PaginationControls } from "@/components/admin/pagination-controls";
 
 export const metadata: Metadata = { title: "Receipts" };
 
@@ -10,13 +12,24 @@ function formatDate(date: Date) {
   return new Intl.DateTimeFormat("en-KE", { dateStyle: "medium" }).format(date);
 }
 
-export default async function AdminReceiptsPage() {
+export default async function AdminReceiptsPage({
+  searchParams,
+}: {
+  searchParams: Promise<PageSearchParams>;
+}) {
   await requireAdminSession();
+  const resolvedSearchParams = await searchParams;
+  const { page, skip, take } = parsePage(resolvedSearchParams);
 
-  const receipts = await prisma.receipt.findMany({
-    orderBy: { paidAt: "desc" },
-    include: { invoice: { include: { order: { include: { customer: true } } } } },
-  });
+  const [receipts, totalCount] = await Promise.all([
+    prisma.receipt.findMany({
+      orderBy: { paidAt: "desc" },
+      include: { invoice: { include: { order: { include: { customer: true } } } } },
+      skip,
+      take,
+    }),
+    prisma.receipt.count(),
+  ]);
 
   return (
     <div>
@@ -47,6 +60,13 @@ export default async function AdminReceiptsPage() {
         ))}
         {receipts.length === 0 && <p className="text-sm text-neutral-500">No receipts yet.</p>}
       </ul>
+      <PaginationControls
+        pathname="/admin/receipts"
+        searchParams={resolvedSearchParams}
+        page={page}
+        pageSize={take}
+        totalCount={totalCount}
+      />
     </div>
   );
 }

@@ -3,6 +3,8 @@ import { requireAdminSession } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
 import { formatPrice } from "@/lib/format";
 import { createManualJournalEntry } from "@/lib/ledger-actions";
+import { parsePage, type PageSearchParams } from "@/lib/pagination";
+import { PaginationControls } from "@/components/admin/pagination-controls";
 
 export const metadata: Metadata = { title: "Journal" };
 
@@ -17,15 +19,23 @@ const primaryButtonClass =
 
 const LINE_ROWS = 6;
 
-export default async function AdminJournalPage() {
+export default async function AdminJournalPage({
+  searchParams,
+}: {
+  searchParams: Promise<PageSearchParams>;
+}) {
   await requireAdminSession();
+  const resolvedSearchParams = await searchParams;
+  const { page, skip, take } = parsePage(resolvedSearchParams, 50);
 
-  const [entries, accounts] = await Promise.all([
+  const [entries, totalCount, accounts] = await Promise.all([
     prisma.journalEntry.findMany({
       orderBy: { date: "desc" },
-      take: 100,
+      skip,
+      take,
       include: { lines: { include: { account: true } } },
     }),
+    prisma.journalEntry.count(),
     prisma.account.findMany({ orderBy: { code: "asc" } }),
   ]);
 
@@ -61,6 +71,13 @@ export default async function AdminJournalPage() {
         ))}
         {entries.length === 0 && <p className="text-sm text-neutral-500">No journal entries yet.</p>}
       </ul>
+      <PaginationControls
+        pathname="/admin/journal"
+        searchParams={resolvedSearchParams}
+        page={page}
+        pageSize={take}
+        totalCount={totalCount}
+      />
 
       <details className="mt-8">
         <summary className="cursor-pointer text-sm font-medium">New manual entry</summary>

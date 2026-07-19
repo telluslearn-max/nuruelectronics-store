@@ -5,6 +5,8 @@ import { prisma } from "@/lib/prisma";
 import { getShopifyOrders, isShopifyAdminConfigured } from "@/lib/shopify/admin-api";
 import { formatPrice } from "@/lib/format";
 import { importShopifyOrder } from "@/lib/admin-actions";
+import { parsePage, type PageSearchParams } from "@/lib/pagination";
+import { PaginationControls } from "@/components/admin/pagination-controls";
 
 export const metadata: Metadata = {
   title: "Orders",
@@ -14,17 +16,26 @@ function formatDate(dateString: string | Date) {
   return new Intl.DateTimeFormat("en-KE", { dateStyle: "medium" }).format(new Date(dateString));
 }
 
-export default async function AdminOrdersPage() {
+export default async function AdminOrdersPage({
+  searchParams,
+}: {
+  searchParams: Promise<PageSearchParams>;
+}) {
   await requireAdminSession();
+  const resolvedSearchParams = await searchParams;
+  const { page, skip, take } = parsePage(resolvedSearchParams);
 
   let shopifyError: string | null = null;
 
-  const [manualOrders, shopifyPage] = await Promise.all([
+  const [manualOrders, manualOrdersCount, shopifyPage] = await Promise.all([
     prisma.order.findMany({
       where: { source: "manual" },
       orderBy: { createdAt: "desc" },
       include: { customer: true, invoice: true, estimates: true, deliveryNote: true },
+      skip,
+      take,
     }),
+    prisma.order.count({ where: { source: "manual" } }),
     isShopifyAdminConfigured
       ? getShopifyOrders({ first: 25 }).catch((error: unknown) => {
           shopifyError = error instanceof Error ? error.message : "Unknown error";
@@ -72,6 +83,13 @@ export default async function AdminOrdersPage() {
           ))}
           {manualOrders.length === 0 && <p className="text-sm text-neutral-500">No manual orders yet.</p>}
         </ul>
+        <PaginationControls
+          pathname="/admin"
+          searchParams={resolvedSearchParams}
+          page={page}
+          pageSize={take}
+          totalCount={manualOrdersCount}
+        />
       </div>
 
       <div className="mt-10">

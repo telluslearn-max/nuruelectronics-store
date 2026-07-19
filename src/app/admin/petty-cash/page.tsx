@@ -3,6 +3,8 @@ import { requireAdminSession } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
 import { formatPrice } from "@/lib/format";
 import { createPettyCashFund, replenishPettyCash } from "@/lib/petty-cash-actions";
+import { parsePage, type PageSearchParams } from "@/lib/pagination";
+import { PaginationControls } from "@/components/admin/pagination-controls";
 
 export const metadata: Metadata = { title: "Petty Cash" };
 
@@ -15,12 +17,16 @@ const inputClass =
 const primaryButtonClass =
   "rounded-control bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:opacity-90";
 
-export default async function AdminPettyCashPage() {
+export default async function AdminPettyCashPage({
+  searchParams,
+}: {
+  searchParams: Promise<PageSearchParams>;
+}) {
   await requireAdminSession();
+  const resolvedSearchParams = await searchParams;
+  const { page, skip, take } = parsePage(resolvedSearchParams);
 
-  const fund = await prisma.pettyCashFund.findFirst({
-    include: { entries: { orderBy: { date: "desc" } } },
-  });
+  const fund = await prisma.pettyCashFund.findFirst();
 
   if (!fund) {
     return (
@@ -46,10 +52,19 @@ export default async function AdminPettyCashPage() {
     );
   }
 
-  const balance = fund.entries.reduce(
-    (sum, entry) => sum + (entry.type === "replenishment" ? Number(entry.amount) : -Number(entry.amount)),
-    0,
-  );
+  const [replenishmentSum, expenseSum, entries, totalCount] = await Promise.all([
+    prisma.pettyCashEntry.aggregate({
+      where: { fundId: fund.id, type: "replenishment" },
+      _sum: { amount: true },
+    }),
+    prisma.pettyCashEntry.aggregate({
+      where: { fundId: fund.id, type: "expense" },
+      _sum: { amount: true },
+    }),
+    prisma.pettyCashEntry.findMany({ where: { fundId: fund.id }, orderBy: { date: "desc" }, skip, take }),
+    prisma.pettyCashEntry.count({ where: { fundId: fund.id } }),
+  ]);
+  const balance = Number(replenishmentSum._sum.amount ?? 0) - Number(expenseSum._sum.amount ?? 0);
 
   return (
     <div>
@@ -79,7 +94,7 @@ export default async function AdminPettyCashPage() {
       </p>
 
       <ul className="mt-4 space-y-2">
-        {fund.entries.map((entry) => (
+        {entries.map((entry) => (
           <li key={entry.id} className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-border-subtle p-4 text-sm">
             <span>
               <span className="block font-medium">{entry.description}</span>
@@ -91,8 +106,15 @@ export default async function AdminPettyCashPage() {
             </span>
           </li>
         ))}
-        {fund.entries.length === 0 && <p className="text-sm text-neutral-500">No entries yet.</p>}
+        {entries.length === 0 && <p className="text-sm text-neutral-500">No entries yet.</p>}
       </ul>
+      <PaginationControls
+        pathname="/admin/petty-cash"
+        searchParams={resolvedSearchParams}
+        page={page}
+        pageSize={take}
+        totalCount={totalCount}
+      />
     </div>
   );
 }

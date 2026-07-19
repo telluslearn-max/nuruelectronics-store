@@ -3,6 +3,8 @@ import { requireAdminSession } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
 import { formatPrice } from "@/lib/format";
 import { createExpense } from "@/lib/expense-actions";
+import { parsePage, type PageSearchParams } from "@/lib/pagination";
+import { PaginationControls } from "@/components/admin/pagination-controls";
 
 export const metadata: Metadata = { title: "Expenses" };
 
@@ -15,10 +17,19 @@ const inputClass =
 const primaryButtonClass =
   "rounded-control bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:opacity-90";
 
-export default async function AdminExpensesPage() {
+export default async function AdminExpensesPage({
+  searchParams,
+}: {
+  searchParams: Promise<PageSearchParams>;
+}) {
   await requireAdminSession();
+  const resolvedSearchParams = await searchParams;
+  const { page, skip, take } = parsePage(resolvedSearchParams);
 
-  const expenses = await prisma.expense.findMany({ orderBy: { date: "desc" }, take: 200 });
+  const [expenses, totalCount] = await Promise.all([
+    prisma.expense.findMany({ orderBy: { date: "desc" }, skip, take }),
+    prisma.expense.count(),
+  ]);
 
   return (
     <div>
@@ -96,6 +107,13 @@ export default async function AdminExpensesPage() {
         ))}
         {expenses.length === 0 && <p className="text-sm text-neutral-500">No expenses recorded yet.</p>}
       </ul>
+      <PaginationControls
+        pathname="/admin/expenses"
+        searchParams={resolvedSearchParams}
+        page={page}
+        pageSize={take}
+        totalCount={totalCount}
+      />
     </div>
   );
 }
