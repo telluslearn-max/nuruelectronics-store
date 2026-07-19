@@ -62,6 +62,18 @@ export async function sendInvoiceEmail(invoice: Invoice, customer: Customer, pdf
   });
 }
 
+export async function sendInvoiceReminderEmail(invoice: Invoice, customer: Customer, pdfBuffer: Buffer): Promise<void> {
+  if (!customer.email) throw new Error("Customer has no email on file.");
+  const balance = Number(invoice.total) - Number(invoice.amountPaid);
+  await sendDocumentEmail({
+    to: customer.email,
+    subject: `Reminder: Invoice ${invoice.number} is overdue`,
+    html: `<p>Hi ${customer.name ?? ""},</p><p>This is a reminder that invoice ${invoice.number} for ${formatPrice(balance.toFixed(2), "KES")} is overdue. Please find it attached.</p>`,
+    pdfBuffer,
+    filename: `${invoice.number}.pdf`,
+  });
+}
+
 export async function sendReceiptEmail(receipt: Receipt, customer: Customer, pdfBuffer: Buffer): Promise<void> {
   if (!customer.email) throw new Error("Customer has no email on file.");
   await sendDocumentEmail({

@@ -153,23 +153,24 @@ model Estimate {
 // ---------------------------------------------------------------------------
 
 model Invoice {
-  id            String        @id @default(cuid())
-  number        String        @unique
-  orderId       String        @unique
-  order         Order         @relation(fields: [orderId], references: [id])
-  status        InvoiceStatus @default(draft)
-  subtotal      Decimal       @db.Decimal(10, 2)
-  taxTotal      Decimal       @default(0) @db.Decimal(10, 2)
-  shippingTotal Decimal       @default(0) @db.Decimal(10, 2)
-  discountTotal Decimal       @default(0) @db.Decimal(10, 2)
-  total         Decimal       @db.Decimal(10, 2)
-  amountPaid    Decimal       @default(0) @db.Decimal(10, 2)
-  note          String?
-  dueAt         DateTime?
-  issuedAt      DateTime?
-  sentAt        DateTime?
-  voidedAt      DateTime?
-  createdAt     DateTime      @default(now())
+  id                 String        @id @default(cuid())
+  number             String        @unique
+  orderId            String        @unique
+  order              Order         @relation(fields: [orderId], references: [id])
+  status             InvoiceStatus @default(draft)
+  subtotal           Decimal       @db.Decimal(10, 2)
+  taxTotal           Decimal       @default(0) @db.Decimal(10, 2)
+  shippingTotal      Decimal       @default(0) @db.Decimal(10, 2)
+  discountTotal      Decimal       @default(0) @db.Decimal(10, 2)
+  total              Decimal       @db.Decimal(10, 2)
+  amountPaid         Decimal       @default(0) @db.Decimal(10, 2)
+  note               String?
+  dueAt              DateTime?
+  issuedAt           DateTime?
+  sentAt             DateTime?
+  voidedAt           DateTime?
+  lastReminderSentAt DateTime?
+  createdAt          DateTime      @default(now())
 
   receipts Receipt[]
 }

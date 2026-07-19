@@ -11,6 +11,7 @@ export type OutstandingInvoice = {
   balance: number;
   currencyCode: string;
   customerName: string;
+  lastReminderSentAt: Date | null;
 };
 
 /** Every non-void, non-fully-paid invoice with a positive balance, oldest first — the Debtors Ledger. */
@@ -31,6 +32,7 @@ export async function getOutstandingInvoices(): Promise<OutstandingInvoice[]> {
       balance: Number(invoice.total) - Number(invoice.amountPaid),
       currencyCode: invoice.order.currencyCode,
       customerName: invoice.order.customer.name ?? invoice.order.customer.email,
+      lastReminderSentAt: invoice.lastReminderSentAt,
     }))
     .filter((invoice) => invoice.balance > 0);
 }
