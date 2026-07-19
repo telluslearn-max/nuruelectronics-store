@@ -5,6 +5,7 @@ import { requireAdminSession } from "@/lib/admin-auth";
 export const metadata: Metadata = { title: "More" };
 
 const LINKS = [
+  { href: "/admin/orders", label: "Orders" },
   { href: "/admin/receipts", label: "Receipts" },
   { href: "/admin/expenses", label: "Expenses" },
   { href: "/admin/suppliers", label: "Suppliers" },

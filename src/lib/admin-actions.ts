@@ -81,7 +81,7 @@ export async function createManualOrder(formData: FormData): Promise<void> {
     }
   }
 
-  revalidatePath("/admin");
+  revalidatePath("/admin/orders");
   redirect(`/admin/orders/${order.id}`);
 }
 
@@ -131,7 +131,7 @@ export async function importShopifyOrder(shopifyOrderId: string): Promise<void> 
     });
   });
 
-  revalidatePath("/admin");
+  revalidatePath("/admin/orders");
   redirect(`/admin/orders/${order.id}`);
 }
 

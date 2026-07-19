@@ -2,144 +2,129 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { requireAdminSession } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
-import { getShopifyOrders, isShopifyAdminConfigured } from "@/lib/shopify/admin-api";
+import { computePnl } from "@/lib/reports/pnl";
+import { getOutstandingInvoices, getOverdueInvoices } from "@/lib/reports/overdue-invoices";
+import { getAccountBalances, debitBalance } from "@/lib/reports/ledger-reports";
+import { ACCOUNTS } from "@/lib/ledger";
 import { formatPrice } from "@/lib/format";
-import { importShopifyOrder } from "@/lib/admin-actions";
-import { parsePage, type PageSearchParams } from "@/lib/pagination";
-import { PaginationControls } from "@/components/admin/pagination-controls";
 
-export const metadata: Metadata = {
-  title: "Orders",
-};
+export const metadata: Metadata = { title: "Dashboard" };
 
-function formatDate(dateString: string | Date) {
-  return new Intl.DateTimeFormat("en-KE", { dateStyle: "medium" }).format(new Date(dateString));
+function formatDate(date: Date) {
+  return new Intl.DateTimeFormat("en-KE", { dateStyle: "medium" }).format(date);
 }
 
-export default async function AdminOrdersPage({
-  searchParams,
-}: {
-  searchParams: Promise<PageSearchParams>;
-}) {
+async function getPettyCashBalance(): Promise<number> {
+  const fund = await prisma.pettyCashFund.findFirst();
+  if (!fund) return 0;
+  const [replenishmentSum, expenseSum] = await Promise.all([
+    prisma.pettyCashEntry.aggregate({ where: { fundId: fund.id, type: "replenishment" }, _sum: { amount: true } }),
+    prisma.pettyCashEntry.aggregate({ where: { fundId: fund.id, type: "expense" }, _sum: { amount: true } }),
+  ]);
+  return Number(replenishmentSum._sum.amount ?? 0) - Number(expenseSum._sum.amount ?? 0);
+}
+
+export default async function AdminDashboardPage() {
   await requireAdminSession();
-  const resolvedSearchParams = await searchParams;
-  const { page, skip, take } = parsePage(resolvedSearchParams);
 
-  let shopifyError: string | null = null;
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
 
-  const [manualOrders, manualOrdersCount, shopifyPage] = await Promise.all([
-    prisma.order.findMany({
-      where: { source: "manual" },
-      orderBy: { createdAt: "desc" },
-      include: { customer: true, invoice: true, estimates: true, deliveryNote: true },
-      skip,
-      take,
-    }),
-    prisma.order.count({ where: { source: "manual" } }),
-    isShopifyAdminConfigured
-      ? getShopifyOrders({ first: 25 }).catch((error: unknown) => {
-          shopifyError = error instanceof Error ? error.message : "Unknown error";
-          return { orders: [], hasNextPage: false, endCursor: null };
-        })
-      : Promise.resolve({ orders: [], hasNextPage: false, endCursor: null }),
+  const [pnl, outstanding, overdue, accountBalances, pettyCashBalance] = await Promise.all([
+    computePnl({ from: monthStart, to: monthEnd, granularity: "monthly" }),
+    getOutstandingInvoices(),
+    getOverdueInvoices(),
+    getAccountBalances(),
+    getPettyCashBalance(),
   ]);
 
-  const importedShopifyOrderIds = new Set(
-    (
-      await prisma.order.findMany({
-        where: { source: "shopify" },
-        select: { shopifyOrderId: true, id: true },
-      })
-    ).map((o) => [o.shopifyOrderId, o.id] as const),
-  );
+  const revenueThisMonth = pnl.buckets.reduce((sum, bucket) => sum + (pnl.totalRevenue[bucket] ?? 0), 0);
+  const outstandingTotal = outstanding.reduce((sum, invoice) => sum + invoice.balance, 0);
+  const overdueTotal = overdue.reduce((sum, invoice) => sum + invoice.balance, 0);
+
+  const cashRow = accountBalances.find((row) => row.account.code === ACCOUNTS.CASH);
+  const mpesaRow = accountBalances.find((row) => row.account.code === ACCOUNTS.MPESA);
+  const cashPosition = (cashRow ? debitBalance(cashRow) : 0) + (mpesaRow ? debitBalance(mpesaRow) : 0);
+
+  const stats: { label: string; value: string; sub?: string; href: string }[] = [
+    { label: "Revenue this month", value: formatPrice(revenueThisMonth.toFixed(2), "KES"), href: "/admin/reports/pnl" },
+    {
+      label: "Outstanding AR",
+      value: formatPrice(outstandingTotal.toFixed(2), "KES"),
+      sub: `${outstanding.length} invoice(s)`,
+      href: "/admin/reports/debtors",
+    },
+    {
+      label: "Overdue invoices",
+      value: String(overdue.length),
+      sub: overdue.length > 0 ? `${formatPrice(overdueTotal.toFixed(2), "KES")} overdue` : undefined,
+      href: "/admin/reports/debtors",
+    },
+    {
+      label: "Cash position",
+      value: formatPrice(cashPosition.toFixed(2), "KES"),
+      sub: "Cash + M-Pesa",
+      href: "/admin/reports/trial-balance",
+    },
+    { label: "Petty cash balance", value: formatPrice(pettyCashBalance.toFixed(2), "KES"), href: "/admin/petty-cash" },
+  ];
 
   return (
     <div>
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-medium">Orders</h2>
-        <Link href="/admin/orders/new" className="rounded-control border border-border-subtle px-4 py-2 text-sm font-medium hover:border-foreground">
+        <h2 className="text-lg font-medium">Dashboard</h2>
+        <Link
+          href="/admin/orders/new"
+          className="rounded-control border border-border-subtle px-4 py-2 text-sm font-medium hover:border-foreground"
+        >
           + New manual order
         </Link>
       </div>
 
-      <div className="mt-6">
-        <h3 className="text-sm font-medium text-neutral-500">Manual / WhatsApp orders</h3>
-        <ul className="mt-3 space-y-3">
-          {manualOrders.map((order) => (
-            <li key={order.id} className="rounded-card border border-border-subtle p-4 text-sm">
-              <Link href={`/admin/orders/${order.id}`} className="flex flex-wrap items-center justify-between gap-3 hover:opacity-80">
-                <span>
-                  <span className="block font-medium">{order.customer.name ?? order.customer.email}</span>
-                  <span className="mt-1 block text-neutral-500">{formatDate(order.createdAt)}</span>
-                </span>
-                <span className="text-right text-neutral-500">
-                  {order.estimates.length > 0 && <span className="block">{order.estimates.length} estimate(s)</span>}
-                  {order.invoice && <span className="block">Invoice {order.invoice.status}</span>}
-                  {order.deliveryNote && <span className="block">Delivery {order.deliveryNote.status}</span>}
-                  {!order.invoice && order.estimates.length === 0 && !order.deliveryNote && "No documents yet"}
-                </span>
-              </Link>
-            </li>
-          ))}
-          {manualOrders.length === 0 && <p className="text-sm text-neutral-500">No manual orders yet.</p>}
-        </ul>
-        <PaginationControls
-          pathname="/admin"
-          searchParams={resolvedSearchParams}
-          page={page}
-          pageSize={take}
-          totalCount={manualOrdersCount}
-        />
+      <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {stats.map((stat) => (
+          <Link
+            key={stat.label}
+            href={stat.href}
+            className="rounded-card border border-border-subtle p-4 transition hover:border-foreground"
+          >
+            <p className="text-xs text-neutral-500">{stat.label}</p>
+            <p className="mt-1 text-2xl font-semibold">{stat.value}</p>
+            {stat.sub && <p className="mt-1 text-xs text-neutral-500">{stat.sub}</p>}
+          </Link>
+        ))}
       </div>
 
       <div className="mt-10">
-        <h3 className="text-sm font-medium text-neutral-500">Shopify orders</h3>
-        {!isShopifyAdminConfigured ? (
-          <p className="mt-3 text-sm text-neutral-500">
-            Set SHOPIFY_ADMIN_API_ACCESS_TOKEN to pull live Shopify orders here.
-          </p>
-        ) : shopifyError ? (
-          <p className="mt-3 text-sm text-red-600">Couldn&apos;t load Shopify orders: {shopifyError}</p>
-        ) : (
-          <ul className="mt-3 space-y-3">
-            {shopifyPage.orders.map((shopifyOrder) => {
-              const importedId = [...importedShopifyOrderIds].find(([sid]) => sid === shopifyOrder.id)?.[1];
-              return (
-                <li key={shopifyOrder.id} className="rounded-card border border-border-subtle p-4 text-sm">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <span>
-                      <span className="block font-medium">{shopifyOrder.name}</span>
-                      <span className="mt-1 block text-neutral-500">
-                        {shopifyOrder.customer?.displayName ?? "No customer"} · {formatDate(shopifyOrder.processedAt)} ·{" "}
-                        {shopifyOrder.displayFinancialStatus}
-                      </span>
-                    </span>
-                    <span className="text-right">
-                      <span className="block text-lg font-semibold">
-                        {formatPrice(
-                          shopifyOrder.currentTotalPriceSet.shopMoney.amount,
-                          shopifyOrder.currentTotalPriceSet.shopMoney.currencyCode,
-                        )}
-                      </span>
-                      {importedId ? (
-                        <Link href={`/admin/orders/${importedId}`} className="mt-1 block underline hover:text-foreground">
-                          View documents
-                        </Link>
-                      ) : (
-                        <form action={importShopifyOrder.bind(null, shopifyOrder.id)}>
-                          <button type="submit" className="mt-1 underline hover:text-foreground">
-                            Create documents
-                          </button>
-                        </form>
-                      )}
-                    </span>
-                  </div>
-                </li>
-              );
-            })}
-            {shopifyPage.orders.length === 0 && <p className="text-sm text-neutral-500">No Shopify orders found.</p>}
-          </ul>
-        )}
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-medium text-neutral-500">Overdue invoices</h3>
+          {overdue.length > 0 && (
+            <Link href="/admin/reports/debtors" className="text-sm underline hover:text-foreground">
+              View all
+            </Link>
+          )}
+        </div>
+        <ul className="mt-3 space-y-3">
+          {overdue.slice(0, 5).map((invoice) => (
+            <li key={invoice.id} className="rounded-card border border-border-subtle p-4 text-sm">
+              <Link
+                href={`/admin/orders/${invoice.orderId}`}
+                className="flex flex-wrap items-center justify-between gap-3 hover:opacity-80"
+              >
+                <span>
+                  <span className="block font-medium">{invoice.customerName}</span>
+                  <span className="mt-1 block text-neutral-500">
+                    {invoice.number}
+                    {invoice.dueAt && ` · due ${formatDate(invoice.dueAt)}`}
+                  </span>
+                </span>
+                <span className="text-lg font-semibold">{formatPrice(invoice.balance.toFixed(2), invoice.currencyCode)}</span>
+              </Link>
+            </li>
+          ))}
+          {overdue.length === 0 && <p className="text-sm text-neutral-500">No overdue invoices.</p>}
+        </ul>
       </div>
     </div>
   );

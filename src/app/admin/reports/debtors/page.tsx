@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { requireAdminSession } from "@/lib/admin-auth";
-import { prisma } from "@/lib/prisma";
 import { formatPrice } from "@/lib/format";
+import { getOutstandingInvoices } from "@/lib/reports/overdue-invoices";
 
 export const metadata: Metadata = { title: "Debtors Ledger" };
 
@@ -12,15 +12,7 @@ export default async function AdminDebtorsReportPage() {
   // The ledger recognizes the receivable as soon as an invoice is created (see
   // createInvoice/createInvoiceFromEstimate), not only once it's been emailed —
   // so every non-void, non-fully-paid invoice is a real outstanding debt here.
-  const invoices = await prisma.invoice.findMany({
-    where: { status: { notIn: ["paid", "void"] } },
-    include: { order: { include: { customer: true } } },
-    orderBy: { createdAt: "asc" },
-  });
-
-  const outstanding = invoices
-    .map((invoice) => ({ ...invoice, balance: Number(invoice.total) - Number(invoice.amountPaid) }))
-    .filter((invoice) => invoice.balance > 0);
+  const outstanding = await getOutstandingInvoices();
   const total = outstanding.reduce((sum, invoice) => sum + invoice.balance, 0);
 
   return (
@@ -33,11 +25,11 @@ export default async function AdminDebtorsReportPage() {
           <li key={invoice.id} className="rounded-card border border-border-subtle p-4 text-sm">
             <Link href={`/admin/orders/${invoice.orderId}`} className="flex items-center justify-between gap-3 hover:opacity-80">
               <span>
-                <span className="block font-medium">{invoice.order.customer.name ?? invoice.order.customer.email}</span>
+                <span className="block font-medium">{invoice.customerName}</span>
                 <span className="mt-1 block text-neutral-500">{invoice.number}</span>
               </span>
               <span className="text-lg font-semibold">
-                {formatPrice(invoice.balance.toFixed(2), invoice.order.currencyCode)}
+                {formatPrice(invoice.balance.toFixed(2), invoice.currencyCode)}
               </span>
             </Link>
           </li>
@@ -63,13 +55,13 @@ export default async function AdminDebtorsReportPage() {
           <tbody>
             {outstanding.map((invoice) => (
               <tr key={invoice.id} className="border-b border-border-subtle/60">
-                <td className="py-2">{invoice.order.customer.name ?? invoice.order.customer.email}</td>
+                <td className="py-2">{invoice.customerName}</td>
                 <td className="py-2">
                   <Link href={`/admin/orders/${invoice.orderId}`} className="underline hover:text-foreground">
                     {invoice.number}
                   </Link>
                 </td>
-                <td className="py-2 text-right">{formatPrice(invoice.balance.toFixed(2), invoice.order.currencyCode)}</td>
+                <td className="py-2 text-right">{formatPrice(invoice.balance.toFixed(2), invoice.currencyCode)}</td>
               </tr>
             ))}
             {outstanding.length === 0 && (

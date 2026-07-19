@@ -3,11 +3,11 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-function OrdersIcon({ active }: { active: boolean }) {
+function HomeIcon({ active }: { active: boolean }) {
   return (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.2 : 1.8} strokeLinecap="round" strokeLinejoin="round">
-      <path d="M4 7h16l-1.5 11a2 2 0 0 1-2 1.7H7.5a2 2 0 0 1-2-1.7L4 7Z" />
-      <path d="M8 7V5a4 4 0 0 1 8 0v2" />
+      <path d="M4 11.5 12 4l8 7.5" />
+      <path d="M6 10v9a1 1 0 0 0 1 1h3v-6h4v6h3a1 1 0 0 0 1-1v-9" />
     </svg>
   );
 }
@@ -41,7 +41,7 @@ function MoreIcon({ active }: { active: boolean }) {
 }
 
 const TABS = [
-  { href: "/admin", label: "Orders", Icon: OrdersIcon },
+  { href: "/admin", label: "Home", Icon: HomeIcon },
   { href: "/admin/documents", label: "Documents", Icon: DocumentsIcon },
   { href: "/admin/reports", label: "Reports", Icon: ReportsIcon },
   { href: "/admin/more", label: "More", Icon: MoreIcon },
