@@ -1,6 +1,7 @@
 import { Text, View } from "@react-pdf/renderer";
 import { formatPrice } from "@/lib/format";
 import { DocumentShell, LineItemsTable, TotalsBlock, styles, type Moneyish } from "./document-layout";
+import type { Letterhead } from "./letterhead";
 import type { Customer, Estimate, Order, OrderItem } from "@prisma/client";
 
 function formatDate(date: Date) {
@@ -12,16 +13,18 @@ export function EstimateDocument({
   order,
   customer,
   items,
+  letterhead,
 }: {
   estimate: Estimate;
   order: Order;
   customer: Customer;
   items: OrderItem[];
+  letterhead?: Letterhead;
 }) {
   const formatMoney = (amount: Moneyish) => formatPrice(String(amount), order.currencyCode);
 
   return (
-    <DocumentShell docTitle="Estimate" docNumber={estimate.number}>
+    <DocumentShell docTitle="Estimate" docNumber={estimate.number} letterhead={letterhead}>
       <View style={styles.row}>
         <View style={{ flex: 1 }}>
           <Text style={styles.sectionLabel}>Prepared for</Text>

@@ -1,6 +1,7 @@
 import { Text, View } from "@react-pdf/renderer";
 import { formatPrice } from "@/lib/format";
 import { DocumentShell, TotalsBlock, styles, type Moneyish } from "./document-layout";
+import type { Letterhead } from "./letterhead";
 import type { Customer, Invoice, Receipt } from "@prisma/client";
 
 function formatDate(date: Date) {
@@ -16,15 +17,17 @@ export function ReceiptDocument({
   receipt,
   invoice,
   customer,
+  letterhead,
 }: {
   receipt: Receipt;
   invoice: Invoice;
   customer: Customer;
+  letterhead?: Letterhead;
 }) {
   const formatMoney = (amount: Moneyish) => formatPrice(String(amount), "KES");
 
   return (
-    <DocumentShell docTitle="Receipt" docNumber={receipt.number}>
+    <DocumentShell docTitle="Receipt" docNumber={receipt.number} letterhead={letterhead}>
       <View style={styles.row}>
         <View style={{ flex: 1 }}>
           <Text style={styles.sectionLabel}>Received from</Text>

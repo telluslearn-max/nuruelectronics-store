@@ -1,6 +1,7 @@
 import { Text, View } from "@react-pdf/renderer";
 import { formatPrice } from "@/lib/format";
 import { DocumentShell, TotalsBlock, styles, type Moneyish } from "./document-layout";
+import type { Letterhead } from "./letterhead";
 import type { Employee, PayRun, Payslip, PayslipDeduction } from "@prisma/client";
 
 function formatDate(date: Date) {
@@ -12,17 +13,19 @@ export function PayslipDocument({
   employee,
   deductions,
   payRun,
+  letterhead,
 }: {
   payslip: Payslip;
   employee: Employee;
   deductions: PayslipDeduction[];
   payRun: PayRun;
+  letterhead?: Letterhead;
 }) {
   const formatMoney = (amount: Moneyish) => formatPrice(String(amount), "KES");
   const totalDeductions = deductions.reduce((sum, d) => sum + Number(d.amount), 0);
 
   return (
-    <DocumentShell docTitle="Payslip" docNumber={payslip.number}>
+    <DocumentShell docTitle="Payslip" docNumber={payslip.number} letterhead={letterhead}>
       <View style={styles.row}>
         <View style={{ flex: 1 }}>
           <Text style={styles.sectionLabel}>Employee</Text>

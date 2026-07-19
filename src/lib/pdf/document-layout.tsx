@@ -1,5 +1,6 @@
-import { Document, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
+import { Document, Image, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
 import type { ReactNode } from "react";
+import type { Letterhead } from "./letterhead";
 
 export const styles = StyleSheet.create({
   page: {
@@ -17,6 +18,11 @@ export const styles = StyleSheet.create({
   brand: {
     fontSize: 18,
     fontFamily: "Helvetica-Bold",
+  },
+  logo: {
+    maxWidth: 140,
+    maxHeight: 50,
+    objectFit: "contain",
   },
   brandSub: {
     fontSize: 9,
@@ -115,18 +121,26 @@ export const styles = StyleSheet.create({
 export function DocumentShell({
   docTitle,
   docNumber,
+  letterhead,
   children,
 }: {
   docTitle: string;
   docNumber: string;
+  letterhead?: Letterhead;
   children: ReactNode;
 }) {
+  const companyName = letterhead?.companyName ?? "NURU Electronics";
   return (
     <Document>
       <Page size="A4" style={styles.page}>
         <View style={styles.headerRow}>
           <View>
-            <Text style={styles.brand}>NURU</Text>
+            {letterhead?.logoDataUri ? (
+              // eslint-disable-next-line jsx-a11y/alt-text -- react-pdf's Image is a PDF node, not an HTML <img>; it has no alt prop.
+              <Image src={letterhead.logoDataUri} style={styles.logo} />
+            ) : (
+              <Text style={styles.brand}>{companyName}</Text>
+            )}
             <Text style={styles.brandSub}>nuruelectronics.com</Text>
           </View>
           <View style={styles.docTitleBlock}>
@@ -135,7 +149,7 @@ export function DocumentShell({
           </View>
         </View>
         {children}
-        <Text style={styles.footer}>NURU Electronics · nuruelectronics.com</Text>
+        <Text style={styles.footer}>{companyName} · nuruelectronics.com</Text>
       </Page>
     </Document>
   );

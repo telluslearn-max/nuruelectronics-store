@@ -18,6 +18,7 @@ import { InvoiceDocument } from "./invoice-document";
 import { ReceiptDocument } from "./receipt-document";
 import { DeliveryNoteDocument } from "./delivery-note-document";
 import { PayslipDocument } from "./payslip-document";
+import { getLetterhead } from "./letterhead";
 
 export async function renderEstimatePdf(
   estimate: Estimate,
@@ -25,7 +26,8 @@ export async function renderEstimatePdf(
   customer: Customer,
   items: OrderItem[],
 ): Promise<Buffer> {
-  return renderToBuffer(EstimateDocument({ estimate, order, customer, items }));
+  const letterhead = await getLetterhead();
+  return renderToBuffer(EstimateDocument({ estimate, order, customer, items, letterhead }));
 }
 
 export async function renderInvoicePdf(
@@ -34,15 +36,18 @@ export async function renderInvoicePdf(
   customer: Customer,
   items: OrderItem[],
 ): Promise<Buffer> {
-  return renderToBuffer(InvoiceDocument({ invoice, order, customer, items }));
+  const letterhead = await getLetterhead();
+  return renderToBuffer(InvoiceDocument({ invoice, order, customer, items, letterhead }));
 }
 
 export async function renderReceiptPdf(receipt: Receipt, invoice: Invoice, customer: Customer): Promise<Buffer> {
-  return renderToBuffer(ReceiptDocument({ receipt, invoice, customer }));
+  const letterhead = await getLetterhead();
+  return renderToBuffer(ReceiptDocument({ receipt, invoice, customer, letterhead }));
 }
 
 export async function renderDeliveryNotePdf(note: DeliveryNote, order: Order, items: OrderItem[]): Promise<Buffer> {
-  return renderToBuffer(DeliveryNoteDocument({ note, order, items }));
+  const letterhead = await getLetterhead();
+  return renderToBuffer(DeliveryNoteDocument({ note, order, items, letterhead }));
 }
 
 export async function renderPayslipPdf(
@@ -51,5 +56,6 @@ export async function renderPayslipPdf(
   deductions: PayslipDeduction[],
   payRun: PayRun,
 ): Promise<Buffer> {
-  return renderToBuffer(PayslipDocument({ payslip, employee, deductions, payRun }));
+  const letterhead = await getLetterhead();
+  return renderToBuffer(PayslipDocument({ payslip, employee, deductions, payRun, letterhead }));
 }

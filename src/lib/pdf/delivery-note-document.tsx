@@ -1,5 +1,6 @@
 import { Text, View } from "@react-pdf/renderer";
 import { DocumentShell, styles } from "./document-layout";
+import type { Letterhead } from "./letterhead";
 import type { DeliveryNote, Order, OrderItem } from "@prisma/client";
 
 function formatDate(date: Date | null) {
@@ -11,13 +12,15 @@ export function DeliveryNoteDocument({
   note,
   order,
   items,
+  letterhead,
 }: {
   note: DeliveryNote;
   order: Order;
   items: OrderItem[];
+  letterhead?: Letterhead;
 }) {
   return (
-    <DocumentShell docTitle="Delivery Note" docNumber={note.number}>
+    <DocumentShell docTitle="Delivery Note" docNumber={note.number} letterhead={letterhead}>
       <View style={styles.row}>
         <View style={{ flex: 1 }}>
           <Text style={styles.sectionLabel}>Deliver to</Text>
