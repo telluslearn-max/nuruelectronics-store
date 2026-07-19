@@ -6,6 +6,9 @@ import { formatPrice } from "@/lib/format";
 import { StatusPill } from "@/components/admin/status-pill";
 import { parsePage, type PageSearchParams } from "@/lib/pagination";
 import { PaginationControls } from "@/components/admin/pagination-controls";
+import { BulkSelectionBar } from "@/components/admin/bulk-selection-bar";
+import { ConfirmSubmitButton } from "@/components/admin/confirm-submit-button";
+import { bulkDeleteDocuments, bulkEmailDocuments } from "@/lib/admin-actions";
 
 export const metadata: Metadata = { title: "Documents" };
 
@@ -32,6 +35,7 @@ function isDocType(value: string | undefined): value is DocType {
 }
 
 type Row = {
+  id: string;
   orderId: string;
   number: string;
   status: string;
@@ -58,6 +62,7 @@ async function loadRows(
     ]);
     return {
       rows: invoices.map((invoice) => ({
+        id: invoice.id,
         orderId: invoice.orderId,
         number: invoice.number,
         status: invoice.status,
@@ -82,6 +87,7 @@ async function loadRows(
     ]);
     return {
       rows: estimates.map((estimate) => ({
+        id: estimate.id,
         orderId: estimate.orderId,
         number: estimate.number,
         status: estimate.status,
@@ -105,6 +111,7 @@ async function loadRows(
   ]);
   return {
     rows: notes.map((note) => ({
+      id: note.id,
       orderId: note.orderId,
       number: note.number,
       status: note.status,
@@ -185,28 +192,50 @@ export default async function AdminDocumentsPage({
       ) : rows.length === 0 ? (
         <p className="mt-6 text-sm text-neutral-500">No {emptyLabel}s match this filter.</p>
       ) : (
-        <ul className="mt-6 space-y-3">
-          {rows.map((row) => (
-            <li key={row.orderId + row.number} className="rounded-card border border-border-subtle p-4 text-sm">
-              <Link
-                href={`/admin/orders/${row.orderId}`}
-                className="flex flex-wrap items-center justify-between gap-3 hover:opacity-80"
+        <form id="bulk-documents-form" className="mt-6">
+          <BulkSelectionBar formId="bulk-documents-form">
+            <button
+              type="submit"
+              formAction={bulkEmailDocuments.bind(null, type)}
+              className="rounded-control border border-border-subtle px-3 py-1.5 text-sm font-medium hover:border-foreground"
+            >
+              Email selected
+            </button>
+            <ConfirmSubmitButton
+              confirmMessage="Delete the selected documents? Ineligible ones (e.g. paid invoices) will be skipped. This can't be undone."
+              formAction={bulkDeleteDocuments.bind(null, type)}
+              className="rounded-control border border-border-subtle px-3 py-1.5 text-sm font-medium text-red-600 hover:border-red-600"
+            >
+              Delete selected
+            </ConfirmSubmitButton>
+          </BulkSelectionBar>
+          <ul className="space-y-3">
+            {rows.map((row) => (
+              <li
+                key={row.id}
+                className="flex items-center gap-3 rounded-card border border-border-subtle p-4 text-sm"
               >
-                <span>
-                  <span className="block font-medium">{row.number}</span>
-                  <span className="mt-1 flex items-center gap-2">
-                    <StatusPill status={row.status} />
-                    <span className="text-neutral-500">{formatDate(row.date)}</span>
+                <input type="checkbox" name="ids" value={row.id} className="h-4 w-4 shrink-0" />
+                <Link
+                  href={`/admin/orders/${row.orderId}`}
+                  className="flex flex-1 flex-wrap items-center justify-between gap-3 hover:opacity-80"
+                >
+                  <span>
+                    <span className="block font-medium">{row.number}</span>
+                    <span className="mt-1 flex items-center gap-2">
+                      <StatusPill status={row.status} />
+                      <span className="text-neutral-500">{formatDate(row.date)}</span>
+                    </span>
                   </span>
-                </span>
-                <span className="text-right">
-                  <span className="block font-medium">{row.primaryLabel}</span>
-                  {row.secondaryLabel && <span className="mt-1 block text-lg font-semibold">{row.secondaryLabel}</span>}
-                </span>
-              </Link>
-            </li>
-          ))}
-        </ul>
+                  <span className="text-right">
+                    <span className="block font-medium">{row.primaryLabel}</span>
+                    {row.secondaryLabel && <span className="mt-1 block text-lg font-semibold">{row.secondaryLabel}</span>}
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </form>
       )}
       <PaginationControls
         pathname="/admin/documents"

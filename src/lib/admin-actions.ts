@@ -590,3 +590,57 @@ export async function sendDeliveryNoteEmail(deliveryNoteId: string): Promise<voi
 
   revalidatePath(`/admin/orders/${note.orderId}`);
 }
+
+export type BulkDocumentType = "invoice" | "estimate" | "delivery-note";
+
+/**
+ * Bulk delete/email reuse each type's existing single-item action (with its
+ * existing guards — e.g. can't delete a paid invoice) one id at a time, so an
+ * ineligible or already-gone row is simply skipped rather than failing the
+ * whole batch. Sequential, not Promise.all, so a run of bulk emails doesn't
+ * hammer the email provider with a burst of concurrent sends.
+ */
+async function bulkRunPerType(
+  type: BulkDocumentType,
+  ids: string[],
+  runners: { invoice: (id: string) => Promise<void>; estimate: (id: string) => Promise<void>; "delivery-note": (id: string) => Promise<void> },
+): Promise<{ succeeded: number; skipped: number }> {
+  let succeeded = 0;
+  for (const id of ids) {
+    try {
+      await runners[type](id);
+      succeeded++;
+    } catch {
+      // Ineligible (guard threw) or already gone — counted as skipped, not a hard failure.
+    }
+  }
+  return { succeeded, skipped: ids.length - succeeded };
+}
+
+export async function bulkDeleteDocuments(type: BulkDocumentType, formData: FormData): Promise<void> {
+  await requireAdminSession();
+  const ids = formData.getAll("ids").map(String);
+
+  await bulkRunPerType(type, ids, {
+    invoice: deleteInvoice,
+    estimate: deleteEstimate,
+    "delivery-note": deleteDeliveryNote,
+  });
+
+  revalidatePath("/admin/documents");
+  redirect(`/admin/documents?type=${type}`);
+}
+
+export async function bulkEmailDocuments(type: BulkDocumentType, formData: FormData): Promise<void> {
+  await requireAdminSession();
+  const ids = formData.getAll("ids").map(String);
+
+  await bulkRunPerType(type, ids, {
+    invoice: sendInvoiceEmail,
+    estimate: sendEstimateEmail,
+    "delivery-note": sendDeliveryNoteEmail,
+  });
+
+  revalidatePath("/admin/documents");
+  redirect(`/admin/documents?type=${type}`);
+}
