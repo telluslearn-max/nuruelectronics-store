@@ -4,18 +4,25 @@ import { prisma } from "@/lib/prisma";
 import { requireAdminSession } from "@/lib/admin-auth";
 import { formatPrice } from "@/lib/format";
 import { StatusPill } from "@/components/admin/status-pill";
+import { ConfirmSubmitButton } from "@/components/admin/confirm-submit-button";
 import type { Customer, OrderItem } from "@prisma/client";
 import {
   createDeliveryNote,
   createEstimate,
   createInvoice,
   createInvoiceFromEstimate,
+  deleteDeliveryNote,
+  deleteEstimate,
+  deleteInvoice,
   markDelivered,
   recordPayment,
   sendDeliveryNoteEmail,
   sendEstimateEmail,
   sendInvoiceEmail,
   sendReceiptEmail,
+  updateDeliveryNote,
+  updateEstimate,
+  updateInvoice,
   voidInvoice,
 } from "@/lib/admin-actions";
 
@@ -26,6 +33,11 @@ export const metadata: Metadata = {
 function formatDate(date: Date | null) {
   if (!date) return "—";
   return new Intl.DateTimeFormat("en-KE", { dateStyle: "medium" }).format(date);
+}
+
+function toDateInputValue(date: Date | null): string {
+  if (!date) return "";
+  return date.toISOString().slice(0, 10);
 }
 
 const inputClass =
@@ -86,6 +98,11 @@ export default async function AdminOrderHubPage({ params }: { params: Promise<{ 
   const formatMoney = (amount: string | number) => formatPrice(String(amount), order.currencyCode);
   const acceptedEstimateWithoutInvoice = order.estimates.find((e) => e.status === "accepted") && !order.invoice;
   const itemsSubtotal = order.items.reduce((sum, item) => sum + Number(item.lineTotal), 0);
+  const invoiceDeletable = order.invoice ? Number(order.invoice.amountPaid) === 0 : false;
+  const invoiceEditable =
+    order.invoice != null &&
+    Number(order.invoice.amountPaid) === 0 &&
+    (order.invoice.status === "draft" || order.invoice.status === "sent");
 
   return (
     <div className="space-y-10">
@@ -113,34 +130,130 @@ export default async function AdminOrderHubPage({ params }: { params: Promise<{ 
       <section className="rounded-card border border-border-subtle p-5">
         <h3 className="font-medium">Estimates</h3>
         <ul className="mt-3 space-y-3 text-sm">
-          {order.estimates.map((estimate) => (
-            <li key={estimate.id} className="flex flex-wrap items-center justify-between gap-3 border-b border-border-subtle/60 pb-3 last:border-0 last:pb-0">
-              <span>
-                <span className="block font-medium">{estimate.number}</span>
-                <span className="mt-1 flex items-center gap-2">
-                  <StatusPill status={estimate.status} />
-                  <span className="text-lg font-semibold">{formatMoney(estimate.total.toString())}</span>
-                </span>
-              </span>
-              <div className="flex gap-3 text-sm">
-                <a className="underline hover:text-foreground" href={`/api/estimates/${estimate.id}/pdf`}>
-                  Download PDF
-                </a>
-                <form action={sendEstimateEmail.bind(null, estimate.id)}>
-                  <button type="submit" className="underline hover:text-foreground">
-                    Send email
-                  </button>
-                </form>
-                {estimate.status === "accepted" && !order.invoice && (
-                  <form action={createInvoiceFromEstimate.bind(null, estimate.id)}>
-                    <button type="submit" className="underline hover:text-foreground">
-                      Create invoice from this
-                    </button>
-                  </form>
+          {order.estimates.map((estimate) => {
+            const editable = estimate.status === "draft" || estimate.status === "sent";
+            return (
+              <li key={estimate.id} className="border-b border-border-subtle/60 pb-3 last:border-0 last:pb-0">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <span>
+                    <span className="block font-medium">{estimate.number}</span>
+                    <span className="mt-1 flex items-center gap-2">
+                      <StatusPill status={estimate.status} />
+                      <span className="text-lg font-semibold">{formatMoney(estimate.total.toString())}</span>
+                    </span>
+                  </span>
+                  <div className="flex flex-wrap gap-3 text-sm">
+                    <a className="underline hover:text-foreground" href={`/api/estimates/${estimate.id}/pdf`}>
+                      Download PDF
+                    </a>
+                    <form action={sendEstimateEmail.bind(null, estimate.id)}>
+                      <button type="submit" className="underline hover:text-foreground">
+                        Send email
+                      </button>
+                    </form>
+                    {estimate.status === "accepted" && !order.invoice && (
+                      <form action={createInvoiceFromEstimate.bind(null, estimate.id)}>
+                        <button type="submit" className="underline hover:text-foreground">
+                          Create invoice from this
+                        </button>
+                      </form>
+                    )}
+                    {editable && <span className="text-neutral-300">·</span>}
+                    {editable && (
+                      <form action={deleteEstimate.bind(null, estimate.id)}>
+                        <ConfirmSubmitButton
+                          confirmMessage={`Delete estimate ${estimate.number}? This can't be undone.`}
+                          className="underline hover:text-foreground"
+                        >
+                          Delete
+                        </ConfirmSubmitButton>
+                      </form>
+                    )}
+                  </div>
+                </div>
+                {editable && (
+                  <details className="mt-3">
+                    <summary className="cursor-pointer text-sm font-medium">Edit estimate</summary>
+                    <form action={updateEstimate.bind(null, estimate.id)} className="mt-4 space-y-4">
+                      <div className={cardClass}>
+                        <p className={cardLabelClass}>Details</p>
+                        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                          <div>
+                            <label className="block text-xs text-neutral-500">Valid until</label>
+                            <input
+                              type="date"
+                              name="validUntil"
+                              required
+                              defaultValue={toDateInputValue(estimate.validUntil)}
+                              className={inputClass}
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <BillToCard customer={order.customer} />
+                      <ItemsCard items={order.items} currencyCode={order.currencyCode} />
+
+                      <div className={cardClass}>
+                        <p className={cardLabelClass}>Total</p>
+                        <div className="mt-3 space-y-2 text-sm">
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="text-neutral-500">Subtotal</span>
+                            <span>{formatMoney(itemsSubtotal.toFixed(2))}</span>
+                          </div>
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="text-neutral-500">Tax</span>
+                            <input
+                              type="number"
+                              step="0.01"
+                              name="taxTotal"
+                              defaultValue={estimate.taxTotal.toString()}
+                              className={`${inputClass} max-w-[9rem]`}
+                            />
+                          </div>
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="text-neutral-500">Shipping</span>
+                            <input
+                              type="number"
+                              step="0.01"
+                              name="shippingTotal"
+                              defaultValue={estimate.shippingTotal.toString()}
+                              className={`${inputClass} max-w-[9rem]`}
+                            />
+                          </div>
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="text-neutral-500">Discount</span>
+                            <input
+                              type="number"
+                              step="0.01"
+                              name="discountTotal"
+                              defaultValue={estimate.discountTotal.toString()}
+                              className={`${inputClass} max-w-[9rem]`}
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className={cardClass}>
+                        <p className={cardLabelClass}>Note</p>
+                        <textarea
+                          name="note"
+                          rows={2}
+                          defaultValue={estimate.note ?? ""}
+                          className={`${inputClass} mt-2 resize-none`}
+                          placeholder="Optional note for the customer"
+                        />
+                      </div>
+
+                      <button type="submit" className={primaryButtonClass}>
+                        Save changes
+                      </button>
+                    </form>
+                  </details>
                 )}
-              </div>
-            </li>
-          ))}
+              </li>
+            );
+          })}
           {order.estimates.length === 0 && <p className="text-neutral-500">No estimates yet.</p>}
         </ul>
 
@@ -235,7 +348,97 @@ export default async function AdminOrderHubPage({ params }: { params: Promise<{ 
                   </button>
                 </form>
               )}
+              {invoiceDeletable && (
+                <form action={deleteInvoice.bind(null, order.invoice.id)}>
+                  <ConfirmSubmitButton
+                    confirmMessage={`Delete invoice ${order.invoice.number}? This removes it and its ledger entries completely — this can't be undone.`}
+                    className="underline hover:text-foreground"
+                  >
+                    Delete
+                  </ConfirmSubmitButton>
+                </form>
+              )}
             </div>
+
+            {invoiceEditable && (
+              <details>
+                <summary className="cursor-pointer font-medium">Edit invoice</summary>
+                <form action={updateInvoice.bind(null, order.invoice.id)} className="mt-4 space-y-4">
+                  <div className={cardClass}>
+                    <p className={cardLabelClass}>Details</p>
+                    <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                      <div>
+                        <label className="block text-xs text-neutral-500">Due date</label>
+                        <input
+                          type="date"
+                          name="dueAt"
+                          defaultValue={toDateInputValue(order.invoice.dueAt)}
+                          className={inputClass}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <BillToCard customer={order.customer} />
+                  <ItemsCard items={order.items} currencyCode={order.currencyCode} />
+
+                  <div className={cardClass}>
+                    <p className={cardLabelClass}>Total</p>
+                    <div className="mt-3 space-y-2 text-sm">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-neutral-500">Subtotal</span>
+                        <span>{formatMoney(itemsSubtotal.toFixed(2))}</span>
+                      </div>
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-neutral-500">Tax</span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          name="taxTotal"
+                          defaultValue={order.invoice.taxTotal.toString()}
+                          className={`${inputClass} max-w-[9rem]`}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-neutral-500">Shipping</span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          name="shippingTotal"
+                          defaultValue={order.invoice.shippingTotal.toString()}
+                          className={`${inputClass} max-w-[9rem]`}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-neutral-500">Discount</span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          name="discountTotal"
+                          defaultValue={order.invoice.discountTotal.toString()}
+                          className={`${inputClass} max-w-[9rem]`}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className={cardClass}>
+                    <p className={cardLabelClass}>Note</p>
+                    <textarea
+                      name="note"
+                      rows={2}
+                      defaultValue={order.invoice.note ?? ""}
+                      className={`${inputClass} mt-2 resize-none`}
+                      placeholder="Optional note for the customer"
+                    />
+                  </div>
+
+                  <button type="submit" className={primaryButtonClass}>
+                    Save changes
+                  </button>
+                </form>
+              </details>
+            )}
 
             {order.invoice.status !== "paid" && order.invoice.status !== "void" && (
               <details>
@@ -381,7 +584,71 @@ export default async function AdminOrderHubPage({ params }: { params: Promise<{ 
                   Send email
                 </button>
               </form>
+              {order.deliveryNote.status === "pending" && (
+                <form action={deleteDeliveryNote.bind(null, order.deliveryNote.id)}>
+                  <ConfirmSubmitButton
+                    confirmMessage={`Delete delivery note ${order.deliveryNote.number}? This can't be undone.`}
+                    className="underline hover:text-foreground"
+                  >
+                    Delete
+                  </ConfirmSubmitButton>
+                </form>
+              )}
             </div>
+            {order.deliveryNote.status === "pending" && (
+              <details>
+                <summary className="cursor-pointer font-medium">Edit delivery note</summary>
+                <form action={updateDeliveryNote.bind(null, order.deliveryNote.id)} className="mt-4 space-y-4">
+                  <div className={cardClass}>
+                    <p className={cardLabelClass}>Recipient</p>
+                    <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                      <div>
+                        <label className="block text-xs text-neutral-500">Recipient name</label>
+                        <input
+                          type="text"
+                          name="recipientName"
+                          required
+                          defaultValue={order.deliveryNote.recipientName}
+                          className={inputClass}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-neutral-500">Recipient phone</label>
+                        <input
+                          type="text"
+                          name="recipientPhone"
+                          defaultValue={order.deliveryNote.recipientPhone ?? ""}
+                          className={inputClass}
+                        />
+                      </div>
+                      <div className="sm:col-span-2">
+                        <label className="block text-xs text-neutral-500">Delivery address</label>
+                        <input
+                          type="text"
+                          name="deliveryAddress"
+                          required
+                          defaultValue={order.deliveryNote.deliveryAddress}
+                          className={inputClass}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-neutral-500">Method</label>
+                        <input
+                          type="text"
+                          name="deliveryMethod"
+                          defaultValue={order.deliveryNote.deliveryMethod ?? ""}
+                          placeholder="Rider, courier, pickup…"
+                          className={inputClass}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <button type="submit" className={primaryButtonClass}>
+                    Save changes
+                  </button>
+                </form>
+              </details>
+            )}
             {order.deliveryNote.status === "pending" && (
               <form
                 action={markDelivered.bind(null, order.deliveryNote.id)}

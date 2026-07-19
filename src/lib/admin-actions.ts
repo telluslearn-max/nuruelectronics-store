@@ -174,6 +174,51 @@ export async function createEstimate(orderId: string, formData: FormData): Promi
   redirect(`/admin/orders/${orderId}`);
 }
 
+export async function updateEstimate(estimateId: string, formData: FormData): Promise<void> {
+  await requireAdminSession();
+  const estimate = await prisma.estimate.findUniqueOrThrow({
+    where: { id: estimateId },
+    include: { order: { include: { items: true } } },
+  });
+
+  if (estimate.status !== "draft" && estimate.status !== "sent") {
+    throw new Error("Can't edit an estimate the customer has already responded to.");
+  }
+
+  const validUntil = new Date(String(formData.get("validUntil")));
+  const taxTotal = Number(formData.get("taxTotal") ?? 0) || 0;
+  const shippingTotal = Number(formData.get("shippingTotal") ?? 0) || 0;
+  const discountTotal = Number(formData.get("discountTotal") ?? 0) || 0;
+  const note = String(formData.get("note") ?? "").trim() || null;
+
+  const subtotal = sumItems(estimate.order.items);
+  const total = subtotal + taxTotal + shippingTotal - discountTotal;
+
+  await prisma.estimate.update({
+    where: { id: estimateId },
+    data: {
+      validUntil,
+      taxTotal: taxTotal.toFixed(2),
+      shippingTotal: shippingTotal.toFixed(2),
+      discountTotal: discountTotal.toFixed(2),
+      total: total.toFixed(2),
+      note,
+    },
+  });
+
+  revalidatePath(`/admin/orders/${estimate.orderId}`);
+  redirect(`/admin/orders/${estimate.orderId}`);
+}
+
+export async function deleteEstimate(estimateId: string): Promise<void> {
+  await requireAdminSession();
+  const estimate = await prisma.estimate.findUniqueOrThrow({ where: { id: estimateId } });
+
+  await prisma.estimate.delete({ where: { id: estimateId } });
+
+  revalidatePath(`/admin/orders/${estimate.orderId}`);
+}
+
 export async function sendEstimateEmail(estimateId: string): Promise<void> {
   await requireAdminSession();
   const estimate = await prisma.estimate.findUniqueOrThrow({
@@ -272,6 +317,79 @@ export async function createInvoice(orderId: string, formData: FormData): Promis
 
   revalidatePath(`/admin/orders/${orderId}`);
   redirect(`/admin/orders/${orderId}`);
+}
+
+export async function updateInvoice(invoiceId: string, formData: FormData): Promise<void> {
+  await requireAdminSession();
+  const invoice = await prisma.invoice.findUniqueOrThrow({
+    where: { id: invoiceId },
+    include: { order: { include: { items: true } } },
+  });
+
+  if (Number(invoice.amountPaid) > 0) {
+    throw new Error("Can't edit an invoice that has received payments.");
+  }
+  if (invoice.status !== "draft" && invoice.status !== "sent") {
+    throw new Error("Can't edit a voided invoice.");
+  }
+
+  const taxTotal = Number(formData.get("taxTotal") ?? 0) || 0;
+  const shippingTotal = Number(formData.get("shippingTotal") ?? 0) || 0;
+  const discountTotal = Number(formData.get("discountTotal") ?? 0) || 0;
+  const dueAtRaw = String(formData.get("dueAt") ?? "");
+  const dueAt = dueAtRaw ? new Date(dueAtRaw) : null;
+  const note = String(formData.get("note") ?? "").trim() || null;
+
+  const subtotal = sumItems(invoice.order.items);
+  const total = subtotal + taxTotal + shippingTotal - discountTotal;
+
+  await prisma.$transaction(async (tx) => {
+    const updated = await tx.invoice.update({
+      where: { id: invoiceId },
+      data: {
+        taxTotal: taxTotal.toFixed(2),
+        shippingTotal: shippingTotal.toFixed(2),
+        discountTotal: discountTotal.toFixed(2),
+        total: total.toFixed(2),
+        note,
+        dueAt,
+      },
+    });
+    // Replace the ledger entry posted at issuance with one reflecting the corrected total.
+    await tx.journalEntry.deleteMany({ where: { sourceType: "invoice", sourceId: invoiceId } });
+    await postJournalEntry(tx, {
+      date: updated.issuedAt ?? updated.createdAt,
+      description: `Invoice ${updated.number} issued`,
+      sourceType: "invoice",
+      sourceId: updated.id,
+      lines: [
+        { accountCode: ACCOUNTS.ACCOUNTS_RECEIVABLE, debit: Number(updated.total) },
+        { accountCode: ACCOUNTS.SALES_REVENUE, credit: Number(updated.total) },
+      ],
+    });
+  });
+
+  revalidatePath(`/admin/orders/${invoice.orderId}`);
+  redirect(`/admin/orders/${invoice.orderId}`);
+}
+
+export async function deleteInvoice(invoiceId: string): Promise<void> {
+  await requireAdminSession();
+  const invoice = await prisma.invoice.findUniqueOrThrow({ where: { id: invoiceId } });
+
+  if (Number(invoice.amountPaid) > 0) {
+    throw new Error("Can't delete an invoice that has received payments.");
+  }
+
+  await prisma.$transaction(async (tx) => {
+    // Removes every ledger effect this invoice ever had — the original issuance
+    // posting and, if it was voided first, the reversal too — so deleting it
+    // leaves no trace, unlike Void which deliberately keeps an audit trail.
+    await tx.journalEntry.deleteMany({ where: { sourceId: invoiceId } });
+    await tx.invoice.delete({ where: { id: invoiceId } });
+  });
+
+  revalidatePath(`/admin/orders/${invoice.orderId}`);
 }
 
 export async function sendInvoiceEmail(invoiceId: string): Promise<void> {
@@ -383,6 +501,45 @@ export async function voidInvoice(invoiceId: string): Promise<void> {
   });
 
   revalidatePath(`/admin/orders/${invoice.orderId}`);
+}
+
+export async function updateDeliveryNote(deliveryNoteId: string, formData: FormData): Promise<void> {
+  await requireAdminSession();
+  const deliveryNote = await prisma.deliveryNote.findUniqueOrThrow({ where: { id: deliveryNoteId } });
+
+  if (deliveryNote.status !== "pending") {
+    throw new Error("Can't edit a delivery note that's already marked delivered.");
+  }
+
+  const recipientName = String(formData.get("recipientName") ?? "").trim();
+  const recipientPhone = String(formData.get("recipientPhone") ?? "").trim() || null;
+  const deliveryAddress = String(formData.get("deliveryAddress") ?? "").trim();
+  const deliveryMethod = String(formData.get("deliveryMethod") ?? "").trim() || null;
+
+  if (!recipientName || !deliveryAddress) {
+    throw new Error("Recipient name and delivery address are required.");
+  }
+
+  await prisma.deliveryNote.update({
+    where: { id: deliveryNoteId },
+    data: { recipientName, recipientPhone, deliveryAddress, deliveryMethod },
+  });
+
+  revalidatePath(`/admin/orders/${deliveryNote.orderId}`);
+  redirect(`/admin/orders/${deliveryNote.orderId}`);
+}
+
+export async function deleteDeliveryNote(deliveryNoteId: string): Promise<void> {
+  await requireAdminSession();
+  const deliveryNote = await prisma.deliveryNote.findUniqueOrThrow({ where: { id: deliveryNoteId } });
+
+  if (deliveryNote.status !== "pending") {
+    throw new Error("Can't delete a delivery note that's already marked delivered.");
+  }
+
+  await prisma.deliveryNote.delete({ where: { id: deliveryNoteId } });
+
+  revalidatePath(`/admin/orders/${deliveryNote.orderId}`);
 }
 
 export async function createDeliveryNote(orderId: string, formData: FormData): Promise<void> {
