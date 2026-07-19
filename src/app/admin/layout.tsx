@@ -24,6 +24,7 @@ const NAV_LINKS = [
   { href: "/admin/accounts", label: "Chart of Accounts" },
   { href: "/admin/journal", label: "Journal" },
   { href: "/admin/reports", label: "Reports" },
+  { href: "/admin/settings", label: "Settings" },
 ];
 
 function BrandMark() {

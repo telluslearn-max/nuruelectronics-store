@@ -417,3 +417,25 @@ model AdminLoginAttempt {
 
   @@index([createdAt])
 }
+
+// ---------------------------------------------------------------------------
+// Business settings — singleton row, fixed id "settings"
+// ---------------------------------------------------------------------------
+
+model Settings {
+  id                               String   @id @default("settings")
+  companyName                      String   @default("NURU Electronics")
+  companyEmail                     String?
+  companyPhone                     String?
+  companyAddress                   String?
+  logoUrl                          String?
+  defaultTaxRatePercent            Decimal  @default(0) @db.Decimal(5, 2)
+  currencyCode                     String   @default("KES")
+  documentNumberPrefixEstimate     String?
+  documentNumberPrefixInvoice      String?
+  documentNumberPrefixReceipt      String?
+  documentNumberPrefixDeliveryNote String?
+  documentNumberPrefixBill         String?
+  documentNumberPrefixPayslip      String?
+  updatedAt                        DateTime @updatedAt
+}

@@ -1,6 +1,7 @@
 import "server-only";
 import { randomBytes } from "node:crypto";
 import type { DocumentType, Prisma } from "@prisma/client";
+import { documentNumberPrefixOverride } from "./settings";
 
 const PREFIXES: Record<DocumentType, string> = {
   estimate: "EST",
@@ -18,12 +19,16 @@ const PREFIXES: Record<DocumentType, string> = {
  */
 export async function mintDocumentNumber(tx: Prisma.TransactionClient, type: DocumentType): Promise<string> {
   const year = new Date().getFullYear();
-  const sequence = await tx.documentSequence.upsert({
-    where: { type_year: { type, year } },
-    create: { type, year, value: 1 },
-    update: { value: { increment: 1 } },
-  });
-  return `${PREFIXES[type]}-${year}-${String(sequence.value).padStart(4, "0")}`;
+  const [sequence, settings] = await Promise.all([
+    tx.documentSequence.upsert({
+      where: { type_year: { type, year } },
+      create: { type, year, value: 1 },
+      update: { value: { increment: 1 } },
+    }),
+    tx.settings.findUnique({ where: { id: "settings" } }),
+  ]);
+  const prefix = (settings && documentNumberPrefixOverride(settings, type)) || PREFIXES[type];
+  return `${prefix}-${year}-${String(sequence.value).padStart(4, "0")}`;
 }
 
 export function generateAccessToken(): string {
