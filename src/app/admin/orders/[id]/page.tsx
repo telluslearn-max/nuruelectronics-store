@@ -1,15 +1,12 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireAdminSession } from "@/lib/admin-auth";
 import { formatPrice } from "@/lib/format";
 import { StatusPill } from "@/components/admin/status-pill";
 import { ConfirmSubmitButton } from "@/components/admin/confirm-submit-button";
-import type { Customer, OrderItem } from "@prisma/client";
 import {
-  createDeliveryNote,
-  createEstimate,
-  createInvoice,
   createInvoiceFromEstimate,
   deleteDeliveryNote,
   deleteEstimate,
@@ -25,58 +22,21 @@ import {
   updateInvoice,
   voidInvoice,
 } from "@/lib/admin-actions";
+import {
+  BillToCard,
+  ItemsCard,
+  cardClass,
+  cardLabelClass,
+  formatDate,
+  inputClass,
+  primaryButtonClass,
+  secondaryButtonClass,
+  toDateInputValue,
+} from "./_shared";
 
 export const metadata: Metadata = {
   title: "Order",
 };
-
-function formatDate(date: Date | null) {
-  if (!date) return "—";
-  return new Intl.DateTimeFormat("en-KE", { dateStyle: "medium" }).format(date);
-}
-
-function toDateInputValue(date: Date | null): string {
-  if (!date) return "";
-  return date.toISOString().slice(0, 10);
-}
-
-const inputClass =
-  "w-full rounded-control border border-border-subtle px-3 py-2 text-sm outline-none focus:border-foreground";
-const primaryButtonClass =
-  "rounded-control bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:opacity-90";
-const secondaryButtonClass =
-  "rounded-control border border-border-subtle px-4 py-2 text-sm font-medium transition hover:border-foreground";
-const cardClass = "rounded-card border border-border-subtle p-4";
-const cardLabelClass = "text-xs font-medium uppercase tracking-wide text-neutral-500";
-
-function BillToCard({ customer }: { customer: Customer }) {
-  return (
-    <div className={cardClass}>
-      <p className={cardLabelClass}>Bill to</p>
-      <p className="mt-2 text-sm font-medium">{customer.name ?? customer.email}</p>
-      {customer.name && <p className="mt-0.5 text-sm text-neutral-500">{customer.email}</p>}
-      {customer.phone && <p className="mt-0.5 text-sm text-neutral-500">{customer.phone}</p>}
-    </div>
-  );
-}
-
-function ItemsCard({ items, currencyCode }: { items: OrderItem[]; currencyCode: string }) {
-  return (
-    <div className={cardClass}>
-      <p className={cardLabelClass}>Items</p>
-      <ul className="mt-3 space-y-2 text-sm">
-        {items.map((item) => (
-          <li key={item.id} className="flex justify-between">
-            <span>
-              {item.title} × {item.quantity}
-            </span>
-            <span>{formatPrice(item.lineTotal.toString(), currencyCode)}</span>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
 
 export default async function AdminOrderHubPage({ params }: { params: Promise<{ id: string }> }) {
   await requireAdminSession();
@@ -257,56 +217,12 @@ export default async function AdminOrderHubPage({ params }: { params: Promise<{ 
           {order.estimates.length === 0 && <p className="text-neutral-500">No estimates yet.</p>}
         </ul>
 
-        <details className="mt-5">
-          <summary className="cursor-pointer text-sm font-medium">New estimate</summary>
-          <form action={createEstimate.bind(null, order.id)} className="mt-4 space-y-4">
-            <div className={cardClass}>
-              <p className={cardLabelClass}>Details</p>
-              <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="block text-xs text-neutral-500">Valid until</label>
-                  <input type="date" name="validUntil" required className={inputClass} />
-                </div>
-              </div>
-            </div>
-
-            <BillToCard customer={order.customer} />
-            <ItemsCard items={order.items} currencyCode={order.currencyCode} />
-
-            <div className={cardClass}>
-              <div className="flex items-center justify-between">
-                <p className={cardLabelClass}>Total</p>
-              </div>
-              <div className="mt-3 space-y-2 text-sm">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-neutral-500">Subtotal</span>
-                  <span>{formatMoney(itemsSubtotal.toFixed(2))}</span>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-neutral-500">Tax</span>
-                  <input type="number" step="0.01" name="taxTotal" defaultValue={0} className={`${inputClass} max-w-[9rem]`} />
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-neutral-500">Shipping</span>
-                  <input type="number" step="0.01" name="shippingTotal" defaultValue={0} className={`${inputClass} max-w-[9rem]`} />
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-neutral-500">Discount</span>
-                  <input type="number" step="0.01" name="discountTotal" defaultValue={0} className={`${inputClass} max-w-[9rem]`} />
-                </div>
-              </div>
-            </div>
-
-            <div className={cardClass}>
-              <p className={cardLabelClass}>Note</p>
-              <textarea name="note" rows={2} className={`${inputClass} mt-2 resize-none`} placeholder="Optional note for the customer" />
-            </div>
-
-            <button type="submit" className={primaryButtonClass}>
-              Create estimate
-            </button>
-          </form>
-        </details>
+        <Link
+          href={`/admin/orders/${order.id}/estimates/new`}
+          className={`mt-5 inline-block ${secondaryButtonClass}`}
+        >
+          New estimate
+        </Link>
         {acceptedEstimateWithoutInvoice && (
           <p className="mt-2 text-sm text-neutral-500">
             An estimate has been accepted — use &ldquo;Create invoice from this&rdquo; above, or create one manually
@@ -502,64 +418,12 @@ export default async function AdminOrderHubPage({ params }: { params: Promise<{ 
             )}
           </div>
         ) : (
-          <details className="mt-3">
-            <summary className="cursor-pointer text-sm font-medium">Create invoice</summary>
-            <form action={createInvoice.bind(null, order.id)} className="mt-4 space-y-4">
-              <div className={cardClass}>
-                <p className={cardLabelClass}>Details</p>
-                <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                  <div>
-                    <label className="block text-xs text-neutral-500">Due date</label>
-                    <input type="date" name="dueAt" className={inputClass} />
-                  </div>
-                </div>
-              </div>
-
-              <BillToCard customer={order.customer} />
-              <ItemsCard items={order.items} currencyCode={order.currencyCode} />
-
-              <div className={cardClass}>
-                <p className={cardLabelClass}>Total</p>
-                <div className="mt-3 space-y-2 text-sm">
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-neutral-500">Subtotal</span>
-                    <span>{formatMoney(itemsSubtotal.toFixed(2))}</span>
-                  </div>
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-neutral-500">Tax</span>
-                    <input type="number" step="0.01" name="taxTotal" defaultValue={0} className={`${inputClass} max-w-[9rem]`} />
-                  </div>
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-neutral-500">Shipping</span>
-                    <input type="number" step="0.01" name="shippingTotal" defaultValue={0} className={`${inputClass} max-w-[9rem]`} />
-                  </div>
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-neutral-500">Discount</span>
-                    <input type="number" step="0.01" name="discountTotal" defaultValue={0} className={`${inputClass} max-w-[9rem]`} />
-                  </div>
-                </div>
-              </div>
-
-              <div className="rounded-card bg-neutral-100 p-4">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-medium">Amount due</p>
-                  <p className="text-lg font-semibold">≥ {formatMoney(itemsSubtotal.toFixed(2))}</p>
-                </div>
-                <p className="mt-1 text-xs text-neutral-500">
-                  Equals subtotal plus any tax/shipping minus discount entered above — no payments recorded yet.
-                </p>
-              </div>
-
-              <div className={cardClass}>
-                <p className={cardLabelClass}>Note</p>
-                <textarea name="note" rows={2} className={`${inputClass} mt-2 resize-none`} placeholder="Optional note for the customer" />
-              </div>
-
-              <button type="submit" className={primaryButtonClass}>
-                Create invoice
-              </button>
-            </form>
-          </details>
+          <Link
+            href={`/admin/orders/${order.id}/invoice/new`}
+            className={`mt-3 inline-block ${secondaryButtonClass}`}
+          >
+            Create invoice
+          </Link>
         )}
       </section>
 
@@ -667,35 +531,12 @@ export default async function AdminOrderHubPage({ params }: { params: Promise<{ 
             )}
           </div>
         ) : (
-          <details className="mt-3">
-            <summary className="cursor-pointer text-sm font-medium">Create delivery note</summary>
-            <form action={createDeliveryNote.bind(null, order.id)} className="mt-4 space-y-4">
-              <div className={cardClass}>
-                <p className={cardLabelClass}>Recipient</p>
-                <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                  <div>
-                    <label className="block text-xs text-neutral-500">Recipient name</label>
-                    <input type="text" name="recipientName" required className={inputClass} />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-neutral-500">Recipient phone</label>
-                    <input type="text" name="recipientPhone" className={inputClass} />
-                  </div>
-                  <div className="sm:col-span-2">
-                    <label className="block text-xs text-neutral-500">Delivery address</label>
-                    <input type="text" name="deliveryAddress" required className={inputClass} />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-neutral-500">Method</label>
-                    <input type="text" name="deliveryMethod" placeholder="Rider, courier, pickup…" className={inputClass} />
-                  </div>
-                </div>
-              </div>
-              <button type="submit" className={primaryButtonClass}>
-                Create delivery note
-              </button>
-            </form>
-          </details>
+          <Link
+            href={`/admin/orders/${order.id}/delivery-note/new`}
+            className={`mt-3 inline-block ${secondaryButtonClass}`}
+          >
+            Create delivery note
+          </Link>
         )}
       </section>
     </div>

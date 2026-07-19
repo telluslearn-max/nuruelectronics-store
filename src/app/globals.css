@@ -96,3 +96,29 @@ body {
     display: none;
   }
 }
+
+.admin-content details > summary {
+  list-style: none;
+  cursor: pointer;
+  position: relative;
+  padding-right: 1.25rem;
+}
+.admin-content details > summary::-webkit-details-marker {
+  display: none;
+}
+.admin-content details > summary::after {
+  content: "";
+  position: absolute;
+  right: 0.125rem;
+  top: 50%;
+  width: 0.4rem;
+  height: 0.4rem;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  opacity: 0.5;
+  transform: translateY(-65%) rotate(-45deg);
+  transition: transform 0.2s ease;
+}
+.admin-content details[open] > summary::after {
+  transform: translateY(-35%) rotate(45deg);
+}

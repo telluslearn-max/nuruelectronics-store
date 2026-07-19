@@ -26,6 +26,26 @@ const NAV_LINKS = [
   { href: "/admin/reports", label: "Reports" },
 ];
 
+function BrandMark() {
+  return (
+    <svg width="30" height="30" viewBox="0 0 64 64" aria-hidden="true" className="shrink-0">
+      <rect width="64" height="64" rx="14" fill="#0a0a0a" />
+      <path d="M20 46V18h6l14 19V18h6v28h-6L26 27v19h-6z" fill="#f5f5f7" />
+      <rect x="42" y="40" width="6" height="6" fill="#d4472e" />
+    </svg>
+  );
+}
+
+function LogoutIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 21H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3" />
+      <path d="M16 17l5-5-5-5" />
+      <path d="M21 12H9" />
+    </svg>
+  );
+}
+
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   // Only the login page ever reaches this layout unauthenticated — proxy.ts
   // redirects every other /admin/* request before it gets here, and every
@@ -37,11 +57,30 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   }
 
   return (
-    <div className="mx-auto max-w-6xl px-6 py-10 pb-24 sm:pb-10">
-      <div className="flex items-start justify-between gap-4 border-b border-border-subtle pb-6">
+    <div className="mx-auto max-w-6xl pb-[calc(6rem+env(safe-area-inset-bottom))] sm:pb-10">
+      {/* Compact sticky app bar on mobile */}
+      <div
+        className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-border-subtle bg-background/95 px-4 py-3 backdrop-blur sm:hidden"
+        style={{ paddingTop: "calc(0.75rem + env(safe-area-inset-top))" }}
+      >
+        <div className="flex items-center gap-2">
+          <BrandMark />
+          <span className="text-sm font-semibold">NURU Admin</span>
+        </div>
+        <a
+          href="/api/admin/logout"
+          aria-label="Log out"
+          className="flex h-9 w-9 items-center justify-center rounded-full border border-border-subtle text-neutral-500 transition hover:border-foreground hover:text-foreground"
+        >
+          <LogoutIcon />
+        </a>
+      </div>
+
+      {/* Full header on sm:+ */}
+      <div className="hidden items-start justify-between gap-4 border-b border-border-subtle px-6 py-10 pb-6 sm:flex">
         <div>
           <h1 className="text-title">Nuru Admin</h1>
-          <nav className="mt-4 hidden flex-wrap gap-x-4 gap-y-2 text-sm text-neutral-600 sm:flex">
+          <nav className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-sm text-neutral-600">
             {NAV_LINKS.map((link) => (
               <Link key={link.href} href={link.href} className="hover:text-foreground hover:underline">
                 {link.label}
@@ -56,7 +95,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           Log out
         </a>
       </div>
-      <div className="mt-8">{children}</div>
+
+      <div className="admin-content px-4 py-6 sm:px-6 sm:py-0 sm:mt-8">{children}</div>
       <BottomNav />
     </div>
   );
