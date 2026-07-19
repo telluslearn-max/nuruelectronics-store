@@ -27,7 +27,12 @@ export default async function AdminLoginPage({
   return (
     <div className="mx-auto flex max-w-sm flex-col items-center justify-center py-24">
       <h1 className="text-title">Admin sign in</h1>
-      {error && (
+      {error === "locked" && (
+        <p className="mt-6 w-full rounded-card border border-border-subtle bg-neutral-50 px-4 py-3 text-sm text-neutral-600">
+          Too many failed sign-in attempts. Try again in 15 minutes.
+        </p>
+      )}
+      {error && error !== "locked" && (
         <p className="mt-6 w-full rounded-card border border-border-subtle bg-neutral-50 px-4 py-3 text-sm text-neutral-600">
           Invalid username or password.
         </p>

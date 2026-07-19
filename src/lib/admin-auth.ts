@@ -1,6 +1,7 @@
 import "server-only";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { prisma } from "./prisma";
 import {
   ADMIN_SESSION_COOKIE,
   ADMIN_SESSION_MAX_AGE_SECONDS,
@@ -13,6 +14,9 @@ const username = process.env.ADMIN_USERNAME;
 const password = process.env.ADMIN_PASSWORD;
 const sessionSecret = process.env.ADMIN_SESSION_SECRET;
 
+const LOGIN_LOCKOUT_WINDOW_MINUTES = 15;
+const LOGIN_LOCKOUT_MAX_ATTEMPTS = 5;
+
 export const isAdminAuthConfigured = Boolean(username && password && sessionSecret);
 
 export function verifyAdminCredentials(candidateUsername: string, candidatePassword: string): boolean {
@@ -21,6 +25,23 @@ export function verifyAdminCredentials(candidateUsername: string, candidatePassw
     constantTimeEqual(candidateUsername, username as string) &&
     constantTimeEqual(candidatePassword, password as string)
   );
+}
+
+export function getClientIp(request: Request): string {
+  const forwardedFor = request.headers.get("x-forwarded-for");
+  return forwardedFor?.split(",")[0]?.trim() || "unknown";
+}
+
+export async function isLoginLockedOut(ipAddress: string): Promise<boolean> {
+  const since = new Date(Date.now() - LOGIN_LOCKOUT_WINDOW_MINUTES * 60 * 1000);
+  const failedAttempts = await prisma.adminLoginAttempt.count({
+    where: { ipAddress, success: false, createdAt: { gte: since } },
+  });
+  return failedAttempts >= LOGIN_LOCKOUT_MAX_ATTEMPTS;
+}
+
+export async function recordLoginAttempt(ipAddress: string, success: boolean): Promise<void> {
+  await prisma.adminLoginAttempt.create({ data: { ipAddress, success } });
 }
 
 export async function createAdminSession(): Promise<void> {

@@ -404,3 +404,16 @@ model PayslipDeduction {
   type      String
   amount    Decimal @db.Decimal(10, 2)
 }
+
+// ---------------------------------------------------------------------------
+// Admin login lockout
+// ---------------------------------------------------------------------------
+
+model AdminLoginAttempt {
+  id        String   @id @default(cuid())
+  ipAddress String?
+  success   Boolean
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
