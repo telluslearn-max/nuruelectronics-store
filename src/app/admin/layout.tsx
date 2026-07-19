@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { getAdminSession } from "@/lib/admin-auth";
 import { BottomNav } from "@/components/admin/bottom-nav";
+import { SearchForm } from "@/components/admin/search-form";
 
 export const metadata: Metadata = {
   title: {
@@ -49,6 +50,15 @@ function LogoutIcon() {
   );
 }
 
+function SearchIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="11" cy="11" r="7" />
+      <path d="m20 20-3.5-3.5" />
+    </svg>
+  );
+}
+
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   // Only the login page ever reaches this layout unauthenticated — proxy.ts
   // redirects every other /admin/* request before it gets here, and every
@@ -70,13 +80,22 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           <BrandMark />
           <span className="text-sm font-semibold">NURU Admin</span>
         </div>
-        <a
-          href="/api/admin/logout"
-          aria-label="Log out"
-          className="flex h-9 w-9 items-center justify-center rounded-full border border-border-subtle text-neutral-500 transition hover:border-foreground hover:text-foreground"
-        >
-          <LogoutIcon />
-        </a>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/admin/search"
+            aria-label="Search"
+            className="flex h-9 w-9 items-center justify-center rounded-full border border-border-subtle text-neutral-500 transition hover:border-foreground hover:text-foreground"
+          >
+            <SearchIcon />
+          </Link>
+          <a
+            href="/api/admin/logout"
+            aria-label="Log out"
+            className="flex h-9 w-9 items-center justify-center rounded-full border border-border-subtle text-neutral-500 transition hover:border-foreground hover:text-foreground"
+          >
+            <LogoutIcon />
+          </a>
+        </div>
       </div>
 
       {/* Full header on sm:+ */}
@@ -91,12 +110,15 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             ))}
           </nav>
         </div>
-        <a
-          href="/api/admin/logout"
-          className="shrink-0 rounded-control border border-border-subtle px-4 py-2 text-sm font-medium transition hover:border-foreground"
-        >
-          Log out
-        </a>
+        <div className="w-64 shrink-0 space-y-3">
+          <SearchForm />
+          <a
+            href="/api/admin/logout"
+            className="block w-full rounded-control border border-border-subtle px-4 py-2 text-center text-sm font-medium transition hover:border-foreground"
+          >
+            Log out
+          </a>
+        </div>
       </div>
 
       <div className="admin-content px-4 py-6 sm:px-6 sm:py-0 sm:mt-8">{children}</div>
