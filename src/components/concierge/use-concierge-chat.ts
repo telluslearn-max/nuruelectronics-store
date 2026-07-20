@@ -1,39 +1,13 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
-import { useCart } from "@/components/cart/cart-context";
 import type { ConciergeEvent } from "@/lib/concierge/types";
-import type { Product } from "@/lib/shopify/types";
+import { makeMessageId, type ConciergeDisplayMessage, type ConciergeMessageStore } from "./use-concierge-messages";
 
-export type ConciergeDisplayMessage = {
-  id: string;
-  role: "user" | "model";
-  text: string;
-  products?: { mode: "list" | "compare"; products: Product[] };
-  whatsappMessage?: string;
-};
-
-let nextId = 0;
-function makeId() {
-  nextId += 1;
-  return `concierge-${nextId}`;
-}
-
-export function useConciergeChat() {
-  const { setCart } = useCart();
-  const [messages, setMessages] = useState<ConciergeDisplayMessage[]>([]);
+export function useConciergeChat(store: ConciergeMessageStore) {
+  const { messagesRef, updateMessages, applyEventToMessage } = store;
   const [isStreaming, setIsStreaming] = useState(false);
   const controllerRef = useRef<AbortController | null>(null);
-  // Source of truth for "what to send next," read synchronously — a sibling setState call in
-  // the same event-handler tick (e.g. clearing the input) can suppress React's eager updater
-  // invocation, so reading the just-set state back out of setMessages(prev => ...) isn't reliable.
-  const messagesRef = useRef<ConciergeDisplayMessage[]>([]);
-
-  const updateMessages = useCallback((updater: (prev: ConciergeDisplayMessage[]) => ConciergeDisplayMessage[]) => {
-    const next = updater(messagesRef.current);
-    messagesRef.current = next;
-    setMessages(next);
-  }, []);
 
   const send = useCallback(
     async (text: string) => {
@@ -46,26 +20,12 @@ export function useConciergeChat() {
       const controller = new AbortController();
       controllerRef.current = controller;
 
-      const userMessage: ConciergeDisplayMessage = { id: makeId(), role: "user", text: trimmed };
-      const assistantId = makeId();
+      const userMessage: ConciergeDisplayMessage = { id: makeMessageId(), role: "user", text: trimmed };
+      const assistantId = makeMessageId();
       const historyForRequest = [...messagesRef.current, userMessage];
 
       updateMessages(() => [...historyForRequest, { id: assistantId, role: "model", text: "" }]);
       setIsStreaming(true);
-
-      function applyEvent(event: ConciergeEvent) {
-        updateMessages((prev) =>
-          prev.map((m) => {
-            if (m.id !== assistantId) return m;
-            if (event.type === "text-delta") return { ...m, text: m.text + event.text };
-            if (event.type === "products") return { ...m, products: { mode: event.mode, products: event.products } };
-            if (event.type === "whatsapp") return { ...m, whatsappMessage: event.message };
-            if (event.type === "error") return { ...m, text: m.text || event.message };
-            return m;
-          }),
-        );
-        if (event.type === "cart") setCart(event.cart);
-      }
 
       try {
         const response = await fetch("/api/concierge/chat", {
@@ -92,10 +52,10 @@ export function useConciergeChat() {
           const lines = buffer.split("\n");
           buffer = lines.pop() ?? "";
           for (const line of lines) {
-            if (line.trim()) applyEvent(JSON.parse(line) as ConciergeEvent);
+            if (line.trim()) applyEventToMessage(assistantId, JSON.parse(line) as ConciergeEvent);
           }
         }
-        if (buffer.trim()) applyEvent(JSON.parse(buffer) as ConciergeEvent);
+        if (buffer.trim()) applyEventToMessage(assistantId, JSON.parse(buffer) as ConciergeEvent);
       } catch (err) {
         if (err instanceof DOMException && err.name === "AbortError") return;
         const message = err instanceof Error ? err.message : "Something went wrong.";
@@ -109,8 +69,8 @@ export function useConciergeChat() {
         }
       }
     },
-    [setCart, updateMessages],
+    [messagesRef, updateMessages, applyEventToMessage],
   );
 
-  return { messages, isStreaming, send };
+  return { isStreaming, send };
 }

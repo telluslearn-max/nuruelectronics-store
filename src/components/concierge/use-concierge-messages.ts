@@ -1,0 +1,63 @@
+"use client";
+
+import { useCallback, useRef, useState } from "react";
+import { useCart } from "@/components/cart/cart-context";
+import type { ConciergeEvent } from "@/lib/concierge/types";
+import type { Product } from "@/lib/shopify/types";
+
+export type ConciergeDisplayMessage = {
+  id: string;
+  role: "user" | "model";
+  text: string;
+  products?: { mode: "list" | "compare"; products: Product[] };
+  whatsappMessage?: string;
+  audioUrl?: string;
+};
+
+let nextId = 0;
+export function makeMessageId(): string {
+  nextId += 1;
+  return `concierge-${nextId}`;
+}
+
+/**
+ * Shared message store for the concierge panel — text and voice turns both append to and
+ * render from this single list, so switching between typing and talking mid-conversation
+ * keeps full context. Tracks messages in a ref alongside state (not just via setState
+ * callbacks) because a sibling setState call in the same event-handler tick can suppress
+ * React's eager updater invocation, making state read back from a setState callback stale.
+ */
+export function useConciergeMessages() {
+  const { setCart } = useCart();
+  const [messages, setMessages] = useState<ConciergeDisplayMessage[]>([]);
+  const messagesRef = useRef<ConciergeDisplayMessage[]>([]);
+
+  const updateMessages = useCallback((updater: (prev: ConciergeDisplayMessage[]) => ConciergeDisplayMessage[]) => {
+    const next = updater(messagesRef.current);
+    messagesRef.current = next;
+    setMessages(next);
+  }, []);
+
+  /** Applies an NDJSON event to the message with `id` — shared by text and voice turns. */
+  const applyEventToMessage = useCallback(
+    (id: string, event: ConciergeEvent) => {
+      updateMessages((prev) =>
+        prev.map((m) => {
+          if (m.id !== id) return m;
+          if (event.type === "text-delta") return { ...m, text: m.text + event.text };
+          if (event.type === "products") return { ...m, products: { mode: event.mode, products: event.products } };
+          if (event.type === "whatsapp") return { ...m, whatsappMessage: event.message };
+          if (event.type === "audio") return { ...m, audioUrl: `data:${event.mimeType};base64,${event.data}` };
+          if (event.type === "error") return { ...m, text: m.text || event.message };
+          return m;
+        }),
+      );
+      if (event.type === "cart") setCart(event.cart);
+    },
+    [setCart, updateMessages],
+  );
+
+  return { messages, messagesRef, updateMessages, applyEventToMessage };
+}
+
+export type ConciergeMessageStore = ReturnType<typeof useConciergeMessages>;

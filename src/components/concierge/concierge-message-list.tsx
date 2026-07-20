@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import type { ConciergeDisplayMessage } from "./use-concierge-chat";
+import type { ConciergeDisplayMessage } from "./use-concierge-messages";
 import { ConciergeMessage } from "./concierge-message";
 
 export function ConciergeMessageList({
@@ -30,8 +30,8 @@ export function ConciergeMessageList({
 
   return (
     <div className="flex flex-col gap-4 p-4">
-      {messages.map((message) => (
-        <ConciergeMessage key={message.id} message={message} />
+      {messages.map((message, index) => (
+        <ConciergeMessage key={message.id} message={message} autoPlayAudio={index === messages.length - 1} />
       ))}
       {isStreaming && messages[messages.length - 1]?.text === "" && (
         <div className="px-1 text-sm text-neutral-400">Thinking…</div>

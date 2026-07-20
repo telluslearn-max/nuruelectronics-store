@@ -13,6 +13,9 @@ export const isConciergeConfigured = Boolean(
 /** Pinned explicitly rather than an alias, so a model swap is a deliberate change. */
 export const CONCIERGE_MODEL = "gemini-2.5-flash";
 
+/** Dedicated Gemini TTS model for the voice concierge's spoken replies. */
+export const CONCIERGE_TTS_MODEL = "gemini-2.5-flash-preview-tts";
+
 let client: GoogleGenAI | null = null;
 
 export function getGenAIClient(): GoogleGenAI {
