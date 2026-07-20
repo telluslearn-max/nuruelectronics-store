@@ -10,6 +10,7 @@ export type ConciergeEvent =
   | { type: "products"; mode: "list" | "compare"; products: Product[] }
   | { type: "cart"; cart: Cart }
   | { type: "whatsapp"; message: string }
+  | { type: "checkout"; url: string }
   | { type: "transcript"; text: string }
   | { type: "audio"; data: string; mimeType: string }
   | { type: "error"; message: string }

@@ -1,11 +1,22 @@
 import "server-only";
 import type { FunctionDeclaration } from "@google/genai";
 import { getCart } from "@/lib/actions";
-import type { Product } from "@/lib/shopify/types";
-import { addToCartTool } from "./cart-tools";
+import type { Cart, Product } from "@/lib/shopify/types";
+import { addToCartTool, removeCartItem, updateCartItemQuantity } from "./cart-tools";
 import { compareProducts, getProductDetails, listKitsOrEcosystems, searchProducts } from "./catalog-tools";
 import type { ConciergeEvent } from "./types";
 import { buildWhatsAppHandoffMessage, isWhatsAppHandoffConfigured } from "./whatsapp-tool";
+
+/** Compact, model-facing projection of a cart's lines — line ids so the model can reference an item again to remove/adjust it. */
+function summarizeCartLines(cart: Cart) {
+  return cart.lines.map((line) => ({
+    lineId: line.id,
+    productTitle: line.merchandise.product.title,
+    variantTitle: line.merchandise.title,
+    quantity: line.quantity,
+    price: line.cost.totalAmount,
+  }));
+}
 
 /** Compact, model-facing projection of a Product — drops descriptionHtml/images to keep tool results focused on facts the model needs to cite (price, specs, ids), not bloat. */
 function summarizeProduct(product: Product) {
@@ -96,6 +107,44 @@ const addToCartDeclaration: FunctionDeclaration = {
   },
 };
 
+const getCartDeclaration: FunctionDeclaration = {
+  name: "get_cart",
+  description:
+    "Get the shopper's current cart contents (line ids, product/variant titles, quantities, prices) and totals. Call this before removing or adjusting an item if you don't already know its lineId, or when the shopper asks what's in their cart.",
+  parametersJsonSchema: { type: "object", properties: {} },
+};
+
+const removeFromCartDeclaration: FunctionDeclaration = {
+  name: "remove_from_cart",
+  description: "Remove a line item from the shopper's cart entirely.",
+  parametersJsonSchema: {
+    type: "object",
+    properties: {
+      lineId: { type: "string", description: "The exact cart line id from a prior add_to_cart or get_cart result — never invent one." },
+    },
+    required: ["lineId"],
+  },
+};
+
+const updateCartQuantityDeclaration: FunctionDeclaration = {
+  name: "update_cart_quantity",
+  description: "Change the quantity of a line item already in the cart. Setting quantity to 0 removes it.",
+  parametersJsonSchema: {
+    type: "object",
+    properties: {
+      lineId: { type: "string", description: "The exact cart line id from a prior add_to_cart or get_cart result — never invent one." },
+      quantity: { type: "integer", description: "The new quantity (0 removes the item)." },
+    },
+    required: ["lineId", "quantity"],
+  },
+};
+
+const openCheckoutDeclaration: FunctionDeclaration = {
+  name: "open_checkout",
+  description: "Surface the real checkout link once the shopper is ready to pay. Only call this once they've indicated they're done deciding.",
+  parametersJsonSchema: { type: "object", properties: {} },
+};
+
 const openWhatsAppHandoffDeclaration: FunctionDeclaration = {
   name: "open_whatsapp_handoff",
   description: "Hand the shopper off to a real staff member on WhatsApp — e.g. when they want to finalize a custom/bulk order or explicitly ask for a human.",
@@ -114,6 +163,10 @@ export const functionDeclarations: FunctionDeclaration[] = [
   compareProductsDeclaration,
   listKitsOrEcosystemsDeclaration,
   addToCartDeclaration,
+  getCartDeclaration,
+  removeFromCartDeclaration,
+  updateCartQuantityDeclaration,
+  openCheckoutDeclaration,
   ...(isWhatsAppHandoffConfigured ? [openWhatsAppHandoffDeclaration] : []),
 ];
 
@@ -174,8 +227,14 @@ export async function dispatchTool(
       }
       try {
         const cart = await addToCartTool({ variantId, quantity });
+        const line = cart.lines.find((l) => l.merchandise.id === variantId);
         return {
-          resultForModel: { ok: true, totalQuantity: cart.totalQuantity, totalAmount: cart.cost.totalAmount },
+          resultForModel: {
+            ok: true,
+            lineId: line?.id,
+            totalQuantity: cart.totalQuantity,
+            totalAmount: cart.cost.totalAmount,
+          },
           events: [{ type: "cart", cart }],
         };
       } catch (error) {
@@ -184,6 +243,60 @@ export async function dispatchTool(
           events: [],
         };
       }
+    }
+
+    case "get_cart": {
+      const cart = await getCart();
+      if (!cart || cart.lines.length === 0) {
+        return { resultForModel: { lines: [], totalQuantity: 0 }, events: [] };
+      }
+      return {
+        resultForModel: {
+          lines: summarizeCartLines(cart),
+          totalQuantity: cart.totalQuantity,
+          totalAmount: cart.cost.totalAmount,
+        },
+        events: [{ type: "cart", cart }],
+      };
+    }
+
+    case "remove_from_cart": {
+      const lineId = typeof args.lineId === "string" ? args.lineId : "";
+      if (!lineId) return { resultForModel: { error: "Missing lineId." }, events: [] };
+      try {
+        const cart = await removeCartItem(lineId);
+        return { resultForModel: { ok: true, totalQuantity: cart.totalQuantity }, events: [{ type: "cart", cart }] };
+      } catch (error) {
+        return {
+          resultForModel: { error: error instanceof Error ? error.message : "Failed to remove item." },
+          events: [],
+        };
+      }
+    }
+
+    case "update_cart_quantity": {
+      const lineId = typeof args.lineId === "string" ? args.lineId : "";
+      const quantity = typeof args.quantity === "number" ? args.quantity : NaN;
+      if (!lineId || Number.isNaN(quantity)) {
+        return { resultForModel: { error: "Missing lineId or quantity." }, events: [] };
+      }
+      try {
+        const cart = await updateCartItemQuantity(lineId, quantity);
+        return { resultForModel: { ok: true, totalQuantity: cart.totalQuantity }, events: [{ type: "cart", cart }] };
+      } catch (error) {
+        return {
+          resultForModel: { error: error instanceof Error ? error.message : "Failed to update quantity." },
+          events: [],
+        };
+      }
+    }
+
+    case "open_checkout": {
+      const cart = await getCart();
+      if (!cart || cart.lines.length === 0) {
+        return { resultForModel: { error: "Cart is empty — nothing to check out yet." }, events: [] };
+      }
+      return { resultForModel: { ok: true, url: cart.checkoutUrl }, events: [{ type: "checkout", url: cart.checkoutUrl }] };
     }
 
     case "open_whatsapp_handoff": {
