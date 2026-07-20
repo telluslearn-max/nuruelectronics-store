@@ -9,19 +9,24 @@ export const maxDuration = 60;
 const MAX_HISTORY_MESSAGES = 30;
 const MAX_MESSAGE_LENGTH = 4000;
 
-function parseMessages(body: unknown): ConciergeMessage[] | null {
-  if (!body || typeof body !== "object" || !("messages" in body)) return null;
+function parseMessages(body: unknown): { messages: ConciergeMessage[] } | { error: string } {
+  if (body === null || typeof body !== "object") return { error: "body must be a JSON object" };
+  if (!("messages" in body)) return { error: "body must include a \"messages\" array" };
   const { messages } = body as { messages: unknown };
-  if (!Array.isArray(messages) || messages.length === 0) return null;
+  if (!Array.isArray(messages)) return { error: "\"messages\" must be an array" };
+  if (messages.length === 0) return { error: "\"messages\" must not be empty" };
 
   const parsed: ConciergeMessage[] = [];
-  for (const entry of messages) {
-    if (!entry || typeof entry !== "object") return null;
+  for (const [index, entry] of messages.entries()) {
+    if (!entry || typeof entry !== "object") return { error: `messages[${index}] must be an object` };
     const { role, text } = entry as { role?: unknown; text?: unknown };
-    if ((role !== "user" && role !== "model") || typeof text !== "string") return null;
+    if (role !== "user" && role !== "model") {
+      return { error: `messages[${index}].role must be "user" or "model"` };
+    }
+    if (typeof text !== "string") return { error: `messages[${index}].text must be a string` };
     parsed.push({ role, text: text.slice(0, MAX_MESSAGE_LENGTH) });
   }
-  return parsed.slice(-MAX_HISTORY_MESSAGES);
+  return { messages: parsed.slice(-MAX_HISTORY_MESSAGES) };
 }
 
 export async function POST(request: Request): Promise<Response> {
@@ -29,11 +34,19 @@ export async function POST(request: Request): Promise<Response> {
     return new Response("Concierge not configured", { status: 503 });
   }
 
-  const body = await request.json().catch(() => null);
-  const messages = parseMessages(body);
-  if (!messages) {
-    return new Response("Invalid request body", { status: 400 });
+  const rawBody = await request.text();
+  let body: unknown = null;
+  try {
+    body = rawBody ? JSON.parse(rawBody) : null;
+  } catch {
+    return new Response("Invalid request body: not valid JSON", { status: 400 });
   }
+
+  const parsed = parseMessages(body);
+  if ("error" in parsed) {
+    return new Response(`Invalid request body: ${parsed.error}`, { status: 400 });
+  }
+  const { messages } = parsed;
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({
