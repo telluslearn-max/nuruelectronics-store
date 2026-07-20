@@ -1,9 +1,15 @@
 import { ProductCard } from "@/components/product-card";
 import { ProductCompareTable } from "@/components/product-compare-table";
-import type { ConciergeDisplayMessage } from "./use-concierge-chat";
+import type { ConciergeDisplayMessage } from "./use-concierge-messages";
 import { ConciergeWhatsAppCta } from "./concierge-whatsapp-cta";
 
-export function ConciergeMessage({ message }: { message: ConciergeDisplayMessage }) {
+export function ConciergeMessage({
+  message,
+  autoPlayAudio = false,
+}: {
+  message: ConciergeDisplayMessage;
+  autoPlayAudio?: boolean;
+}) {
   const isUser = message.role === "user";
 
   return (
@@ -41,6 +47,10 @@ export function ConciergeMessage({ message }: { message: ConciergeDisplayMessage
           )}
 
         {message.whatsappMessage && <ConciergeWhatsAppCta message={message.whatsappMessage} />}
+
+        {message.audioUrl && (
+          <audio className="mt-2 h-9 w-full" controls autoPlay={autoPlayAudio} src={message.audioUrl} />
+        )}
       </div>
     </div>
   );
