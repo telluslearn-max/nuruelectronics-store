@@ -1,4 +1,5 @@
 import { runConciergeTurn } from "@/lib/concierge/agent-loop";
+import { saveHistoryForCurrentCustomer } from "@/lib/concierge/history";
 import { parseConciergeMessages } from "@/lib/concierge/parse-messages";
 import type { ConciergeMessage } from "@/lib/concierge/types";
 import { isConciergeConfigured } from "@/lib/concierge/vertex-client";
@@ -36,10 +37,15 @@ export async function POST(request: Request): Promise<Response> {
   const encoder = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
+      let finalText = "";
       try {
         await runConciergeTurn(messages, (event) => {
+          if (event.type === "text-delta") finalText += event.text;
           controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
         });
+        if (finalText.trim()) {
+          await saveHistoryForCurrentCustomer([...messages, { role: "model", text: finalText }]);
+        }
       } catch (error) {
         const message = error instanceof Error ? error.message : "The concierge hit an unexpected error.";
         controller.enqueue(encoder.encode(`${JSON.stringify({ type: "error", message })}\n`));

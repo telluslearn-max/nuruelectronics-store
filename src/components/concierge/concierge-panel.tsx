@@ -1,14 +1,21 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import type { ConciergeMessage } from "@/lib/concierge/types";
 import { ConciergeInputBar } from "./concierge-input-bar";
 import { ConciergeMessageList } from "./concierge-message-list";
 import { useConciergeChat } from "./use-concierge-chat";
 import { useConciergeMessages } from "./use-concierge-messages";
 import { useConciergeVoice } from "./use-concierge-voice";
 
-export function ConciergePanel({ onClose }: { onClose: () => void }) {
-  const store = useConciergeMessages();
+export function ConciergePanel({
+  onClose,
+  initialMessages,
+}: {
+  onClose: () => void;
+  initialMessages: ConciergeMessage[];
+}) {
+  const store = useConciergeMessages(initialMessages);
   const { messages } = store;
   const { isStreaming, send } = useConciergeChat(store);
   const { isVoiceSupported, recordingState, startRecording, stopRecording } = useConciergeVoice(store);

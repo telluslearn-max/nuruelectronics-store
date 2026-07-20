@@ -1,4 +1,5 @@
 import { runConciergeTurn } from "@/lib/concierge/agent-loop";
+import { saveHistoryForCurrentCustomer } from "@/lib/concierge/history";
 import { parseConciergeMessages } from "@/lib/concierge/parse-messages";
 import type { ConciergeMessage } from "@/lib/concierge/types";
 import { isConciergeConfigured } from "@/lib/concierge/vertex-client";
@@ -74,6 +75,7 @@ export async function POST(request: Request): Promise<Response> {
             const message = error instanceof Error ? error.message : "Could not generate speech for the reply.";
             emit({ type: "error", message });
           }
+          await saveHistoryForCurrentCustomer([...history, { role: "model", text: finalText }]);
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : "The concierge hit an unexpected error.";
