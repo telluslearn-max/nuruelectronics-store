@@ -1,9 +1,11 @@
 import { AnnouncementBar } from "@/components/announcement-bar";
 import { CartProvider } from "@/components/cart/cart-context";
 import { CartDrawer } from "@/components/cart/cart-drawer";
+import { ConciergeWidget } from "@/components/concierge/concierge-widget";
 import { Footer } from "@/components/footer";
 import { Nav } from "@/components/nav";
 import { getCart } from "@/lib/actions";
+import { isConciergeConfigured } from "@/lib/concierge/vertex-client";
 import { getCurrentCustomer } from "@/lib/customer";
 import { isCustomerAuthConfigured } from "@/lib/customer-auth";
 
@@ -30,6 +32,7 @@ export default async function StorefrontLayout({
       <main id="main" className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">{children}</main>
       <Footer />
       <CartDrawer />
+      <ConciergeWidget enabled={isConciergeConfigured} />
     </CartProvider>
   );
 }
