@@ -11,6 +11,7 @@ export type ConciergeDisplayMessage = {
   text: string;
   products?: { mode: "list" | "compare"; products: Product[] };
   whatsappMessage?: string;
+  checkoutUrl?: string;
   audioUrl?: string;
 };
 
@@ -47,6 +48,7 @@ export function useConciergeMessages() {
           if (event.type === "text-delta") return { ...m, text: m.text + event.text };
           if (event.type === "products") return { ...m, products: { mode: event.mode, products: event.products } };
           if (event.type === "whatsapp") return { ...m, whatsappMessage: event.message };
+          if (event.type === "checkout") return { ...m, checkoutUrl: event.url };
           if (event.type === "audio") return { ...m, audioUrl: `data:${event.mimeType};base64,${event.data}` };
           if (event.type === "error") return { ...m, text: m.text || event.message };
           return m;
