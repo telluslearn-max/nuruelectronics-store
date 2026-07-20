@@ -24,6 +24,16 @@ export function useConciergeChat() {
   const [messages, setMessages] = useState<ConciergeDisplayMessage[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
   const controllerRef = useRef<AbortController | null>(null);
+  // Source of truth for "what to send next," read synchronously — a sibling setState call in
+  // the same event-handler tick (e.g. clearing the input) can suppress React's eager updater
+  // invocation, so reading the just-set state back out of setMessages(prev => ...) isn't reliable.
+  const messagesRef = useRef<ConciergeDisplayMessage[]>([]);
+
+  const updateMessages = useCallback((updater: (prev: ConciergeDisplayMessage[]) => ConciergeDisplayMessage[]) => {
+    const next = updater(messagesRef.current);
+    messagesRef.current = next;
+    setMessages(next);
+  }, []);
 
   const send = useCallback(
     async (text: string) => {
@@ -38,16 +48,13 @@ export function useConciergeChat() {
 
       const userMessage: ConciergeDisplayMessage = { id: makeId(), role: "user", text: trimmed };
       const assistantId = makeId();
-      let historyForRequest: ConciergeDisplayMessage[] = [];
+      const historyForRequest = [...messagesRef.current, userMessage];
 
-      setMessages((prev) => {
-        historyForRequest = [...prev, userMessage];
-        return [...historyForRequest, { id: assistantId, role: "model", text: "" }];
-      });
+      updateMessages(() => [...historyForRequest, { id: assistantId, role: "model", text: "" }]);
       setIsStreaming(true);
 
       function applyEvent(event: ConciergeEvent) {
-        setMessages((prev) =>
+        updateMessages((prev) =>
           prev.map((m) => {
             if (m.id !== assistantId) return m;
             if (event.type === "text-delta") return { ...m, text: m.text + event.text };
@@ -92,7 +99,7 @@ export function useConciergeChat() {
       } catch (err) {
         if (err instanceof DOMException && err.name === "AbortError") return;
         const message = err instanceof Error ? err.message : "Something went wrong.";
-        setMessages((prev) =>
+        updateMessages((prev) =>
           prev.map((m) => (m.id === assistantId ? { ...m, text: m.text || `Sorry — ${message}` } : m)),
         );
       } finally {
@@ -102,7 +109,7 @@ export function useConciergeChat() {
         }
       }
     },
-    [setCart],
+    [setCart, updateMessages],
   );
 
   return { messages, isStreaming, send };
