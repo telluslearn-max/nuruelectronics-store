@@ -2,6 +2,11 @@ export type ConditionGrade = {
   tag: string;
   label: string;
   description: string;
+  /** Tailwind classes for the pill background/text/dot — color-coded so grades are distinguishable at a glance, not just by reading the label. */
+  badgeClass: string;
+  dotClass: string;
+  /** Solid variant for the card's badge, which sits directly over a photo and needs more contrast than the translucent detail-overlay pill does. */
+  cardBadgeClass: string;
 };
 
 // Same pattern as the ex-uk tag itself, and ecosystem/kit tags in src/lib/collections.ts — a
@@ -9,9 +14,30 @@ export type ConditionGrade = {
 // product today) falls back to the generic copy wherever this is used, so this is additive and
 // doesn't require every listing to have one.
 const CONDITION_GRADES: ConditionGrade[] = [
-  { tag: "condition-a", label: "Grade A", description: "Like new — no visible wear" },
-  { tag: "condition-b", label: "Grade B", description: "Light wear, fully functional" },
-  { tag: "condition-c", label: "Grade C", description: "Visible wear, fully functional" },
+  {
+    tag: "condition-a",
+    label: "Grade A",
+    description: "Like new — no visible wear",
+    badgeClass: "bg-emerald-500/15 text-emerald-700",
+    dotClass: "bg-emerald-500",
+    cardBadgeClass: "bg-emerald-600 text-white",
+  },
+  {
+    tag: "condition-b",
+    label: "Grade B",
+    description: "Light wear, fully functional",
+    badgeClass: "bg-amber-500/15 text-amber-700",
+    dotClass: "bg-amber-500",
+    cardBadgeClass: "bg-amber-600 text-white",
+  },
+  {
+    tag: "condition-c",
+    label: "Grade C",
+    description: "Visible wear, fully functional",
+    badgeClass: "bg-orange-500/15 text-orange-700",
+    dotClass: "bg-orange-500",
+    cardBadgeClass: "bg-orange-600 text-white",
+  },
 ];
 
 export function gradeForProduct(tags: string[]): ConditionGrade | null {

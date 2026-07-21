@@ -115,8 +115,13 @@ export function ExUkProductDetail({
           </div>
 
           <div className="mt-3 flex flex-wrap gap-2">
-            <span className="inline-flex items-center rounded-control bg-accent/10 px-3 py-1.5 text-sm font-medium text-accent">
-              ✅ Condition: {grade ? `${grade.label} — ${grade.description}` : "Fully tested & unboxed"}
+            <span
+              className={`inline-flex items-center gap-1.5 rounded-control px-3 py-1.5 text-sm font-medium ${
+                grade ? grade.badgeClass : "bg-accent/10 text-accent"
+              }`}
+            >
+              {grade && <span className={`h-2 w-2 rounded-full ${grade.dotClass}`} aria-hidden="true" />}
+              {grade ? `${grade.label} — ${grade.description}` : "✅ Condition: Fully tested & unboxed"}
             </span>
             {savings && (
               <span className="inline-flex items-center rounded-control bg-green-600/10 px-3 py-1.5 text-sm font-medium text-green-700">

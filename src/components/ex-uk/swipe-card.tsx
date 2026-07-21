@@ -10,6 +10,10 @@ const COMMIT_VELOCITY = 0.5;
 // Pointer movement below this (in px) on release is treated as a tap rather than an aborted
 // drag — opens the detail overlay instead of just springing the card back to center.
 const TAP_THRESHOLD = 6;
+// A well-known "back out" bezier — overshoots past 100% then settles, reads as a springy snap
+// rather than a mechanical linear return. Used for the release-to-center animation only; the
+// commit fly-away keeps a plain ease-out since it's leaving, not settling.
+const SPRING_EASE = "cubic-bezier(0.34, 1.56, 0.64, 1)";
 
 type DragState = {
   pointerId: number;
@@ -22,6 +26,73 @@ export type SwipeCardHandle = {
   swipe: (direction: "left" | "right") => void;
 };
 
+/** x in [0,1] → overshoots past 1 before settling — used to give the stamp a "pop" as the drag approaches commit distance, computed per-frame so it stays in lockstep with the live drag instead of animating on a delay. */
+function easeOutBack(x: number): number {
+  const c1 = 1.70158;
+  const c3 = c1 + 1;
+  const t = x - 1;
+  return 1 + c3 * t * t * t + c1 * t * t;
+}
+
+// Faux text-outline via layered shadows — works everywhere (unlike -webkit-text-stroke, which
+// Firefox doesn't support at all); -webkit-text-stroke is layered on top below as a crisper
+// enhancement where it is supported.
+function outlineShadow(color: string): string {
+  const offsets: [number, number][] = [
+    [-1, -1],
+    [1, -1],
+    [-1, 1],
+    [1, 1],
+    [0, -1.6],
+    [0, 1.6],
+    [-1.6, 0],
+    [1.6, 0],
+  ];
+  return offsets.map(([x, y]) => `${x * 1.5}px ${y * 1.5}px 0 ${color}`).join(", ");
+}
+
+function Stamp({
+  label,
+  color,
+  glow,
+  side,
+  opacity,
+  scale,
+}: {
+  label: string;
+  color: string;
+  glow: string;
+  side: "left" | "right";
+  opacity: number;
+  scale: number;
+}) {
+  return (
+    <div
+      aria-hidden="true"
+      className={`pointer-events-none absolute top-10 ${side === "right" ? "right-[18%] -rotate-12" : "left-[18%] rotate-12"}`}
+      style={{ opacity }}
+    >
+      <div
+        className="absolute inset-0 -z-10 rounded-full blur-2xl"
+        style={{ background: `radial-gradient(circle, ${glow}, transparent 70%)`, transform: "scale(2.4)" }}
+      />
+      <span
+        className="block text-4xl font-black italic tracking-wide"
+        style={{
+          color,
+          transform: `scale(${scale})`,
+          textShadow: outlineShadow("var(--background)"),
+          WebkitTextStroke: `2.5px var(--background)`,
+          paintOrder: "stroke fill",
+          filter: "drop-shadow(0 3px 5px rgba(0,0,0,0.35))",
+        }}
+      >
+        {label}
+      </span>
+    </div>
+  );
+}
+
 /** The single draggable top card in the deck. Drag with pointer events, or call `swipe()` imperatively from the deck's ❤️/✕ buttons. */
 export const SwipeCard = forwardRef<
   SwipeCardHandle,
@@ -32,8 +103,11 @@ export const SwipeCard = forwardRef<
     const dragRef = useRef<DragState | null>(null);
     const cardRef = useRef<HTMLDivElement>(null);
 
+    const [isDragging, setIsDragging] = useState(false);
+
     function commit(direction: "left" | "right") {
       dragRef.current = null;
+      setIsDragging(false);
       setExiting(direction);
     }
 
@@ -43,6 +117,7 @@ export const SwipeCard = forwardRef<
       if (exiting) return;
       cardRef.current?.setPointerCapture(e.pointerId);
       dragRef.current = { pointerId: e.pointerId, startX: e.clientX, startY: e.clientY, startTime: Date.now() };
+      setIsDragging(true);
     }
 
     function handlePointerMove(e: React.PointerEvent<HTMLDivElement>) {
@@ -62,17 +137,20 @@ export const SwipeCard = forwardRef<
       }
       const wasTap = Math.hypot(delta.x, delta.y) < TAP_THRESHOLD;
       dragRef.current = null;
+      setIsDragging(false);
       setDelta({ x: 0, y: 0 });
       if (wasTap) onTap?.();
     }
 
-    const isDragging = dragRef.current !== null;
     const rotate = Math.max(-15, Math.min(15, delta.x / 12));
-    const stampOpacity = Math.min(1, Math.abs(delta.x) / COMMIT_DISTANCE);
+    const commitProgress = Math.min(1, Math.abs(delta.x) / COMMIT_DISTANCE);
+    const stampOpacity = commitProgress;
+    const stampScale = 0.6 + 0.6 * easeOutBack(commitProgress);
 
     const transform = exiting
       ? `translate(${exiting === "right" ? 600 : -600}px, ${delta.y}px) rotate(${exiting === "right" ? 30 : -30}deg)`
       : `translate(${delta.x}px, ${delta.y}px) rotate(${rotate}deg)`;
+    const transition = isDragging ? "none" : exiting ? "transform 300ms ease-out" : `transform 400ms ${SPRING_EASE}`;
 
     return (
       <div
@@ -86,28 +164,26 @@ export const SwipeCard = forwardRef<
         onTransitionEnd={() => {
           if (exiting) onSwiped(exiting);
         }}
-        style={{
-          transform,
-          transition: isDragging ? "none" : "transform 300ms ease-out",
-          touchAction: "pan-y",
-        }}
+        style={{ transform, transition, touchAction: "pan-y" }}
         className="absolute inset-0 cursor-grab active:cursor-grabbing"
       >
         <ExUkProductCard product={product} savings={savings} />
-        <span
-          aria-hidden="true"
-          style={{ opacity: delta.x > 0 ? stampOpacity : 0 }}
-          className="pointer-events-none absolute right-4 top-4 -rotate-12 rounded-control border-4 border-accent px-3 py-1 text-lg font-bold text-accent"
-        >
-          LOVE
-        </span>
-        <span
-          aria-hidden="true"
-          style={{ opacity: delta.x < 0 ? stampOpacity : 0 }}
-          className="pointer-events-none absolute left-4 top-4 rotate-12 rounded-control border-4 border-neutral-500 px-3 py-1 text-lg font-bold text-neutral-500"
-        >
-          NOPE
-        </span>
+        <Stamp
+          label="LOVE"
+          side="right"
+          color="var(--accent)"
+          glow="rgba(212,71,46,0.55)"
+          opacity={delta.x > 0 ? stampOpacity : 0}
+          scale={stampScale}
+        />
+        <Stamp
+          label="NOPE"
+          side="left"
+          color="#6b7280"
+          glow="rgba(107,114,128,0.5)"
+          opacity={delta.x < 0 ? stampOpacity : 0}
+          scale={stampScale}
+        />
       </div>
     );
   },
