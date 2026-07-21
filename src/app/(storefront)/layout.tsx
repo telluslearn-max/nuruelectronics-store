@@ -37,7 +37,7 @@ export default async function StorefrontLayout({
       <GoogleAnalytics />
       <AnnouncementBar />
       <Nav authEnabled={isCustomerAuthConfigured} customerName={customer?.displayName ?? null} />
-      <main id="main" className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">{children}</main>
+      <main id="main" className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 pb-24">{children}</main>
       <Footer />
       <CartDrawer />
       <ConciergeWidget enabled={isConciergeConfigured} initialMessages={conciergeHistory} />

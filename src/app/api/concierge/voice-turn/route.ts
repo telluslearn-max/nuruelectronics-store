@@ -1,7 +1,7 @@
 import { runConciergeTurn } from "@/lib/concierge/agent-loop";
 import { saveHistoryForCurrentCustomer } from "@/lib/concierge/history";
-import { parseConciergeMessages } from "@/lib/concierge/parse-messages";
-import type { ConciergeMessage } from "@/lib/concierge/types";
+import { parseConciergeMessages, parsePageContext } from "@/lib/concierge/parse-messages";
+import type { ConciergeMessage, ConciergePageContext } from "@/lib/concierge/types";
 import { isConciergeConfigured } from "@/lib/concierge/vertex-client";
 import { synthesizeSpeech, transcribeAudio } from "@/lib/concierge/voice";
 
@@ -13,11 +13,15 @@ const ALLOWED_AUDIO_MIME_PREFIXES = ["audio/webm", "audio/ogg", "audio/wav", "au
 // ~8MB of raw audio, base64-encoded (base64 runs ~4/3 the size of the source bytes) — generous for a short spoken question, well under Gemini's 20MB inline-data limit.
 const MAX_AUDIO_BASE64_LENGTH = 11_000_000;
 
-type VoiceTurnBody = { messages: ConciergeMessage[]; audio: { mimeType: string; data: string } };
+type VoiceTurnBody = {
+  messages: ConciergeMessage[];
+  audio: { mimeType: string; data: string };
+  pageContext?: ConciergePageContext;
+};
 
 function parseBody(body: unknown): VoiceTurnBody | { error: string } {
   if (body === null || typeof body !== "object") return { error: "body must be a JSON object" };
-  const { messages, audio } = body as { messages?: unknown; audio?: unknown };
+  const { messages, audio, pageContext } = body as { messages?: unknown; audio?: unknown; pageContext?: unknown };
 
   const messagesResult = parseConciergeMessages(messages ?? [], { allowEmpty: true });
   if ("error" in messagesResult) return messagesResult;
@@ -30,7 +34,7 @@ function parseBody(body: unknown): VoiceTurnBody | { error: string } {
   if (typeof data !== "string" || data.length === 0) return { error: "audio.data must be a non-empty base64 string" };
   if (data.length > MAX_AUDIO_BASE64_LENGTH) return { error: "audio.data exceeds the size limit" };
 
-  return { messages: messagesResult.messages, audio: { mimeType, data } };
+  return { messages: messagesResult.messages, audio: { mimeType, data }, pageContext: parsePageContext(pageContext) };
 }
 
 export async function POST(request: Request): Promise<Response> {
@@ -50,7 +54,7 @@ export async function POST(request: Request): Promise<Response> {
   if ("error" in parsed) {
     return new Response(`Invalid request body: ${parsed.error}`, { status: 400 });
   }
-  const { messages, audio } = parsed;
+  const { messages, audio, pageContext } = parsed;
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({
@@ -62,10 +66,14 @@ export async function POST(request: Request): Promise<Response> {
 
         const history = [...messages, { role: "user" as const, text: transcript }];
         let finalText = "";
-        await runConciergeTurn(history, (event) => {
-          if (event.type === "text-delta") finalText += event.text;
-          emit(event);
-        });
+        await runConciergeTurn(
+          history,
+          (event) => {
+            if (event.type === "text-delta") finalText += event.text;
+            emit(event);
+          },
+          pageContext,
+        );
 
         if (finalText.trim()) {
           try {
