@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
-import { ExUkTopBar } from "@/components/ex-uk/ex-uk-top-bar";
-import { SwipeDeck } from "@/components/ex-uk/swipe-deck";
+import { Suspense } from "react";
+import { ExUkDiscoverScreen } from "@/components/ex-uk/ex-uk-discover-screen";
+import { computeSavings, findCounterpart, type Savings } from "@/lib/product-match";
 import { getProducts } from "@/lib/shopify";
 
 export const metadata: Metadata = {
@@ -11,12 +12,25 @@ export const metadata: Metadata = {
 export default async function ExUkPage() {
   const { products } = await getProducts({ searchTerm: "tag:ex-uk", includeSpecs: true, first: 50 });
 
+  const savingsEntries = await Promise.all(
+    products.map(async (product) => {
+      const counterpart = await findCounterpart(product, { requireExUk: false });
+      if (!counterpart) return null;
+      const savings = computeSavings(
+        product.priceRange.minVariantPrice.amount,
+        counterpart.priceRange.minVariantPrice.amount,
+        product.priceRange.minVariantPrice.currencyCode,
+      );
+      return savings ? ([product.handle, savings] as const) : null;
+    }),
+  );
+  const savingsByHandle: Record<string, Savings> = Object.fromEntries(
+    savingsEntries.filter((entry): entry is readonly [string, Savings] => entry !== null),
+  );
+
   return (
-    <>
-      <ExUkTopBar title="Ex-UK" />
-      <div className="flex flex-1 flex-col overflow-hidden">
-        <SwipeDeck products={products} />
-      </div>
-    </>
+    <Suspense>
+      <ExUkDiscoverScreen products={products} savingsByHandle={savingsByHandle} />
+    </Suspense>
   );
 }

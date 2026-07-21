@@ -1,6 +1,7 @@
 "use client";
 
 import { forwardRef, useImperativeHandle, useRef, useState } from "react";
+import type { Savings } from "@/lib/product-match";
 import type { Product } from "@/lib/shopify/types";
 import { ExUkProductCard } from "./ex-uk-product-card";
 
@@ -24,8 +25,8 @@ export type SwipeCardHandle = {
 /** The single draggable top card in the deck. Drag with pointer events, or call `swipe()` imperatively from the deck's ❤️/✕ buttons. */
 export const SwipeCard = forwardRef<
   SwipeCardHandle,
-  { product: Product; onSwiped: (direction: "left" | "right") => void; onTap?: () => void }
->(function SwipeCard({ product, onSwiped, onTap }, ref) {
+  { product: Product; savings?: Savings | null; onSwiped: (direction: "left" | "right") => void; onTap?: () => void }
+>(function SwipeCard({ product, savings, onSwiped, onTap }, ref) {
     const [delta, setDelta] = useState({ x: 0, y: 0 });
     const [exiting, setExiting] = useState<"left" | "right" | null>(null);
     const dragRef = useRef<DragState | null>(null);
@@ -92,7 +93,7 @@ export const SwipeCard = forwardRef<
         }}
         className="absolute inset-0 cursor-grab active:cursor-grabbing"
       >
-        <ExUkProductCard product={product} />
+        <ExUkProductCard product={product} savings={savings} />
         <span
           aria-hidden="true"
           style={{ opacity: delta.x > 0 ? stampOpacity : 0 }}

@@ -4,7 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import { ProductMedia } from "@/components/product-media";
 import { WhatsAppOrderButton } from "@/components/whatsapp-order-button";
 import { formatPrice } from "@/lib/format";
+import type { Savings } from "@/lib/product-match";
 import type { Product } from "@/lib/shopify/types";
+import { gradeForProduct } from "./condition-grade";
 import { sortSpecs } from "./spec-order";
 
 /**
@@ -15,10 +17,12 @@ import { sortSpecs } from "./spec-order";
  */
 export function ExUkProductDetail({
   product,
+  savings,
   onClose,
   onSwipe,
 }: {
   product: Product;
+  savings?: Savings | null;
   onClose: () => void;
   onSwipe: (direction: "left" | "right") => void;
 }) {
@@ -27,6 +31,7 @@ export function ExUkProductDetail({
   const image = product.images[photoIndex] ?? product.images[0];
   const price = product.priceRange.minVariantPrice;
   const specs = sortSpecs(product.specs);
+  const grade = gradeForProduct(product.tags);
 
   useEffect(() => {
     closeButtonRef.current?.focus();
@@ -109,9 +114,16 @@ export function ExUkProductDetail({
             <p>🛡️ 1-year warranty included</p>
           </div>
 
-          <span className="mt-3 inline-flex items-center rounded-control bg-accent/10 px-3 py-1.5 text-sm font-medium text-accent">
-            ✅ Condition: Fully tested & unboxed
-          </span>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <span className="inline-flex items-center rounded-control bg-accent/10 px-3 py-1.5 text-sm font-medium text-accent">
+              ✅ Condition: {grade ? `${grade.label} — ${grade.description}` : "Fully tested & unboxed"}
+            </span>
+            {savings && (
+              <span className="inline-flex items-center rounded-control bg-green-600/10 px-3 py-1.5 text-sm font-medium text-green-700">
+                💰 Save {formatPrice(savings.amount, savings.currencyCode)} ({savings.percent}%) vs new
+              </span>
+            )}
+          </div>
 
           {specs.length > 0 && (
             <div className="mt-5 border-t border-border-subtle pt-4">

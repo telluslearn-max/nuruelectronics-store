@@ -4,15 +4,32 @@ import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { WhatsAppOrderButton } from "@/components/whatsapp-order-button";
 import { formatPrice } from "@/lib/format";
+import type { Savings } from "@/lib/product-match";
 import type { Product } from "@/lib/shopify/types";
 import { ExUkProductCard } from "./ex-uk-product-card";
 import { ExUkProductDetail } from "./ex-uk-product-detail";
 import { SwipeCard, type SwipeCardHandle } from "./swipe-card";
 import { useExUkMatches } from "./use-ex-uk-matches";
 
-export function SwipeDeck({ products }: { products: Product[] }) {
+function UndoIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 20 20" className={className} fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M5 8H12a4 4 0 1 1 0 8H8" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M8 4.5 5 8l3 3.5" />
+    </svg>
+  );
+}
+
+export function SwipeDeck({
+  products,
+  savingsByHandle = {},
+}: {
+  products: Product[];
+  savingsByHandle?: Record<string, Savings>;
+}) {
   const [index, setIndex] = useState(0);
   const [detailProduct, setDetailProduct] = useState<Product | null>(null);
+  const [lastPassed, setLastPassed] = useState<Product | null>(null);
   const { addMatch } = useExUkMatches();
   const topCardRef = useRef<SwipeCardHandle>(null);
   const router = useRouter();
@@ -27,7 +44,14 @@ export function SwipeDeck({ products }: { products: Product[] }) {
       router.push(`/ex-uk/messages/${current.handle}`);
       return;
     }
+    if (current) setLastPassed(current);
     setIndex((i) => i + 1);
+  }
+
+  function handleUndo() {
+    if (!lastPassed) return;
+    setLastPassed(null);
+    setIndex((i) => Math.max(0, i - 1));
   }
 
   return (
@@ -46,7 +70,7 @@ export function SwipeDeck({ products }: { products: Product[] }) {
                 opacity: 0.6,
               }}
             >
-              <ExUkProductCard product={product} />
+              <ExUkProductCard product={product} savings={savingsByHandle[product.handle]} />
             </div>
           ))}
 
@@ -55,6 +79,7 @@ export function SwipeDeck({ products }: { products: Product[] }) {
             key={current.id}
             ref={topCardRef}
             product={current}
+            savings={savingsByHandle[current.handle]}
             onSwiped={handleSwiped}
             onTap={() => setDetailProduct(current)}
           />
@@ -67,7 +92,16 @@ export function SwipeDeck({ products }: { products: Product[] }) {
       </div>
 
       {current && (
-        <div className="flex shrink-0 items-center justify-center gap-6 py-3">
+        <div className="flex shrink-0 items-center justify-center gap-4 py-3">
+          <button
+            type="button"
+            aria-label="Undo last pass"
+            onClick={handleUndo}
+            disabled={!lastPassed}
+            className="flex h-11 w-11 items-center justify-center rounded-control border border-border-subtle text-neutral-500 transition hover:border-neutral-400 disabled:opacity-30"
+          >
+            <UndoIcon className="h-5 w-5" />
+          </button>
           <button
             type="button"
             aria-label={`Pass on ${current.title}`}
@@ -94,7 +128,12 @@ export function SwipeDeck({ products }: { products: Product[] }) {
       )}
 
       {detailProduct && (
-        <ExUkProductDetail product={detailProduct} onClose={() => setDetailProduct(null)} onSwipe={handleSwiped} />
+        <ExUkProductDetail
+          product={detailProduct}
+          savings={savingsByHandle[detailProduct.handle]}
+          onClose={() => setDetailProduct(null)}
+          onSwipe={handleSwiped}
+        />
       )}
     </div>
   );

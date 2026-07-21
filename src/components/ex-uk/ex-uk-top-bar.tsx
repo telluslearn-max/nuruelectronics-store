@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-export function ExUkTopBar({ title }: { title: string }) {
+export function ExUkTopBar({ title, rightSlot }: { title: string; rightSlot?: React.ReactNode }) {
   return (
     <header className="flex shrink-0 items-center justify-between border-b border-border-subtle px-4 py-3">
       <Link href="/" aria-label="Back to NURU" className="flex items-center gap-1 text-sm font-medium">
@@ -10,7 +10,7 @@ export function ExUkTopBar({ title }: { title: string }) {
         NURU
       </Link>
       <span className="text-sm font-semibold">{title}</span>
-      <span className="w-10" aria-hidden="true" />
+      <div className="flex w-10 justify-end">{rightSlot}</div>
     </header>
   );
 }

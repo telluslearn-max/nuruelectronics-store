@@ -292,7 +292,8 @@ export const mockProducts: Product[] = [
       "<p>Unboxed ex-UK unit in excellent condition. Fully tested, factory reset, and covered by a 1-year warranty.</p>",
     availableForSale: true,
     productType: "Smartphones",
-    tags: ["mock", "ex-uk"],
+    // condition-a: exercises the graded-condition badge locally (see condition-grade.ts).
+    tags: ["mock", "ex-uk", "condition-a"],
     priceRange: { minVariantPrice: money("699.00"), maxVariantPrice: money("699.00") },
     // Multiple images so the swipe card's dot pagination has something to page through locally.
     images: [
@@ -327,7 +328,7 @@ export const mockProducts: Product[] = [
       "<p>Unboxed ex-UK unit, lightly used. Fully tested, factory reset, and covered by a 1-year warranty.</p>",
     availableForSale: true,
     productType: "Smartphones",
-    tags: ["mock", "ex-uk"],
+    tags: ["mock", "ex-uk", "condition-b"],
     priceRange: { minVariantPrice: money("549.00"), maxVariantPrice: money("549.00") },
     images: [],
     variants: [
@@ -387,7 +388,7 @@ export const mockProducts: Product[] = [
       "<p>Unboxed ex-UK unit, barely used. Fully tested, factory reset, and covered by a 1-year warranty.</p>",
     availableForSale: true,
     productType: "Audio",
-    tags: ["mock", "ex-uk"],
+    tags: ["mock", "ex-uk", "condition-c"],
     priceRange: { minVariantPrice: money("219.00"), maxVariantPrice: money("219.00") },
     images: [],
     variants: [
@@ -432,6 +433,36 @@ export const mockProducts: Product[] = [
       { key: "processor", value: "Apple M1" },
       { key: "storage", value: "64GB" },
       { key: "display", value: "10.9-inch Liquid Retina" },
+    ],
+  },
+  // Regular (non-ex-uk) listing of the same model as the ex-uk iPhone 14 Pro above — gives the
+  // Ex-UK "save X% vs new" comparison and the regular PDP's Ex-UK cross-sell banner something real
+  // to match against locally.
+  {
+    id: "gid://mock/Product/18",
+    handle: "iphone-14-pro",
+    title: "iPhone 14 Pro",
+    description: "Apple's 2022 flagship, brand new and sealed.",
+    descriptionHtml: "<p>Apple's 2022 flagship, brand new and sealed.</p>",
+    availableForSale: true,
+    productType: "Smartphones",
+    tags: ["mock", "apple"],
+    priceRange: { minVariantPrice: money("899.00"), maxVariantPrice: money("899.00") },
+    images: [],
+    variants: [
+      {
+        id: "gid://mock/ProductVariant/19",
+        title: "Default",
+        availableForSale: true,
+        price: money("899.00"),
+        selectedOptions: [{ name: "Title", value: "Default" }],
+      },
+    ],
+    options: [{ id: "1", name: "Title", values: ["Default"] }],
+    specs: [
+      { key: "processor", value: "A16 Bionic" },
+      { key: "ram", value: "6GB" },
+      { key: "storage", value: "256GB" },
     ],
   },
 ];

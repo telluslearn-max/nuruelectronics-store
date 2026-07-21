@@ -4,14 +4,17 @@ import { useState } from "react";
 import { formatPrice, truncate } from "@/lib/format";
 import type { Product } from "@/lib/shopify/types";
 import { ProductMedia } from "@/components/product-media";
+import { gradeForProduct } from "./condition-grade";
 import { sortSpecs } from "./spec-order";
+import type { Savings } from "@/lib/product-match";
 
-export function ExUkProductCard({ product }: { product: Product }) {
+export function ExUkProductCard({ product, savings }: { product: Product; savings?: Savings | null }) {
   const [expanded, setExpanded] = useState(false);
   const [photoIndex, setPhotoIndex] = useState(0);
   const image = product.images[photoIndex] ?? product.images[0];
   const price = product.priceRange.minVariantPrice;
   const specs = sortSpecs(product.specs);
+  const grade = gradeForProduct(product.tags);
 
   return (
     <div className="relative h-full select-none overflow-hidden rounded-card bg-neutral-900 shadow-lg">
@@ -25,7 +28,7 @@ export function ExUkProductCard({ product }: { product: Product }) {
       />
 
       <span className="absolute left-3 top-3 rounded-control bg-accent px-2.5 py-1 text-xs font-medium text-accent-foreground">
-        Ex-UK · Unboxed · 1-Year Warranty
+        {grade ? grade.label : "Ex-UK"} · Unboxed · 1-Year Warranty
       </span>
 
       {product.images.length > 1 && (
@@ -52,7 +55,14 @@ export function ExUkProductCard({ product }: { product: Product }) {
       <div className="absolute inset-x-0 bottom-0 flex flex-col gap-2 bg-gradient-to-t from-black/85 via-black/50 to-transparent px-4 pb-4 pt-16 text-white">
         <div className="flex items-start justify-between gap-2">
           <h3 className="text-base font-semibold leading-snug">{product.title}</h3>
-          <p className="shrink-0 text-base font-medium">{formatPrice(price.amount, price.currencyCode)}</p>
+          <div className="shrink-0 text-right">
+            <p className="text-base font-medium">{formatPrice(price.amount, price.currencyCode)}</p>
+            {savings && (
+              <p className="text-xs font-medium text-green-400">
+                Save {formatPrice(savings.amount, savings.currencyCode)} ({savings.percent}%)
+              </p>
+            )}
+          </div>
         </div>
 
         {specs.length > 0 && (

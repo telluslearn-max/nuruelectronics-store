@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { Breadcrumb } from "@/components/breadcrumb";
 import { BuyersGuide } from "@/components/buyers-guide";
 import { BuyItWith } from "@/components/buy-it-with";
+import { ExUkCrossSellBanner } from "@/components/ex-uk-cross-sell-banner";
 import { Faq, type FaqItem } from "@/components/faq";
 import { ProductCompareTable } from "@/components/product-compare-table";
 import { ProductGallery } from "@/components/product-gallery";
@@ -14,6 +15,7 @@ import { categoryForProductType, getRelatedCategories } from "@/lib/categories";
 import { ecosystemTagForProduct } from "@/lib/collections";
 import { getBuyersGuide } from "@/lib/buyers-guides";
 import { getOriginOptionValues, hasEsimOnlyWarranty } from "@/lib/origin-options";
+import { findCounterpart } from "@/lib/product-match";
 import { getProductByHandle, getProducts } from "@/lib/shopify";
 import type { Product } from "@/lib/shopify/types";
 import { buildSpecsGuide } from "@/lib/spec-glossary";
@@ -101,13 +103,16 @@ export default async function ProductPage({ params }: ProductPageProps) {
   const supportsEsim = hasEsimOnlyWarranty(product.options) || product.tags.includes("iphone");
   const buyersGuide = getBuyersGuide(supportsEsim ? [...product.tags, "esim"] : product.tags);
 
-  const [related, relatedCategoryPages] = await Promise.all([
+  const [related, relatedCategoryPages, exUkCounterpart] = await Promise.all([
     getRelatedProducts(product),
     Promise.all(
       relatedEdges.map((edge) =>
         getEcosystemScopedCategoryProducts(edge.category.query, ecosystemTag),
       ),
     ),
+    // Don't look up a counterpart for an ex-uk listing itself — the banner only makes sense
+    // pointing shoppers *into* the ex-uk section from a regular listing, not the reverse.
+    product.tags.includes("ex-uk") ? null : findCounterpart(product, { requireExUk: true }),
   ]);
 
   const relatedCategories = relatedEdges
@@ -198,6 +203,12 @@ export default async function ProductPage({ params }: ProductPageProps) {
         <div>
           <h1 className="text-title">{product.title}</h1>
           <ProductOptions product={product} />
+          {exUkCounterpart && (
+            <ExUkCrossSellBanner
+              handle={exUkCounterpart.handle}
+              price={exUkCounterpart.priceRange.minVariantPrice}
+            />
+          )}
           <div
             className="mt-8 border-t border-border-subtle pt-6 text-neutral-600 [&_a]:text-accent [&_a]:underline [&_a]:underline-offset-2 [&_a]:hover:opacity-80 [&_li]:mb-1 [&_p]:mb-4 [&_p:last-child]:mb-0 [&_ul]:mb-4 [&_ul]:list-disc [&_ul]:pl-5"
             dangerouslySetInnerHTML={{ __html: product.descriptionHtml }}
