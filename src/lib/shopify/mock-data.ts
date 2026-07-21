@@ -287,9 +287,12 @@ export const mockProducts: Product[] = [
     handle: "ex-uk-iphone-14-pro",
     title: "iPhone 14 Pro",
     description:
-      "Unboxed ex-UK unit in excellent condition. Fully tested, factory reset, and covered by a 1-year warranty.",
+      "Unboxed ex-UK unit in excellent condition. Inclusive of charging cable, silicone cover, phone protector. 1-year warranty applies for software and manufacturer faults.",
+    // Mirrors how a merchant's bullet list actually looks once rendered — the plain-text
+    // `description` field flattens this into one run-on sentence, which is why the detail
+    // overlay renders descriptionHtml instead.
     descriptionHtml:
-      "<p>Unboxed ex-UK unit in excellent condition. Fully tested, factory reset, and covered by a 1-year warranty.</p>",
+      "<p>Unboxed ex-UK unit in excellent condition.</p><ul><li>Inclusive of charging cable</li><li>Silicone cover</li><li>Phone protector</li><li>1-year warranty applies for software and manufacturer faults</li></ul>",
     availableForSale: true,
     productType: "Smartphones",
     // condition-a: exercises the graded-condition badge locally (see condition-grade.ts).

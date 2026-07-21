@@ -143,7 +143,14 @@ export function ExUkProductDetail({
 
           <div className="mt-5 border-t border-border-subtle pt-4">
             <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-neutral-500">About this unit</h3>
-            <p className="text-sm leading-relaxed text-neutral-700">{product.description}</p>
+            {/* descriptionHtml (not the plain-text description) so paragraphs/bullet lists the
+                merchant actually entered in Shopify survive, matching the real PDP's rendering
+                (src/app/(storefront)/products/[handle]/page.tsx) instead of collapsing them into
+                one run-on line. */}
+            <div
+              className="rounded-card bg-neutral-50 p-4 text-sm leading-relaxed text-neutral-700 [&_a]:text-accent [&_a]:underline [&_a]:underline-offset-2 [&_li]:mb-1.5 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:mb-3 [&_p:last-child]:mb-0 [&_ul]:list-disc [&_ul]:pl-5"
+              dangerouslySetInnerHTML={{ __html: product.descriptionHtml }}
+            />
           </div>
         </div>
       </div>
