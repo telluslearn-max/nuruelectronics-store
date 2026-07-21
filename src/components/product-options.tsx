@@ -68,6 +68,15 @@ export function ProductOptions({ product }: { product: Product }) {
 
   const showStickyBar = !buyBlockVisible && !cartIsOpen && Boolean(selectedVariant);
 
+  // Lets the concierge FAB (rendered elsewhere in the tree) shift up to
+  // clear this bar without prop-drilling or a shared context.
+  useEffect(() => {
+    document.documentElement.style.setProperty("--buy-bar-visible", showStickyBar ? "1" : "0");
+    return () => {
+      document.documentElement.style.setProperty("--buy-bar-visible", "0");
+    };
+  }, [showStickyBar]);
+
   return (
     <div>
       <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
