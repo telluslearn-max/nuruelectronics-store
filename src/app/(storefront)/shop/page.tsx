@@ -8,6 +8,7 @@ import { LifestyleTiles } from "@/components/lifestyle-tiles";
 import { ProductCarousel } from "@/components/product-carousel";
 import { ProductList } from "@/components/product-list";
 import { SectionHeading } from "@/components/section-heading";
+import { MobileBrowseNav } from "@/components/shop/mobile-browse-nav";
 import { TrustBadges } from "@/components/trust-badges";
 import { categories, getCategory } from "@/lib/categories";
 import { ecosystems, kits } from "@/lib/collections";
@@ -43,6 +44,10 @@ export default async function ShopPage() {
         <p className="mt-4 text-neutral-500">
           Browse by category, catch what&apos;s new, or jump straight to what you need.
         </p>
+      </section>
+
+      <section className="mt-10 md:hidden">
+        <MobileBrowseNav />
       </section>
 
       <section aria-label="Shop by category" className="mt-10">

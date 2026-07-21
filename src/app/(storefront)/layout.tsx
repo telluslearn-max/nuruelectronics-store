@@ -4,6 +4,7 @@ import { CartProvider } from "@/components/cart/cart-context";
 import { CartDrawer } from "@/components/cart/cart-drawer";
 import { ConciergeWidget } from "@/components/concierge/concierge-widget";
 import { Footer } from "@/components/footer";
+import { MobileTabBar } from "@/components/mobile-tab-bar";
 import { Nav } from "@/components/nav";
 import { getCart } from "@/lib/actions";
 import { getConversationHistory } from "@/lib/concierge/history";
@@ -37,10 +38,11 @@ export default async function StorefrontLayout({
       <GoogleAnalytics />
       <AnnouncementBar />
       <Nav authEnabled={isCustomerAuthConfigured} customerName={customer?.displayName ?? null} />
-      <main id="main" className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 pb-24">{children}</main>
+      <main id="main" className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 pb-40 md:pb-24">{children}</main>
       <Footer />
       <CartDrawer />
       <ConciergeWidget enabled={isConciergeConfigured} initialMessages={conciergeHistory} />
+      <MobileTabBar authEnabled={isCustomerAuthConfigured} customerName={customer?.displayName ?? null} />
     </CartProvider>
   );
 }
