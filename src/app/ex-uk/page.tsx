@@ -10,7 +10,12 @@ export const metadata: Metadata = {
 };
 
 export default async function ExUkPage() {
-  const { products } = await getProducts({ searchTerm: "tag:ex-uk", includeSpecs: true, first: 50 });
+  const { products } = await getProducts({
+    searchTerm: "tag:ex-uk",
+    includeSpecs: true,
+    first: 50,
+    includeExUk: true,
+  });
 
   const savingsEntries = await Promise.all(
     products.map(async (product) => {

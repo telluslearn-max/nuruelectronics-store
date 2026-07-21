@@ -137,20 +137,29 @@ export async function getProducts(
     first?: number;
     /** Also fetch spec metafields per product (e.g. for the PDP comparison table). Adds query cost, so opt-in only. */
     includeSpecs?: boolean;
+    /**
+     * Ex-UK units (tag "ex-uk") are excluded from every general browse/search surface by
+     * default — they're only meant to be discovered through the dedicated /ex-uk swipe
+     * experience. Pass true for the few call sites that intentionally want them (the /ex-uk
+     * page itself, and the ex-uk-counterpart lookup in src/lib/product-match.ts).
+     */
+    includeExUk?: boolean;
   } = {},
 ): Promise<ProductsPage> {
-  const { after, searchTerm, sortKey, reverse, first, includeSpecs } = options;
+  const { after, searchTerm, sortKey, reverse, first, includeSpecs, includeExUk } = options;
   if (!isShopifyConfigured) {
-    const products = searchTerm
-      ? mockProducts.filter((p) => matchesSearchTerm(p, searchTerm))
-      : mockProducts;
+    const products = mockProducts.filter((p) => {
+      if (!includeExUk && p.tags.includes("ex-uk")) return false;
+      return !searchTerm || matchesSearchTerm(p, searchTerm);
+    });
     return { products, hasNextPage: false, endCursor: null };
   }
+  const effectiveQuery = includeExUk ? searchTerm : searchTerm ? `(${searchTerm}) AND -tag:ex-uk` : "-tag:ex-uk";
   const data = await shopifyFetch<{
     products: PaginatedConnection<Parameters<typeof reshapeProduct>[0]>;
   }>(
     includeSpecs ? getProductsWithSpecsQuery : getProductsQuery,
-    { after, query: searchTerm, sortKey, reverse, first },
+    { after, query: effectiveQuery, sortKey, reverse, first },
     { revalidate: 60 },
   );
   return {

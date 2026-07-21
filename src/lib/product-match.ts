@@ -42,7 +42,9 @@ export async function findCounterpart(
   const category = categoryForProductType(product.productType);
   if (!category) return null;
 
-  const { products } = await getProducts({ searchTerm: category.query, first: 50 });
+  // getProducts excludes ex-uk-tagged products by default (they're only meant to surface via
+  // /ex-uk) — opt back in when that's specifically what we're looking for.
+  const { products } = await getProducts({ searchTerm: category.query, first: 50, includeExUk: options.requireExUk });
   const match = products.find((p) => {
     if (p.handle === product.handle) return false;
     if (p.tags.includes("ex-uk") !== options.requireExUk) return false;
