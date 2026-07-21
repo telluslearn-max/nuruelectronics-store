@@ -4,17 +4,14 @@ import { useState } from "react";
 import { formatPrice, truncate } from "@/lib/format";
 import type { Product } from "@/lib/shopify/types";
 import { ProductMedia } from "@/components/product-media";
-
-const KEY_SPEC_ORDER = ["processor", "ram", "storage", "battery", "camera", "display", "connectivity"];
+import { sortSpecs } from "./spec-order";
 
 export function ExUkProductCard({ product }: { product: Product }) {
   const [expanded, setExpanded] = useState(false);
   const [photoIndex, setPhotoIndex] = useState(0);
   const image = product.images[photoIndex] ?? product.images[0];
   const price = product.priceRange.minVariantPrice;
-  const specs = [...(product.specs ?? [])].sort(
-    (a, b) => KEY_SPEC_ORDER.indexOf(a.key) - KEY_SPEC_ORDER.indexOf(b.key),
-  );
+  const specs = sortSpecs(product.specs);
 
   return (
     <div className="relative h-full select-none overflow-hidden rounded-card bg-neutral-900 shadow-lg">

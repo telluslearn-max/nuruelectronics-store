@@ -6,6 +6,9 @@ import { ExUkProductCard } from "./ex-uk-product-card";
 
 const COMMIT_DISTANCE = 110;
 const COMMIT_VELOCITY = 0.5;
+// Pointer movement below this (in px) on release is treated as a tap rather than an aborted
+// drag — opens the detail overlay instead of just springing the card back to center.
+const TAP_THRESHOLD = 6;
 
 type DragState = {
   pointerId: number;
@@ -19,8 +22,10 @@ export type SwipeCardHandle = {
 };
 
 /** The single draggable top card in the deck. Drag with pointer events, or call `swipe()` imperatively from the deck's ❤️/✕ buttons. */
-export const SwipeCard = forwardRef<SwipeCardHandle, { product: Product; onSwiped: (direction: "left" | "right") => void }>(
-  function SwipeCard({ product, onSwiped }, ref) {
+export const SwipeCard = forwardRef<
+  SwipeCardHandle,
+  { product: Product; onSwiped: (direction: "left" | "right") => void; onTap?: () => void }
+>(function SwipeCard({ product, onSwiped, onTap }, ref) {
     const [delta, setDelta] = useState({ x: 0, y: 0 });
     const [exiting, setExiting] = useState<"left" | "right" | null>(null);
     const dragRef = useRef<DragState | null>(null);
@@ -52,10 +57,12 @@ export const SwipeCard = forwardRef<SwipeCardHandle, { product: Product; onSwipe
       const velocity = delta.x / elapsed;
       if (Math.abs(delta.x) > COMMIT_DISTANCE || Math.abs(velocity) > COMMIT_VELOCITY) {
         commit(delta.x > 0 ? "right" : "left");
-      } else {
-        dragRef.current = null;
-        setDelta({ x: 0, y: 0 });
+        return;
       }
+      const wasTap = Math.hypot(delta.x, delta.y) < TAP_THRESHOLD;
+      dragRef.current = null;
+      setDelta({ x: 0, y: 0 });
+      if (wasTap) onTap?.();
     }
 
     const isDragging = dragRef.current !== null;

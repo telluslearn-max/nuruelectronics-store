@@ -6,11 +6,13 @@ import { WhatsAppOrderButton } from "@/components/whatsapp-order-button";
 import { formatPrice } from "@/lib/format";
 import type { Product } from "@/lib/shopify/types";
 import { ExUkProductCard } from "./ex-uk-product-card";
+import { ExUkProductDetail } from "./ex-uk-product-detail";
 import { SwipeCard, type SwipeCardHandle } from "./swipe-card";
 import { useExUkMatches } from "./use-ex-uk-matches";
 
 export function SwipeDeck({ products }: { products: Product[] }) {
   const [index, setIndex] = useState(0);
+  const [detailProduct, setDetailProduct] = useState<Product | null>(null);
   const { addMatch } = useExUkMatches();
   const topCardRef = useRef<SwipeCardHandle>(null);
   const router = useRouter();
@@ -19,6 +21,7 @@ export function SwipeDeck({ products }: { products: Product[] }) {
   const peekCards = products.slice(index + 1, index + 3);
 
   function handleSwiped(direction: "left" | "right") {
+    setDetailProduct(null);
     if (direction === "right" && current) {
       addMatch({ handle: current.handle, title: current.title, imageUrl: current.images[0]?.url ?? null });
       router.push(`/ex-uk/messages/${current.handle}`);
@@ -28,8 +31,8 @@ export function SwipeDeck({ products }: { products: Product[] }) {
   }
 
   return (
-    <div className="mx-auto flex max-w-sm flex-col items-center px-4 py-6">
-      <div className="relative aspect-[4/5] w-full">
+    <div className="flex h-full flex-col px-2 pb-2 pt-2">
+      <div className="relative flex-1">
         {peekCards
           .slice()
           .reverse()
@@ -48,7 +51,13 @@ export function SwipeDeck({ products }: { products: Product[] }) {
           ))}
 
         {current ? (
-          <SwipeCard key={current.id} ref={topCardRef} product={current} onSwiped={handleSwiped} />
+          <SwipeCard
+            key={current.id}
+            ref={topCardRef}
+            product={current}
+            onSwiped={handleSwiped}
+            onTap={() => setDetailProduct(current)}
+          />
         ) : (
           <div className="flex h-full flex-col items-center justify-center gap-2 rounded-card border border-dashed border-border-subtle p-8 text-center">
             <p className="text-base font-medium">That&apos;s every Ex-UK unit for now</p>
@@ -58,7 +67,7 @@ export function SwipeDeck({ products }: { products: Product[] }) {
       </div>
 
       {current && (
-        <div className="mt-6 flex items-center justify-center gap-6">
+        <div className="flex shrink-0 items-center justify-center gap-6 py-3">
           <button
             type="button"
             aria-label={`Pass on ${current.title}`}
@@ -82,6 +91,10 @@ export function SwipeDeck({ products }: { products: Product[] }) {
             ♥
           </button>
         </div>
+      )}
+
+      {detailProduct && (
+        <ExUkProductDetail product={detailProduct} onClose={() => setDetailProduct(null)} onSwipe={handleSwiped} />
       )}
     </div>
   );

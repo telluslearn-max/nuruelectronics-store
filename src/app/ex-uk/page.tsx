@@ -14,11 +14,7 @@ export default async function ExUkPage() {
   return (
     <>
       <ExUkTopBar title="Ex-UK" />
-      <div className="flex-1 overflow-y-auto">
-        <p className="mx-auto max-w-sm px-4 pt-4 text-center text-sm text-neutral-600">
-          Unboxed units imported from the UK, at a lower price — every one covered by a 1-year warranty. Swipe
-          right to love it, left to pass.
-        </p>
+      <div className="flex flex-1 flex-col overflow-hidden">
         <SwipeDeck products={products} />
       </div>
     </>
