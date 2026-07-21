@@ -35,7 +35,7 @@ export function CartDrawer() {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex justify-end"
+      className="fixed inset-0 z-50 flex flex-col justify-end md:flex-row md:justify-end"
       role="dialog"
       aria-modal="true"
       aria-label="Shopping cart"
@@ -45,7 +45,7 @@ export function CartDrawer() {
         className="absolute inset-0 animate-fade-in bg-black/40"
         onClick={closeCart}
       />
-      <div className="relative flex h-full w-full max-w-md animate-slide-in flex-col bg-background shadow-xl">
+      <div className="relative flex w-full max-h-[75vh] animate-slide-up flex-col rounded-t-card border border-b-0 border-border-subtle bg-background shadow-xl md:h-full md:max-h-full md:max-w-md md:animate-slide-in md:rounded-t-none md:border-0">
         <div className="flex items-center justify-between border-b border-border-subtle p-4">
           <h2 className="text-lg font-semibold">Your Cart</h2>
           <button

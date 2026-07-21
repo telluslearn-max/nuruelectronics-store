@@ -48,7 +48,7 @@ export function ConciergeDock({ store }: { store: ConciergeMessageStore }) {
           className="fixed inset-0 z-40 animate-fade-in bg-black/40"
         />
       )}
-      <div className="fixed inset-x-0 bottom-0 z-40 flex flex-col">
+      <div className="fixed inset-x-0 bottom-14 z-40 flex flex-col md:bottom-0">
         {isExpanded && (
           <ConciergeSheet
             messages={messages}

@@ -171,7 +171,7 @@ export function ProductOptions({ product }: { product: Product }) {
       </div>
 
       {showStickyBar && (
-        <div className="fixed inset-x-0 bottom-0 z-30 animate-fade-up border-t border-border-subtle bg-background/95 backdrop-blur">
+        <div className="fixed inset-x-0 bottom-14 z-30 animate-fade-up border-t border-border-subtle bg-background/95 backdrop-blur md:bottom-0">
           <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3">
             <div className="min-w-0">
               <p className="truncate text-sm font-medium">{product.title}</p>

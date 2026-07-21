@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { redirect } from "next/navigation";
+import { FooterLinks } from "@/components/footer-links";
 import { formatPrice } from "@/lib/format";
 import { getCurrentCustomer } from "@/lib/customer";
 import { isCustomerAuthConfigured } from "@/lib/customer-auth";
@@ -28,24 +28,47 @@ export default async function AccountPage({
 }) {
   if (!isCustomerAuthConfigured) {
     return (
-      <div className="flex flex-col items-center justify-center py-24 text-center">
-        <h1 className="text-title">Sign-in isn&apos;t available yet</h1>
-        <p className="mt-2 max-w-sm text-neutral-500">
-          Customer accounts are being set up. Check back soon.
-        </p>
-        <Link
-          href="/"
-          className="mt-8 rounded-control bg-foreground px-6 py-3 text-sm font-medium text-background transition hover:opacity-90"
-        >
-          Back to shop
-        </Link>
+      <div>
+        <div className="flex flex-col items-center justify-center py-24 text-center">
+          <h1 className="text-title">Sign-in isn&apos;t available yet</h1>
+          <p className="mt-2 max-w-sm text-neutral-500">
+            Customer accounts are being set up. Check back soon.
+          </p>
+          <Link
+            href="/"
+            className="mt-8 rounded-control bg-foreground px-6 py-3 text-sm font-medium text-background transition hover:opacity-90"
+          >
+            Back to shop
+          </Link>
+        </div>
+        <section className="mt-12 border-t border-border-subtle pt-8 md:hidden">
+          <FooterLinks />
+        </section>
       </div>
     );
   }
 
   const customer = await getCurrentCustomer();
   if (!customer) {
-    redirect("/api/auth/login");
+    return (
+      <div>
+        <div className="flex flex-col items-center justify-center py-24 text-center">
+          <h1 className="text-title">Sign in to your account</h1>
+          <p className="mt-2 max-w-sm text-neutral-500">
+            Sign in to see your order history and manage your account.
+          </p>
+          <a
+            href="/api/auth/login"
+            className="mt-8 rounded-control bg-foreground px-6 py-3 text-sm font-medium text-background transition hover:opacity-90"
+          >
+            Sign in
+          </a>
+        </div>
+        <section className="mt-12 border-t border-border-subtle pt-8 md:hidden">
+          <FooterLinks />
+        </section>
+      </div>
+    );
   }
 
   const { error } = await searchParams;
@@ -112,6 +135,10 @@ export default async function AccountPage({
           </ul>
         )}
       </div>
+
+      <section className="mt-12 border-t border-border-subtle pt-8 md:hidden">
+        <FooterLinks />
+      </section>
     </div>
   );
 }
