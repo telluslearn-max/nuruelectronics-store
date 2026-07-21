@@ -11,6 +11,7 @@ import { sendDeliveryNoteEmail as sendDeliveryNoteEmailMessage, sendEstimateEmai
 import { renderDeliveryNotePdf, renderEstimatePdf, renderInvoicePdf, renderReceiptPdf } from "./pdf/render";
 import { redirectWithError, redirectWithSuccess } from "./admin-feedback";
 import { logAdminAction } from "./audit-log";
+import { sendWhatsAppTemplateMessage } from "./whatsapp";
 import type { PaymentMethod } from "@prisma/client";
 
 /**
@@ -565,6 +566,55 @@ export async function sendReceiptEmail(receiptId: string): Promise<void> {
 
   revalidatePath(`/admin/orders/${receipt.invoice.orderId}`);
   redirectWithSuccess(`/admin/orders/${receipt.invoice.orderId}`, "Receipt emailed.");
+}
+
+/**
+ * Sends a "your invoice is ready" template with a quick-reply button;
+ * tapping it fires a webhook handled in
+ * src/app/api/webhooks/whatsapp/route.ts, which renders and delivers the PDF
+ * as a follow-up document message. See WHATSAPP_SETUP.md for the exact
+ * template text this expects to already be approved in Meta Business Manager.
+ */
+export async function sendInvoiceWhatsApp(invoiceId: string): Promise<void> {
+  await requireAdminSession();
+  const invoice = await prisma.invoice.findUniqueOrThrow({
+    where: { id: invoiceId },
+    include: { order: { include: { customer: true } } },
+  });
+  if (!invoice.order.customer.phone) {
+    redirectWithError(`/admin/orders/${invoice.orderId}`, "Customer has no phone number on file.");
+  }
+
+  await sendWhatsAppTemplateMessage({
+    to: invoice.order.customer.phone,
+    templateName: "invoice_ready",
+    bodyParams: [invoice.number],
+    buttonPayload: `invoice:${invoice.id}`,
+  });
+
+  revalidatePath(`/admin/orders/${invoice.orderId}`);
+  redirectWithSuccess(`/admin/orders/${invoice.orderId}`, "WhatsApp notification sent.");
+}
+
+export async function sendReceiptWhatsApp(receiptId: string): Promise<void> {
+  await requireAdminSession();
+  const receipt = await prisma.receipt.findUniqueOrThrow({
+    where: { id: receiptId },
+    include: { invoice: { include: { order: { include: { customer: true } } } } },
+  });
+  if (!receipt.invoice.order.customer.phone) {
+    redirectWithError(`/admin/orders/${receipt.invoice.orderId}`, "Customer has no phone number on file.");
+  }
+
+  await sendWhatsAppTemplateMessage({
+    to: receipt.invoice.order.customer.phone,
+    templateName: "receipt_ready",
+    bodyParams: [receipt.number],
+    buttonPayload: `receipt:${receipt.id}`,
+  });
+
+  revalidatePath(`/admin/orders/${receipt.invoice.orderId}`);
+  redirectWithSuccess(`/admin/orders/${receipt.invoice.orderId}`, "WhatsApp notification sent.");
 }
 
 export async function voidInvoice(invoiceId: string): Promise<void> {

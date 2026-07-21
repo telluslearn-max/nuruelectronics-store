@@ -17,12 +17,15 @@ import {
   sendDeliveryNoteEmail,
   sendEstimateEmail,
   sendInvoiceEmail,
+  sendInvoiceWhatsApp,
   sendReceiptEmail,
+  sendReceiptWhatsApp,
   updateDeliveryNote,
   updateEstimate,
   updateInvoice,
   voidInvoice,
 } from "@/lib/admin-actions";
+import { isWhatsAppConfigured } from "@/lib/whatsapp";
 import {
   BillToCard,
   ItemsCard,
@@ -266,6 +269,13 @@ export default async function AdminOrderHubPage({
                   Send email
                 </button>
               </form>
+              {isWhatsAppConfigured && order.customer.phone && (
+                <form action={sendInvoiceWhatsApp.bind(null, order.invoice.id)}>
+                  <button type="submit" className="underline hover:text-foreground">
+                    Send via WhatsApp
+                  </button>
+                </form>
+              )}
               {order.invoice.status !== "paid" && order.invoice.status !== "void" && Number(order.invoice.amountPaid) === 0 && (
                 <form action={voidInvoice.bind(null, order.invoice.id)}>
                   <button type="submit" className="underline hover:text-foreground">
@@ -419,6 +429,13 @@ export default async function AdminOrderHubPage({
                             Send email
                           </button>
                         </form>
+                        {isWhatsAppConfigured && order.customer.phone && (
+                          <form action={sendReceiptWhatsApp.bind(null, receipt.id)}>
+                            <button type="submit" className="underline hover:text-foreground">
+                              Send via WhatsApp
+                            </button>
+                          </form>
+                        )}
                       </div>
                     </li>
                   ))}
