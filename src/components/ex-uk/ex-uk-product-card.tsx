@@ -27,7 +27,11 @@ export function ExUkProductCard({ product, savings }: { product: Product; saving
         className="object-cover"
       />
 
-      <span className="absolute left-3 top-3 rounded-control bg-accent px-2.5 py-1 text-xs font-medium text-accent-foreground">
+      <span
+        className={`absolute left-3 top-3 rounded-control px-2.5 py-1 text-xs font-medium shadow-sm ${
+          grade ? grade.cardBadgeClass : "bg-accent text-accent-foreground"
+        }`}
+      >
         {grade ? grade.label : "Ex-UK"} · Unboxed · 1-Year Warranty
       </span>
 
@@ -52,7 +56,7 @@ export function ExUkProductCard({ product, savings }: { product: Product; saving
         </div>
       )}
 
-      <div className="absolute inset-x-0 bottom-0 flex flex-col gap-2 bg-gradient-to-t from-black/85 via-black/50 to-transparent px-4 pb-4 pt-16 text-white">
+      <div className="absolute inset-x-0 bottom-0 flex flex-col gap-2 bg-gradient-to-t from-black/85 via-black/60 to-transparent px-4 pb-4 pt-16 text-white backdrop-blur-[2px]">
         <div className="flex items-start justify-between gap-2">
           <h3 className="text-base font-semibold leading-snug">{product.title}</h3>
           <div className="shrink-0 text-right">
