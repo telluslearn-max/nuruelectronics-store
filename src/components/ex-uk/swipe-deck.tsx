@@ -6,6 +6,7 @@ import { WhatsAppOrderButton } from "@/components/whatsapp-order-button";
 import { formatPrice } from "@/lib/format";
 import type { Savings } from "@/lib/product-match";
 import type { Product } from "@/lib/shopify/types";
+import { HeartIcon, PassIcon } from "./action-icons";
 import { ExUkProductCard } from "./ex-uk-product-card";
 import { ExUkProductDetail } from "./ex-uk-product-detail";
 import { SwipeCard, type SwipeCardHandle } from "./swipe-card";
@@ -106,9 +107,9 @@ export function SwipeDeck({
             type="button"
             aria-label={`Pass on ${current.title}`}
             onClick={() => topCardRef.current?.swipe("left")}
-            className="flex h-14 w-14 items-center justify-center rounded-control border border-border-subtle text-2xl text-neutral-500 transition hover:border-neutral-400"
+            className="flex h-14 w-14 items-center justify-center rounded-control border border-border-subtle text-neutral-500 shadow-sm transition hover:border-neutral-400 hover:text-neutral-700"
           >
-            ✕
+            <PassIcon className="h-6 w-6" />
           </button>
           <WhatsAppOrderButton
             productTitle={current.title}
@@ -120,9 +121,9 @@ export function SwipeDeck({
             type="button"
             aria-label={`Love ${current.title}`}
             onClick={() => topCardRef.current?.swipe("right")}
-            className="flex h-14 w-14 items-center justify-center rounded-control bg-accent text-2xl text-accent-foreground transition hover:opacity-90"
+            className="flex h-14 w-14 items-center justify-center rounded-control bg-accent text-accent-foreground shadow-md transition hover:opacity-90"
           >
-            ♥
+            <HeartIcon className="h-7 w-7 drop-shadow-sm" />
           </button>
         </div>
       )}

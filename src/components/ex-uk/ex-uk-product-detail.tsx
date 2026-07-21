@@ -6,6 +6,7 @@ import { WhatsAppOrderButton } from "@/components/whatsapp-order-button";
 import { formatPrice } from "@/lib/format";
 import type { Savings } from "@/lib/product-match";
 import type { Product } from "@/lib/shopify/types";
+import { HeartIcon, PassIcon } from "./action-icons";
 import { gradeForProduct } from "./condition-grade";
 import { sortSpecs } from "./spec-order";
 
@@ -165,9 +166,9 @@ export function ExUkProductDetail({
           type="button"
           aria-label={`Pass on ${product.title}`}
           onClick={() => onSwipe("left")}
-          className="flex h-14 w-14 items-center justify-center rounded-control border border-border-subtle text-2xl text-neutral-500 transition hover:border-neutral-400"
+          className="flex h-14 w-14 items-center justify-center rounded-control border border-border-subtle text-neutral-500 shadow-sm transition hover:border-neutral-400 hover:text-neutral-700"
         >
-          ✕
+          <PassIcon className="h-6 w-6" />
         </button>
         <WhatsAppOrderButton
           productTitle={product.title}
@@ -179,9 +180,9 @@ export function ExUkProductDetail({
           type="button"
           aria-label={`Love ${product.title}`}
           onClick={() => onSwipe("right")}
-          className="flex h-14 w-14 items-center justify-center rounded-control bg-accent text-2xl text-accent-foreground transition hover:opacity-90"
+          className="flex h-14 w-14 items-center justify-center rounded-control bg-accent text-accent-foreground shadow-md transition hover:opacity-90"
         >
-          ♥
+          <HeartIcon className="h-7 w-7 drop-shadow-sm" />
         </button>
       </div>
     </div>
