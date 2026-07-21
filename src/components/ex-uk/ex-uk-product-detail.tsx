@@ -44,7 +44,7 @@ export function ExUkProductDetail({
       aria-label={`${product.title} details`}
       className="fixed inset-0 z-50 flex flex-col bg-background"
     >
-      <div className="flex shrink-0 items-center justify-between border-b border-border-subtle px-4 py-3">
+      <div className="flex shrink-0 items-center border-b border-border-subtle px-4 py-3">
         <button
           ref={closeButtonRef}
           onClick={onClose}
@@ -53,8 +53,6 @@ export function ExUkProductDetail({
         >
           &times;
         </button>
-        <span className="text-sm font-semibold">Ex-UK · Unboxed · 1-Year Warranty</span>
-        <span className="w-9" aria-hidden="true" />
       </div>
 
       <div className="flex-1 overflow-y-auto">
@@ -81,26 +79,60 @@ export function ExUkProductDetail({
           </div>
         )}
 
-        <div className="space-y-4 px-4 pb-6">
+        <div className="px-4 pb-6">
           <div className="flex items-start justify-between gap-2">
-            <h2 className="text-lg font-semibold leading-snug">{product.title}</h2>
+            <h2 className="flex items-center gap-1.5 text-lg font-semibold leading-snug">
+              {product.title}
+              <svg
+                viewBox="0 0 20 20"
+                className="h-4 w-4 shrink-0 text-accent"
+                fill="currentColor"
+                aria-label="Tested & verified"
+              >
+                <title>Tested &amp; verified</title>
+                <path d="M10 1.5 12.4 4l3.4-.6.6 3.4 2.5 2.4-2.5 2.4-.6 3.4-3.4-.6L10 17l-2.4-2.6-3.4.6-.6-3.4L1.1 9.2l2.5-2.4.6-3.4L7.6 4 10 1.5Z" />
+                <path
+                  d="M6.8 9.4l2 2 4.2-4.4"
+                  fill="none"
+                  stroke="var(--background)"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </h2>
             <p className="shrink-0 text-lg font-medium">{formatPrice(price.amount, price.currencyCode)}</p>
           </div>
 
+          <div className="mt-2 space-y-1 text-sm text-neutral-600">
+            <p>📦 Unboxed · imported from the UK</p>
+            <p>🛡️ 1-year warranty included</p>
+          </div>
+
+          <span className="mt-3 inline-flex items-center rounded-control bg-accent/10 px-3 py-1.5 text-sm font-medium text-accent">
+            ✅ Condition: Fully tested & unboxed
+          </span>
+
           {specs.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {specs.map((spec) => (
-                <span
-                  key={spec.key}
-                  className="rounded-control border border-border-subtle px-2.5 py-1 text-sm text-neutral-600"
-                >
-                  {spec.value}
-                </span>
-              ))}
+            <div className="mt-5 border-t border-border-subtle pt-4">
+              <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-neutral-500">Specs</h3>
+              <div className="flex flex-wrap gap-2">
+                {specs.map((spec) => (
+                  <span
+                    key={spec.key}
+                    className="rounded-control border border-border-subtle px-2.5 py-1 text-sm text-neutral-600"
+                  >
+                    {spec.value}
+                  </span>
+                ))}
+              </div>
             </div>
           )}
 
-          <p className="text-sm leading-relaxed text-neutral-700">{product.description}</p>
+          <div className="mt-5 border-t border-border-subtle pt-4">
+            <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-neutral-500">About this unit</h3>
+            <p className="text-sm leading-relaxed text-neutral-700">{product.description}</p>
+          </div>
         </div>
       </div>
 
