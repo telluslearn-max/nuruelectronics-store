@@ -22,9 +22,9 @@ export function MatchesTray({
             key={match.handle}
             type="button"
             onClick={() => onSelect(match)}
-            className="flex shrink-0 items-center gap-2 rounded-control border border-border-subtle py-1 pl-1 pr-3 text-sm transition hover:border-foreground"
+            className="flex shrink-0 flex-col items-center gap-1 text-xs"
           >
-            <span className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-control bg-neutral-100 text-xs text-neutral-400">
+            <span className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border-2 border-accent bg-neutral-100 text-neutral-400">
               {match.imageUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={match.imageUrl} alt="" className="h-full w-full object-cover" />
@@ -32,7 +32,7 @@ export function MatchesTray({
                 "♥"
               )}
             </span>
-            {match.title}
+            <span className="max-w-[4.5rem] truncate text-neutral-600">{match.title}</span>
           </button>
         ))}
       </div>

@@ -294,7 +294,12 @@ export const mockProducts: Product[] = [
     productType: "Smartphones",
     tags: ["mock", "ex-uk"],
     priceRange: { minVariantPrice: money("699.00"), maxVariantPrice: money("699.00") },
-    images: [],
+    // Multiple images so the swipe card's dot pagination has something to page through locally.
+    images: [
+      { url: "https://picsum.photos/seed/exuk-iphone14pro-1/800/1000", altText: null, width: 800, height: 1000 },
+      { url: "https://picsum.photos/seed/exuk-iphone14pro-2/800/1000", altText: null, width: 800, height: 1000 },
+      { url: "https://picsum.photos/seed/exuk-iphone14pro-3/800/1000", altText: null, width: 800, height: 1000 },
+    ],
     variants: [
       {
         id: "gid://mock/ProductVariant/14",

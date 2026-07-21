@@ -2,6 +2,8 @@
 
 import { useRef, useState } from "react";
 import { ConciergePanel } from "@/components/concierge/concierge-panel";
+import { WhatsAppOrderButton } from "@/components/whatsapp-order-button";
+import { formatPrice } from "@/lib/format";
 import type { Product } from "@/lib/shopify/types";
 import { ExUkProductCard } from "./ex-uk-product-card";
 import { MatchesTray } from "./matches-tray";
@@ -75,6 +77,12 @@ export function SwipeDeck({ products }: { products: Product[] }) {
             >
               ✕
             </button>
+            <WhatsAppOrderButton
+              productTitle={current.title}
+              price={formatPrice(current.priceRange.minVariantPrice.amount, current.priceRange.minVariantPrice.currencyCode)}
+              productHandle={current.handle}
+              compact
+            />
             <button
               type="button"
               aria-label={`Love ${current.title}`}
