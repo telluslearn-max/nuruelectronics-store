@@ -12,7 +12,7 @@ export type ConciergePageContext = {
 
 export type ConciergeEvent =
   | { type: "text-delta"; text: string }
-  | { type: "products"; mode: "list" | "compare"; products: Product[] }
+  | { type: "products"; mode: "list" | "compare"; products: Product[]; autoNavigate?: boolean }
   | { type: "cart"; cart: Cart }
   | { type: "whatsapp"; message: string }
   | { type: "checkout"; url: string }

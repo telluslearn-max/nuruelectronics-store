@@ -1,5 +1,6 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { ConciergeInputBar } from "./concierge-input-bar";
 import { ConciergeSheet } from "./concierge-sheet";
@@ -20,6 +21,18 @@ export function ConciergeDock({ store }: { store: ConciergeMessageStore }) {
   const [input, setInput] = useState("");
   const [isExpanded, setIsExpanded] = useState(false);
   const hasAutoExpanded = useRef(false);
+  const pathname = usePathname();
+  const previousPathname = useRef(pathname);
+
+  // A page change while the sheet is open — whether from the concierge auto-navigating to a
+  // product it just looked up, or the shopper clicking elsewhere — means they want to see the
+  // new page, not have it dimmed behind the backdrop.
+  useEffect(() => {
+    if (previousPathname.current !== pathname) {
+      previousPathname.current = pathname;
+      setIsExpanded(false);
+    }
+  }, [pathname]);
 
   // Returning to a page mid-conversation (history restored from Firestore) opens straight to the
   // transcript rather than making the shopper re-expand it themselves.

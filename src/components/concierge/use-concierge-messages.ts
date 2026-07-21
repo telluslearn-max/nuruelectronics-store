@@ -1,5 +1,6 @@
 "use client";
 
+import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useRef, useState } from "react";
 import { useCart } from "@/components/cart/cart-context";
 import type { ConciergeEvent, ConciergeMessage } from "@/lib/concierge/types";
@@ -30,6 +31,8 @@ export function makeMessageId(): string {
  */
 export function useConciergeMessages(initialMessages: ConciergeMessage[] = []) {
   const { setCart } = useCart();
+  const router = useRouter();
+  const pathname = usePathname();
   const [messages, setMessages] = useState<ConciergeDisplayMessage[]>(() =>
     initialMessages.map((m) => ({ id: makeMessageId(), role: m.role, text: m.text })),
   );
@@ -57,8 +60,12 @@ export function useConciergeMessages(initialMessages: ConciergeMessage[] = []) {
         }),
       );
       if (event.type === "cart") setCart(event.cart);
+      if (event.type === "products" && event.autoNavigate && event.products.length === 1) {
+        const target = `/products/${event.products[0].handle}`;
+        if (target !== pathname) router.push(target);
+      }
     },
-    [setCart, updateMessages],
+    [pathname, router, setCart, updateMessages],
   );
 
   return { messages, messagesRef, updateMessages, applyEventToMessage };

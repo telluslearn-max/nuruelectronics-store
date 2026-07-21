@@ -185,7 +185,9 @@ export async function dispatchTool(
       });
       return {
         resultForModel: products.map(summarizeProduct),
-        events: products.length ? [{ type: "products", mode: "list", products }] : [],
+        events: products.length
+          ? [{ type: "products", mode: "list", products, autoNavigate: products.length === 1 }]
+          : [],
       };
     }
 
@@ -194,7 +196,7 @@ export async function dispatchTool(
       const product = handle ? await getProductDetails(handle) : null;
       return {
         resultForModel: product ? summarizeProduct(product) : { error: "Product not found." },
-        events: product ? [{ type: "products", mode: "list", products: [product] }] : [],
+        events: product ? [{ type: "products", mode: "list", products: [product], autoNavigate: true }] : [],
       };
     }
 
