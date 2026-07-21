@@ -7,21 +7,13 @@ import { useConciergeChat } from "./use-concierge-chat";
 import { useConciergeMessages } from "./use-concierge-messages";
 import { useConciergeVoice } from "./use-concierge-voice";
 
-export function ConciergePanel({
-  onClose,
-  initialMessage,
-}: {
-  onClose: () => void;
-  /** Sent automatically as the first user turn once, e.g. to open a chat already scoped to a product. */
-  initialMessage?: string;
-}) {
+export function ConciergePanel({ onClose }: { onClose: () => void }) {
   const store = useConciergeMessages();
   const { messages } = store;
   const { isStreaming, send } = useConciergeChat(store);
   const { isVoiceSupported, recordingState, startRecording, stopRecording } = useConciergeVoice(store);
   const [input, setInput] = useState("");
   const closeButtonRef = useRef<HTMLButtonElement>(null);
-  const hasSentInitialMessage = useRef(false);
 
   useEffect(() => {
     closeButtonRef.current?.focus();
@@ -32,12 +24,6 @@ export function ConciergePanel({
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [onClose]);
-
-  useEffect(() => {
-    if (!initialMessage || hasSentInitialMessage.current || messages.length > 0) return;
-    hasSentInitialMessage.current = true;
-    void send(initialMessage);
-  }, [initialMessage, messages.length, send]);
 
   return (
     <div role="dialog" aria-modal="true" aria-label="Shopping concierge" className="fixed inset-0 z-40 flex flex-col bg-background">
