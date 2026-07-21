@@ -279,6 +279,192 @@ export const mockProducts: Product[] = [
     ],
     options: [{ id: "1", name: "Title", values: ["Default"] }],
   },
+  // Ex-UK line: unboxed units imported from the UK, sold with a 1-year
+  // warranty. Tagged "ex-uk" so /ex-uk can filter with `tag:ex-uk` the same
+  // way it will against the real Shopify catalog.
+  {
+    id: "gid://mock/Product/13",
+    handle: "ex-uk-iphone-14-pro",
+    title: "iPhone 14 Pro",
+    description:
+      "Unboxed ex-UK unit in excellent condition. Fully tested, factory reset, and covered by a 1-year warranty.",
+    descriptionHtml:
+      "<p>Unboxed ex-UK unit in excellent condition. Fully tested, factory reset, and covered by a 1-year warranty.</p>",
+    availableForSale: true,
+    productType: "Smartphones",
+    // condition-a: exercises the graded-condition badge locally (see condition-grade.ts).
+    tags: ["mock", "ex-uk", "condition-a"],
+    priceRange: { minVariantPrice: money("699.00"), maxVariantPrice: money("699.00") },
+    // Multiple images so the swipe card's dot pagination has something to page through locally.
+    images: [
+      { url: "https://picsum.photos/seed/exuk-iphone14pro-1/800/1000", altText: null, width: 800, height: 1000 },
+      { url: "https://picsum.photos/seed/exuk-iphone14pro-2/800/1000", altText: null, width: 800, height: 1000 },
+      { url: "https://picsum.photos/seed/exuk-iphone14pro-3/800/1000", altText: null, width: 800, height: 1000 },
+    ],
+    variants: [
+      {
+        id: "gid://mock/ProductVariant/14",
+        title: "Default",
+        availableForSale: true,
+        price: money("699.00"),
+        selectedOptions: [{ name: "Title", value: "Default" }],
+      },
+    ],
+    options: [{ id: "1", name: "Title", values: ["Default"] }],
+    specs: [
+      { key: "processor", value: "A16 Bionic" },
+      { key: "ram", value: "6GB" },
+      { key: "storage", value: "256GB" },
+      { key: "battery", value: "Up to 23h video playback" },
+    ],
+  },
+  {
+    id: "gid://mock/Product/14",
+    handle: "ex-uk-galaxy-s23",
+    title: "Samsung Galaxy S23",
+    description:
+      "Unboxed ex-UK unit, lightly used. Fully tested, factory reset, and covered by a 1-year warranty.",
+    descriptionHtml:
+      "<p>Unboxed ex-UK unit, lightly used. Fully tested, factory reset, and covered by a 1-year warranty.</p>",
+    availableForSale: true,
+    productType: "Smartphones",
+    tags: ["mock", "ex-uk", "condition-b"],
+    priceRange: { minVariantPrice: money("549.00"), maxVariantPrice: money("549.00") },
+    images: [],
+    variants: [
+      {
+        id: "gid://mock/ProductVariant/15",
+        title: "Default",
+        availableForSale: true,
+        price: money("549.00"),
+        selectedOptions: [{ name: "Title", value: "Default" }],
+      },
+    ],
+    options: [{ id: "1", name: "Title", values: ["Default"] }],
+    specs: [
+      { key: "processor", value: "Snapdragon 8 Gen 2" },
+      { key: "ram", value: "8GB" },
+      { key: "storage", value: "256GB" },
+      { key: "camera", value: "50MP triple camera" },
+    ],
+  },
+  {
+    id: "gid://mock/Product/15",
+    handle: "ex-uk-macbook-pro-14-m2",
+    title: 'MacBook Pro 14" M2',
+    description:
+      "Unboxed ex-UK unit in great cosmetic condition. Fully tested, factory reset, and covered by a 1-year warranty.",
+    descriptionHtml:
+      "<p>Unboxed ex-UK unit in great cosmetic condition. Fully tested, factory reset, and covered by a 1-year warranty.</p>",
+    availableForSale: true,
+    productType: "Laptops",
+    tags: ["mock", "ex-uk"],
+    priceRange: { minVariantPrice: money("1399.00"), maxVariantPrice: money("1399.00") },
+    images: [],
+    variants: [
+      {
+        id: "gid://mock/ProductVariant/16",
+        title: "Default",
+        availableForSale: true,
+        price: money("1399.00"),
+        selectedOptions: [{ name: "Title", value: "Default" }],
+      },
+    ],
+    options: [{ id: "1", name: "Title", values: ["Default"] }],
+    specs: [
+      { key: "processor", value: "Apple M2" },
+      { key: "ram", value: "16GB" },
+      { key: "storage", value: "512GB SSD" },
+      { key: "battery", value: "Up to 18h" },
+    ],
+  },
+  {
+    id: "gid://mock/Product/16",
+    handle: "ex-uk-sony-wh1000xm5",
+    title: "Sony WH-1000XM5",
+    description:
+      "Unboxed ex-UK unit, barely used. Fully tested, factory reset, and covered by a 1-year warranty.",
+    descriptionHtml:
+      "<p>Unboxed ex-UK unit, barely used. Fully tested, factory reset, and covered by a 1-year warranty.</p>",
+    availableForSale: true,
+    productType: "Audio",
+    tags: ["mock", "ex-uk", "condition-c"],
+    priceRange: { minVariantPrice: money("219.00"), maxVariantPrice: money("219.00") },
+    images: [],
+    variants: [
+      {
+        id: "gid://mock/ProductVariant/17",
+        title: "Default",
+        availableForSale: true,
+        price: money("219.00"),
+        selectedOptions: [{ name: "Title", value: "Default" }],
+      },
+    ],
+    options: [{ id: "1", name: "Title", values: ["Default"] }],
+    specs: [
+      { key: "battery", value: "Up to 30h with ANC" },
+      { key: "connectivity", value: "Bluetooth 5.2" },
+    ],
+  },
+  {
+    id: "gid://mock/Product/17",
+    handle: "ex-uk-ipad-air-5",
+    title: "iPad Air (5th Gen)",
+    description:
+      "Unboxed ex-UK unit in excellent condition. Fully tested, factory reset, and covered by a 1-year warranty.",
+    descriptionHtml:
+      "<p>Unboxed ex-UK unit in excellent condition. Fully tested, factory reset, and covered by a 1-year warranty.</p>",
+    availableForSale: true,
+    productType: "Tablets",
+    tags: ["mock", "ex-uk"],
+    priceRange: { minVariantPrice: money("449.00"), maxVariantPrice: money("449.00") },
+    images: [],
+    variants: [
+      {
+        id: "gid://mock/ProductVariant/18",
+        title: "Default",
+        availableForSale: true,
+        price: money("449.00"),
+        selectedOptions: [{ name: "Title", value: "Default" }],
+      },
+    ],
+    options: [{ id: "1", name: "Title", values: ["Default"] }],
+    specs: [
+      { key: "processor", value: "Apple M1" },
+      { key: "storage", value: "64GB" },
+      { key: "display", value: "10.9-inch Liquid Retina" },
+    ],
+  },
+  // Regular (non-ex-uk) listing of the same model as the ex-uk iPhone 14 Pro above — gives the
+  // Ex-UK "save X% vs new" comparison and the regular PDP's Ex-UK cross-sell banner something real
+  // to match against locally.
+  {
+    id: "gid://mock/Product/18",
+    handle: "iphone-14-pro",
+    title: "iPhone 14 Pro",
+    description: "Apple's 2022 flagship, brand new and sealed.",
+    descriptionHtml: "<p>Apple's 2022 flagship, brand new and sealed.</p>",
+    availableForSale: true,
+    productType: "Smartphones",
+    tags: ["mock", "apple"],
+    priceRange: { minVariantPrice: money("899.00"), maxVariantPrice: money("899.00") },
+    images: [],
+    variants: [
+      {
+        id: "gid://mock/ProductVariant/19",
+        title: "Default",
+        availableForSale: true,
+        price: money("899.00"),
+        selectedOptions: [{ name: "Title", value: "Default" }],
+      },
+    ],
+    options: [{ id: "1", name: "Title", values: ["Default"] }],
+    specs: [
+      { key: "processor", value: "A16 Bionic" },
+      { key: "ram", value: "6GB" },
+      { key: "storage", value: "256GB" },
+    ],
+  },
 ];
 
 // In-memory mock cart store, keyed by cart id. Resets on server restart -
