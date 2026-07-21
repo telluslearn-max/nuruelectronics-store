@@ -2,6 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import { useCallback, useRef, useState } from "react";
+import { isWhatsAppHandoffConfigured } from "@/lib/concierge/whatsapp-tool";
 import type { ConciergeEvent } from "@/lib/concierge/types";
 import { getPageContext } from "./page-context";
 import { makeMessageId, type ConciergeDisplayMessage, type ConciergeMessageStore } from "./use-concierge-messages";
@@ -63,8 +64,24 @@ export function useConciergeChat(store: ConciergeMessageStore) {
       } catch (err) {
         if (err instanceof DOMException && err.name === "AbortError") return;
         const message = err instanceof Error ? err.message : "Something went wrong.";
+        // The AI backend is unavailable/erroring (its own "limit" here, not a message-count cap) —
+        // hand off to a human via the existing WhatsApp CTA rather than leaving the shopper with
+        // just a raw error and no way forward. Falls back to the plain error when WhatsApp isn't
+        // configured, since there's no other escalation channel to offer.
         updateMessages((prev) =>
-          prev.map((m) => (m.id === assistantId ? { ...m, text: m.text || `Sorry — ${message}` } : m)),
+          prev.map((m) => {
+            if (m.id !== assistantId) return m;
+            if (isWhatsAppHandoffConfigured) {
+              return {
+                ...m,
+                text: m.text || "Sorry, I'm having trouble responding right now.",
+                whatsappMessage:
+                  m.whatsappMessage ??
+                  "Hi! I was chatting with the shopping assistant on the site, but it's temporarily unavailable — could someone from the team help me?",
+              };
+            }
+            return { ...m, text: m.text || `Sorry — ${message}` };
+          }),
         );
       } finally {
         if (controllerRef.current === controller) {
