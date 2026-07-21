@@ -105,6 +105,7 @@ export function Nav({
       href: "/kit",
       panelItems: kits.map((k) => ({ href: `/kit/${k.slug}`, label: k.label })),
     },
+    { id: "ex-uk", label: "Ex-UK", href: "/ex-uk", panelItems: [] },
     { id: "support", label: "Support", href: "/support", panelItems: [] },
   ];
   const activeEntry = entries.find((e) => e.id === openId);
