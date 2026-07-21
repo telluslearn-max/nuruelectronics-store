@@ -3,7 +3,7 @@ import { FunctionCallingConfigMode, type Content, type FunctionCall, type Part }
 import { CONCIERGE_MODEL, getGenAIClient } from "./vertex-client";
 import { buildSystemInstruction } from "./system-prompt";
 import { dispatchTool, functionDeclarations } from "./tools";
-import type { ConciergeEvent, ConciergeMessage } from "./types";
+import type { ConciergeEvent, ConciergeMessage, ConciergePageContext } from "./types";
 
 const MAX_TOOL_ITERATIONS = 6;
 
@@ -14,10 +14,11 @@ function toContents(history: ConciergeMessage[]): Content[] {
 export async function runConciergeTurn(
   history: ConciergeMessage[],
   onEvent: (event: ConciergeEvent) => void,
+  pageContext?: ConciergePageContext,
 ): Promise<void> {
   const ai = getGenAIClient();
   const contents = toContents(history);
-  const systemInstruction = buildSystemInstruction();
+  const systemInstruction = buildSystemInstruction(pageContext);
 
   for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
     const stream = await ai.models.generateContentStream({

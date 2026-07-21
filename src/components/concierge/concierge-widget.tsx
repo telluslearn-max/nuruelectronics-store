@@ -1,18 +1,19 @@
 "use client";
 
-import { useState } from "react";
-import { ConciergeLauncherButton } from "./concierge-launcher-button";
-import { ConciergePanel } from "./concierge-panel";
+import type { ConciergeMessage } from "@/lib/concierge/types";
+import { ConciergeDock } from "./concierge-dock";
+import { useConciergeMessages } from "./use-concierge-messages";
 
-export function ConciergeWidget({ enabled }: { enabled: boolean }) {
-  const [isOpen, setIsOpen] = useState(false);
+export function ConciergeWidget({
+  enabled,
+  initialMessages = [],
+}: {
+  enabled: boolean;
+  initialMessages?: ConciergeMessage[];
+}) {
+  const store = useConciergeMessages(initialMessages);
 
   if (!enabled) return null;
 
-  return (
-    <>
-      {!isOpen && <ConciergeLauncherButton onClick={() => setIsOpen(true)} />}
-      {isOpen && <ConciergePanel onClose={() => setIsOpen(false)} />}
-    </>
-  );
+  return <ConciergeDock store={store} />;
 }

@@ -16,6 +16,7 @@ export function ConciergeInputBar({
   input,
   onInputChange,
   onSubmit,
+  onFocus,
   isVoiceSupported,
   recordingState,
   onStartRecording,
@@ -24,6 +25,7 @@ export function ConciergeInputBar({
   input: string;
   onInputChange: (value: string) => void;
   onSubmit: (text: string) => void;
+  onFocus?: () => void;
   isVoiceSupported: boolean;
   recordingState: ConciergeRecordingState;
   onStartRecording: () => void;
@@ -63,7 +65,8 @@ export function ConciergeInputBar({
           ref={inputRef}
           value={input}
           onChange={(e) => onInputChange(e.target.value)}
-          placeholder="Ask about a product, compare two, or find a kit…"
+          onFocus={onFocus}
+          placeholder="Ask anything…"
           className="flex-1 rounded-control border border-border-subtle px-3.5 py-2.5 text-sm outline-none focus:border-foreground"
         />
         {isVoiceSupported && (

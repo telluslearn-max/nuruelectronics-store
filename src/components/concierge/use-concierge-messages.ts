@@ -2,7 +2,7 @@
 
 import { useCallback, useRef, useState } from "react";
 import { useCart } from "@/components/cart/cart-context";
-import type { ConciergeEvent } from "@/lib/concierge/types";
+import type { ConciergeEvent, ConciergeMessage } from "@/lib/concierge/types";
 import type { Product } from "@/lib/shopify/types";
 
 export type ConciergeDisplayMessage = {
@@ -28,10 +28,12 @@ export function makeMessageId(): string {
  * callbacks) because a sibling setState call in the same event-handler tick can suppress
  * React's eager updater invocation, making state read back from a setState callback stale.
  */
-export function useConciergeMessages() {
+export function useConciergeMessages(initialMessages: ConciergeMessage[] = []) {
   const { setCart } = useCart();
-  const [messages, setMessages] = useState<ConciergeDisplayMessage[]>([]);
-  const messagesRef = useRef<ConciergeDisplayMessage[]>([]);
+  const [messages, setMessages] = useState<ConciergeDisplayMessage[]>(() =>
+    initialMessages.map((m) => ({ id: makeMessageId(), role: m.role, text: m.text })),
+  );
+  const messagesRef = useRef<ConciergeDisplayMessage[]>(messages);
 
   const updateMessages = useCallback((updater: (prev: ConciergeDisplayMessage[]) => ConciergeDisplayMessage[]) => {
     const next = updater(messagesRef.current);

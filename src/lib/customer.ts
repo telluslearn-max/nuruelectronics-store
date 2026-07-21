@@ -13,6 +13,7 @@ export type CustomerOrder = {
 };
 
 export type Customer = {
+  id: string;
   displayName: string;
   email: string | null;
   orders: CustomerOrder[];
@@ -21,6 +22,7 @@ export type Customer = {
 const CUSTOMER_QUERY = /* GraphQL */ `
   query CurrentCustomer {
     customer {
+      id
       displayName
       emailAddress {
         emailAddress
@@ -68,6 +70,7 @@ export async function getCurrentCustomer(): Promise<Customer | null> {
 
   const data = await customerAccountFetch<{
     customer: {
+      id: string;
       displayName: string;
       emailAddress: { emailAddress: string } | null;
       orders: { edges: { node: RawOrder }[] };
@@ -77,6 +80,7 @@ export async function getCurrentCustomer(): Promise<Customer | null> {
   if (!data.customer) return null;
 
   return {
+    id: data.customer.id,
     displayName: data.customer.displayName,
     email: data.customer.emailAddress?.emailAddress ?? null,
     orders: data.customer.orders.edges.map((edge) => ({
@@ -92,4 +96,21 @@ export async function getCurrentCustomer(): Promise<Customer | null> {
       })),
     })),
   };
+}
+
+const CUSTOMER_ID_QUERY = /* GraphQL */ `
+  query CurrentCustomerId {
+    customer {
+      id
+    }
+  }
+`;
+
+/** Lean id-only lookup for the concierge's hot path (every turn) — avoids the heavier orders fetch in getCurrentCustomer(). */
+export async function getCurrentCustomerId(): Promise<string | null> {
+  const accessToken = await getValidAccessToken();
+  if (!accessToken) return null;
+
+  const data = await customerAccountFetch<{ customer: { id: string } | null }>(accessToken, CUSTOMER_ID_QUERY);
+  return data.customer?.id ?? null;
 }

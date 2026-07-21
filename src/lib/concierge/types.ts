@@ -5,6 +5,11 @@ export type ConciergeMessage = {
   text: string;
 };
 
+/** What page the shopper is currently on, so the concierge can act on it without being told. */
+export type ConciergePageContext = {
+  productHandle?: string;
+};
+
 export type ConciergeEvent =
   | { type: "text-delta"; text: string }
   | { type: "products"; mode: "list" | "compare"; products: Product[] }

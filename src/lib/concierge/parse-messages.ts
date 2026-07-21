@@ -1,7 +1,14 @@
-import type { ConciergeMessage } from "./types";
+import type { ConciergeMessage, ConciergePageContext } from "./types";
 
 const MAX_HISTORY_MESSAGES = 30;
 const MAX_MESSAGE_LENGTH = 4000;
+
+/** Optional — absent or malformed pageContext just means "no page context," never a 400. */
+export function parsePageContext(value: unknown): ConciergePageContext | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const { productHandle } = value as { productHandle?: unknown };
+  return typeof productHandle === "string" && productHandle ? { productHandle } : undefined;
+}
 
 export function parseConciergeMessages(
   messages: unknown,

@@ -1,11 +1,12 @@
 import { categories } from "@/lib/categories";
 import { ecosystems, kits } from "@/lib/collections";
 import { SPEC_GLOSSARY } from "@/lib/spec-glossary";
+import type { ConciergePageContext } from "./types";
 import { isWhatsAppHandoffConfigured } from "./whatsapp-tool";
 
 const GLOSSARY_STYLE_SAMPLE_KEYS = ["processor", "ram", "camera", "battery"];
 
-export function buildSystemInstruction(): string {
+export function buildSystemInstruction(pageContext?: ConciergePageContext): string {
   const categoryList = categories.map((c) => `- ${c.label} (categorySlug: "${c.slug}")`).join("\n");
   const ecosystemList = ecosystems
     .map((e) => `- ${e.label} (ecosystemSlug: "${e.slug}"): ${e.blurb}`)
@@ -47,6 +48,10 @@ Act like an attentive salesperson working the floor, not a search box that answe
 - Stay grounded in this store's real catalog and your own general product knowledge for context (typical use cases, how a spec matters in practice) — don't cite external reviews, prices, or availability you can't verify here.${
     isWhatsAppHandoffConfigured
       ? "\n- Offer open_whatsapp_handoff when the shopper is ready to finalize, explicitly wants a human, or has a complex/custom/bulk request — not on every turn."
+      : ""
+  }${
+    pageContext?.productHandle
+      ? `\n\n## Page context\nThe shopper is currently viewing the product page for handle "${pageContext.productHandle}". Call get_product_details on it proactively rather than waiting to be asked, and acknowledge it naturally if relevant to what they say next.`
       : ""
   }`;
 }

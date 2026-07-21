@@ -1,13 +1,16 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import { useCallback, useRef, useState } from "react";
 import type { ConciergeEvent } from "@/lib/concierge/types";
+import { getPageContext } from "./page-context";
 import { makeMessageId, type ConciergeDisplayMessage, type ConciergeMessageStore } from "./use-concierge-messages";
 
 export function useConciergeChat(store: ConciergeMessageStore) {
   const { messagesRef, updateMessages, applyEventToMessage } = store;
   const [isStreaming, setIsStreaming] = useState(false);
   const controllerRef = useRef<AbortController | null>(null);
+  const pathname = usePathname();
 
   const send = useCallback(
     async (text: string) => {
@@ -33,6 +36,7 @@ export function useConciergeChat(store: ConciergeMessageStore) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             messages: historyForRequest.map((m) => ({ role: m.role, text: m.text })),
+            pageContext: getPageContext(pathname),
           }),
           signal: controller.signal,
         });
@@ -69,7 +73,7 @@ export function useConciergeChat(store: ConciergeMessageStore) {
         }
       }
     },
-    [messagesRef, updateMessages, applyEventToMessage],
+    [messagesRef, updateMessages, applyEventToMessage, pathname],
   );
 
   return { isStreaming, send };

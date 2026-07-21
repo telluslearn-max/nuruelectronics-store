@@ -1,7 +1,9 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import { useCallback, useRef, useState } from "react";
 import type { ConciergeEvent } from "@/lib/concierge/types";
+import { getPageContext } from "./page-context";
 import { makeMessageId, type ConciergeMessageStore } from "./use-concierge-messages";
 
 const CANDIDATE_MIME_TYPES = [
@@ -38,6 +40,7 @@ export function useConciergeVoice(store: ConciergeMessageStore) {
   const chunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
   const controllerRef = useRef<AbortController | null>(null);
+  const pathname = usePathname();
 
   const isVoiceSupported =
     typeof window !== "undefined" && typeof MediaRecorder !== "undefined" && Boolean(navigator.mediaDevices?.getUserMedia);
@@ -79,7 +82,11 @@ export function useConciergeVoice(store: ConciergeMessageStore) {
         const response = await fetch("/api/concierge/voice-turn", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ messages: historyForRequest, audio: { mimeType, data } }),
+          body: JSON.stringify({
+            messages: historyForRequest,
+            audio: { mimeType, data },
+            pageContext: getPageContext(pathname),
+          }),
           signal: controller.signal,
         });
 
@@ -115,7 +122,7 @@ export function useConciergeVoice(store: ConciergeMessageStore) {
         }
       }
     },
-    [messagesRef, updateMessages, applyEventToMessage],
+    [messagesRef, updateMessages, applyEventToMessage, pathname],
   );
 
   const startRecording = useCallback(async () => {
