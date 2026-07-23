@@ -451,6 +451,7 @@ export const mockProducts: Product[] = [
     productType: "Smartphones",
     tags: ["mock", "apple"],
     priceRange: { minVariantPrice: money("899.00"), maxVariantPrice: money("899.00") },
+    compareAtPriceRange: { minVariantPrice: money("999.00"), maxVariantPrice: money("999.00") },
     images: [],
     variants: [
       {
@@ -458,6 +459,7 @@ export const mockProducts: Product[] = [
         title: "Default",
         availableForSale: true,
         price: money("899.00"),
+        compareAtPrice: money("999.00"),
         selectedOptions: [{ name: "Title", value: "Default" }],
       },
     ],

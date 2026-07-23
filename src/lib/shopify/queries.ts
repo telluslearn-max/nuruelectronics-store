@@ -19,6 +19,16 @@ const productFragment = /* GraphQL */ `
         currencyCode
       }
     }
+    compareAtPriceRange {
+      minVariantPrice {
+        amount
+        currencyCode
+      }
+      maxVariantPrice {
+        amount
+        currencyCode
+      }
+    }
     images(first: 10) {
       edges {
         node {
@@ -37,6 +47,10 @@ const productFragment = /* GraphQL */ `
           availableForSale
           sku
           price {
+            amount
+            currencyCode
+          }
+          compareAtPrice {
             amount
             currencyCode
           }

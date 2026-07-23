@@ -15,6 +15,7 @@ export type ProductVariant = {
   title: string;
   availableForSale: boolean;
   price: Money;
+  compareAtPrice?: Money | null;
   selectedOptions: { name: string; value: string }[];
   sku?: string | null;
 };
@@ -38,6 +39,10 @@ export type Product = {
     minVariantPrice: Money;
     maxVariantPrice: Money;
   };
+  compareAtPriceRange?: {
+    minVariantPrice: Money;
+    maxVariantPrice: Money;
+  } | null;
   images: ProductImage[];
   variants: ProductVariant[];
   options: { id: string; name: string; values: string[] }[];

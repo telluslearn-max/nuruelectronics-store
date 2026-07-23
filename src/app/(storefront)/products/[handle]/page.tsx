@@ -5,13 +5,16 @@ import { BuyersGuide } from "@/components/buyers-guide";
 import { BuyItWith } from "@/components/buy-it-with";
 import { ExUkCrossSellBanner } from "@/components/ex-uk-cross-sell-banner";
 import { Faq, type FaqItem } from "@/components/faq";
+import { ProductCarousel } from "@/components/product-carousel";
 import { ProductCompareTable } from "@/components/product-compare-table";
 import { ProductGallery } from "@/components/product-gallery";
 import { ProductOptions } from "@/components/product-options";
 import { ProductSpecs } from "@/components/product-specs";
 import { OriginGuide } from "@/components/origin-guide";
+import { RecentlyViewedCarousel } from "@/components/recently-viewed-carousel";
 import { RelatedCategories } from "@/components/related-categories";
-import { categoryForProductType, getRelatedCategories } from "@/lib/categories";
+import { SectionHeading } from "@/components/section-heading";
+import { categoryForProductType, getRelatedCategories, type Category } from "@/lib/categories";
 import { ecosystemTagForProduct } from "@/lib/collections";
 import { getBuyersGuide } from "@/lib/buyers-guides";
 import { getOriginOptionValues, hasEsimOnlyWarranty } from "@/lib/origin-options";
@@ -33,6 +36,13 @@ async function getRelatedProducts(product: Product): Promise<Product[]> {
     includeSpecs: true,
   });
   return products.filter((p) => p.handle !== product.handle).slice(0, 4);
+}
+
+/** Same-category products for a "Similar products" carousel, excluding the product itself. */
+async function getSimilarProducts(product: Product, category: Category | undefined): Promise<Product[]> {
+  if (!category) return [];
+  const { products } = await getProducts({ searchTerm: category.query, sortKey: "BEST_SELLING", first: 9 });
+  return products.filter((p) => p.handle !== product.handle).slice(0, 8);
 }
 
 /**
@@ -103,7 +113,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
   const supportsEsim = hasEsimOnlyWarranty(product.options) || product.tags.includes("iphone");
   const buyersGuide = getBuyersGuide(supportsEsim ? [...product.tags, "esim"] : product.tags);
 
-  const [related, relatedCategoryPages, exUkCounterpart] = await Promise.all([
+  const [related, relatedCategoryPages, exUkCounterpart, similarProducts] = await Promise.all([
     getRelatedProducts(product),
     Promise.all(
       relatedEdges.map((edge) =>
@@ -113,6 +123,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
     // Don't look up a counterpart for an ex-uk listing itself — the banner only makes sense
     // pointing shoppers *into* the ex-uk section from a regular listing, not the reverse.
     product.tags.includes("ex-uk") ? null : findCounterpart(product, { requireExUk: true }),
+    getSimilarProducts(product, category),
   ]);
 
   const relatedCategories = relatedEdges
@@ -249,6 +260,17 @@ export default async function ProductPage({ params }: ProductPageProps) {
       )}
 
       <RelatedCategories title={category?.label ?? product.title} items={relatedCategories} />
+
+      {similarProducts.length > 0 && (
+        <section className="mt-16">
+          <SectionHeading eyebrow="More like this" title={`Similar to ${product.title}`} />
+          <div className="mt-6">
+            <ProductCarousel products={similarProducts} />
+          </div>
+        </section>
+      )}
+
+      <RecentlyViewedCarousel currentHandle={product.handle} />
 
       <section className="mt-16">
         <h2 className="text-title">Common questions</h2>
