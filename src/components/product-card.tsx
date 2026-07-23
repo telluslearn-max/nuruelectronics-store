@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { CompareToggleButton } from "@/components/compare/compare-toggle-button";
 import { formatPrice } from "@/lib/format";
 import type { Product } from "@/lib/shopify/types";
 import { ProductMedia } from "./product-media";
@@ -22,6 +23,9 @@ export function ProductCard({ product }: { product: Product }) {
             Sold out
           </span>
         )}
+        <div className="absolute right-3 top-3">
+          <CompareToggleButton product={product} />
+        </div>
       </div>
       <div className="mt-3 flex items-center justify-between gap-2">
         <h3 className="text-sm font-medium">{product.title}</h3>
