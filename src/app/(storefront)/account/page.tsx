@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { FooterLinks } from "@/components/footer-links";
+import { WishlistSection } from "@/components/wishlist/wishlist-section";
 import { formatPrice } from "@/lib/format";
 import { getCurrentCustomer } from "@/lib/customer";
 import { isCustomerAuthConfigured } from "@/lib/customer-auth";
@@ -41,6 +42,9 @@ export default async function AccountPage({
             Back to shop
           </Link>
         </div>
+        <section className="mt-12 border-t border-border-subtle pt-8">
+          <WishlistSection />
+        </section>
         <section className="mt-12 border-t border-border-subtle pt-8 md:hidden">
           <FooterLinks />
         </section>
@@ -64,6 +68,9 @@ export default async function AccountPage({
             Sign in
           </a>
         </div>
+        <section className="mt-12 border-t border-border-subtle pt-8">
+          <WishlistSection />
+        </section>
         <section className="mt-12 border-t border-border-subtle pt-8 md:hidden">
           <FooterLinks />
         </section>
@@ -135,6 +142,10 @@ export default async function AccountPage({
           </ul>
         )}
       </div>
+
+      <section className="mt-12 border-t border-border-subtle pt-8">
+        <WishlistSection />
+      </section>
 
       <section className="mt-12 border-t border-border-subtle pt-8 md:hidden">
         <FooterLinks />
