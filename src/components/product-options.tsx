@@ -2,10 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AddToCartButton } from "@/components/cart/add-to-cart-button";
-import { BnplBreakdown } from "@/components/bnpl-breakdown";
+import { BnplSection } from "@/components/bnpl-section";
 import { useCart } from "@/components/cart/cart-context";
 import { WhatsAppOrderButton } from "@/components/whatsapp-order-button";
-import { calculateBnplPlan } from "@/lib/bnpl";
 import { formatPrice } from "@/lib/format";
 import type { Product, ProductVariant } from "@/lib/shopify/types";
 
@@ -39,12 +38,6 @@ export function ProductOptions({ product }: { product: Product }) {
 
   const showOptions = product.options.some((option) => option.values.length > 1);
   const price = selectedVariant?.price ?? product.priceRange.minVariantPrice;
-  const bnplPlan = useMemo(() => calculateBnplPlan(Number(price.amount)), [price]);
-  const bnpl = {
-    depositFormatted: formatPrice(String(bnplPlan.deposit), price.currencyCode),
-    monthlyFormatted: formatPrice(String(bnplPlan.monthlyInstallment), price.currencyCode),
-    termMonths: bnplPlan.termMonths,
-  };
 
   useEffect(() => {
     const el = buyBlockRef.current;
@@ -100,10 +93,10 @@ export function ProductOptions({ product }: { product: Product }) {
           {selectedVariant?.availableForSale ? "In stock" : "Out of stock"}
         </span>
       </div>
-      <BnplBreakdown price={price} />
       <p className="mt-1 text-sm text-neutral-500">
         Same-day delivery in Nairobi &bull; Countrywide shipping available
       </p>
+      <BnplSection product={product} price={price} />
 
       {showOptions && (
         <div className="mt-6 space-y-5">
@@ -185,7 +178,6 @@ export function ProductOptions({ product }: { product: Product }) {
           variantLabel={variantLabel(selectedVariant)}
           price={formatPrice(price.amount, price.currencyCode)}
           productHandle={product.handle}
-          bnpl={bnpl}
         />
       </div>
 
@@ -198,7 +190,6 @@ export function ProductOptions({ product }: { product: Product }) {
                 {formatPrice(price.amount, price.currencyCode)}{" "}
                 <span className="text-xs text-neutral-400" title="VAT is calculated and added at checkout.">excl. VAT</span>
               </p>
-              <BnplBreakdown price={price} compact />
             </div>
             <div className="flex shrink-0 items-center gap-2">
               <WhatsAppOrderButton
@@ -206,7 +197,6 @@ export function ProductOptions({ product }: { product: Product }) {
                 variantLabel={variantLabel(selectedVariant)}
                 price={formatPrice(price.amount, price.currencyCode)}
                 productHandle={product.handle}
-                bnpl={bnpl}
                 compact
               />
               <div className="w-36 sm:w-44">
