@@ -5,12 +5,13 @@ import {
   addToCart as addToCartInShopify,
   createCart,
   getCart as getCartFromShopify,
+  getProductByHandle,
   getProducts,
   removeFromCart as removeFromCartInShopify,
   updateCartLine as updateCartLineInShopify,
 } from "./shopify";
 import type { ProductsPage } from "./shopify";
-import type { Cart } from "./shopify/types";
+import type { Cart, Product } from "./shopify/types";
 
 const CART_COOKIE = "cartId";
 
@@ -85,6 +86,11 @@ export async function searchSuggestions(term: string): Promise<SearchSuggestion[
     productType: p.productType,
     price: p.priceRange.minVariantPrice,
   }));
+}
+
+export async function getProductsByHandles(handles: string[]): Promise<Product[]> {
+  const results = await Promise.all(handles.map((handle) => getProductByHandle(handle)));
+  return results.filter((p): p is Product => p !== null);
 }
 
 export async function loadMoreProducts(
