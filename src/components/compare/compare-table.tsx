@@ -12,10 +12,15 @@ const SPEC_KEY_ORDER = Object.keys(SPEC_LABELS);
 /**
  * Shared spec-comparison table: rows are built from real product data only —
  * price, each product's own option axes (Storage, Color, ...), spec
- * metafields, and availability — nothing fabricated. A spec row only appears
- * if at least one column actually has that value set. `renderColumnHeader`
- * lets callers customize the per-column header area (e.g. a "Viewing" badge
- * vs. Remove/Add-to-cart buttons) while sharing the rest of the table.
+ * metafields, and availability — nothing fabricated. Price and availability
+ * always show. Option and spec rows are held to a stricter bar: a row only
+ * appears if EVERY compared product actually has that field set (no "—"
+ * filler for products that simply don't have it) AND the values aren't
+ * identical across all of them — comparing across dissimilar products
+ * otherwise buries the few relevant rows in irrelevant/blank ones.
+ * `renderColumnHeader` lets callers customize the per-column header area
+ * (e.g. a "Viewing" badge vs. Remove/Add-to-cart buttons) while sharing the
+ * rest of the table.
  */
 export function CompareTable({
   columns,
@@ -29,14 +34,25 @@ export function CompareTable({
   // comparison row, so it's excluded.
   const optionNames = Array.from(
     new Set(columns.flatMap((p) => p.options.map((o) => o.name))),
-  ).filter((name) => name !== "Title");
+  )
+    .filter((name) => name !== "Title")
+    .filter((name) => columns.every((p) => p.options.some((o) => o.name === name)))
+    .filter((name) => {
+      const values = columns.map(
+        (p) => p.options.find((o) => o.name === name)?.values.join(", ") ?? "",
+      );
+      return new Set(values).size > 1;
+    });
 
   const specsByHandle = new Map(
     columns.map((p) => [p.handle, new Map((p.specs ?? []).map((s) => [s.key, s.value]))]),
   );
   const specKeys = SPEC_KEY_ORDER.filter((key) =>
-    columns.some((p) => specsByHandle.get(p.handle)?.has(key)),
-  );
+    columns.every((p) => specsByHandle.get(p.handle)?.has(key)),
+  ).filter((key) => {
+    const values = columns.map((p) => specsByHandle.get(p.handle)?.get(key));
+    return new Set(values).size > 1;
+  });
 
   return (
     <div className="overflow-x-auto">
@@ -112,6 +128,12 @@ export function CompareTable({
           </tr>
         </tbody>
       </table>
+      {optionNames.length === 0 && specKeys.length === 0 && (
+        <p className="mt-4 text-sm text-neutral-500">
+          These products don&apos;t share any comparable option or spec fields — try comparing
+          items from the same category for a more detailed breakdown.
+        </p>
+      )}
     </div>
   );
 }
