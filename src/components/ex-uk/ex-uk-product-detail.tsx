@@ -8,6 +8,7 @@ import type { Savings } from "@/lib/product-match";
 import type { Product } from "@/lib/shopify/types";
 import { HeartIcon, PassIcon } from "./action-icons";
 import { gradeForProduct } from "./condition-grade";
+import { InspectionAccordion } from "./inspection-accordion";
 import { sortSpecs } from "./spec-order";
 
 /**
@@ -131,6 +132,19 @@ export function ExUkProductDetail({
             )}
           </div>
 
+          {grade && (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {grade.chips.map((chip) => (
+                <span
+                  key={chip}
+                  className="rounded-control border border-border-subtle px-2 py-1 text-xs text-neutral-600"
+                >
+                  {chip}
+                </span>
+              ))}
+            </div>
+          )}
+
           {specs.length > 0 && (
             <div className="mt-5 border-t border-border-subtle pt-4">
               <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-neutral-500">Specs</h3>
@@ -146,6 +160,8 @@ export function ExUkProductDetail({
               </div>
             </div>
           )}
+
+          <InspectionAccordion />
 
           <div className="mt-5 border-t border-border-subtle pt-4">
             <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-neutral-500">About this unit</h3>
