@@ -1,7 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { BNPL_PLANS, calculateBnplPlan, isBnplEligibleProduct, type BnplPlanId } from "@/lib/bnpl";
+import {
+  BNPL_PLANS,
+  calculateBnplPlan,
+  isBnplComingSoonProduct,
+  isBnplEligibleProduct,
+  type BnplPlanId,
+} from "@/lib/bnpl";
 import { formatPrice } from "@/lib/format";
 import type { Money, Product } from "@/lib/shopify/types";
 import { buildWhatsAppUrl, productUrl } from "@/lib/whatsapp";
@@ -15,7 +21,17 @@ const ELIGIBILITY_REQUIREMENTS = [
 export function BnplSection({ product, price }: { product: Product; price: Money }) {
   const [planId, setPlanId] = useState<BnplPlanId>("weekly");
 
-  if (!isBnplEligibleProduct(product.tags)) return null;
+  if (!isBnplEligibleProduct(product.tags)) {
+    if (isBnplComingSoonProduct(product.tags)) {
+      return (
+        <div className="mt-4 rounded-card border border-border-subtle p-4">
+          <p className="text-sm font-medium">Buy Now, Pay Later</p>
+          <p className="mt-1 text-xs text-neutral-500">Coming soon for this brand.</p>
+        </div>
+      );
+    }
+    return null;
+  }
 
   const plan = calculateBnplPlan(Number(price.amount), planId);
   const fmt = (amount: number) => formatPrice(String(amount), price.currencyCode);

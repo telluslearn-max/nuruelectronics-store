@@ -1,5 +1,3 @@
-import { ecosystemTagForProduct } from "@/lib/collections";
-
 export type BnplPlanId = "weekly" | "monthly";
 
 type BnplPlanConfig = {
@@ -48,7 +46,16 @@ export function calculateBnplPlan(itemPrice: number, planId: BnplPlanId): BnplPl
   };
 }
 
-/** BNPL is currently offered on Apple-tagged products only. */
+/** Brand tags BNPL is currently live for. */
+export const BNPL_LIVE_BRAND_TAGS = ["apple"];
+
+/** Brand tags BNPL is planned for but not yet live. */
+export const BNPL_COMING_SOON_BRAND_TAGS = ["infinix", "oppo", "samsung", "tecno", "vivo", "xiaomi"];
+
 export function isBnplEligibleProduct(tags: string[]): boolean {
-  return ecosystemTagForProduct(tags) === "apple";
+  return tags.some((tag) => BNPL_LIVE_BRAND_TAGS.includes(tag));
+}
+
+export function isBnplComingSoonProduct(tags: string[]): boolean {
+  return tags.some((tag) => BNPL_COMING_SOON_BRAND_TAGS.includes(tag));
 }
