@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { calculateBnplPlan } from "@/lib/bnpl";
 import { formatPrice } from "@/lib/format";
 import type { Product } from "@/lib/shopify/types";
 import { ProductMedia } from "./product-media";
@@ -6,6 +7,7 @@ import { ProductMedia } from "./product-media";
 export function ProductCard({ product }: { product: Product }) {
   const image = product.images[0];
   const price = product.priceRange.minVariantPrice;
+  const bnplPlan = calculateBnplPlan(Number(price.amount));
 
   return (
     <Link href={`/products/${product.handle}`} className="group block">
@@ -25,9 +27,12 @@ export function ProductCard({ product }: { product: Product }) {
       </div>
       <div className="mt-3 flex items-center justify-between gap-2">
         <h3 className="text-sm font-medium">{product.title}</h3>
-        <p className="shrink-0 text-sm text-neutral-600">
-          {formatPrice(price.amount, price.currencyCode)}
-        </p>
+        <div className="shrink-0 text-right">
+          <p className="text-sm text-neutral-600">{formatPrice(price.amount, price.currencyCode)}</p>
+          <p className="text-[11px] text-neutral-400">
+            from {formatPrice(String(bnplPlan.monthlyInstallment), price.currencyCode)}/mo
+          </p>
+        </div>
       </div>
     </Link>
   );

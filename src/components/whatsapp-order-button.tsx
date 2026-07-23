@@ -16,18 +16,23 @@ export function WhatsAppOrderButton({
   variantLabel,
   price,
   productHandle,
+  bnpl,
   compact = false,
 }: {
   productTitle: string;
   variantLabel?: string;
   price: string;
   productHandle: string;
+  bnpl?: { depositFormatted: string; monthlyFormatted: string; termMonths: number };
   compact?: boolean;
 }) {
   if (!WHATSAPP_NUMBER) return null;
 
   const productUrl = `${SITE_URL}/products/${productHandle}`;
-  const message = `Hi! I'd like to order ${productTitle}${variantLabel ? ` (${variantLabel})` : ""} - ${price}. ${productUrl}`;
+  const bnplText = bnpl
+    ? ` I'd like to ask about the BNPL option: ${bnpl.depositFormatted} deposit + ${bnpl.termMonths} x ${bnpl.monthlyFormatted}/month.`
+    : "";
+  const message = `Hi! I'd like to order ${productTitle}${variantLabel ? ` (${variantLabel})` : ""} - ${price}.${bnplText} ${productUrl}`;
   const href = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
 
   return (
