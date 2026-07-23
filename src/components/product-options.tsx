@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { AddToCartButton } from "@/components/cart/add-to-cart-button";
 import { BnplSection } from "@/components/bnpl-section";
 import { useCart } from "@/components/cart/cart-context";
+import { TradeInSection } from "@/components/trade-in-section";
 import { WhatsAppOrderButton } from "@/components/whatsapp-order-button";
 import { formatPrice } from "@/lib/format";
 import type { Product, ProductVariant } from "@/lib/shopify/types";
@@ -97,6 +98,7 @@ export function ProductOptions({ product }: { product: Product }) {
         Same-day delivery in Nairobi &bull; Countrywide shipping available
       </p>
       <BnplSection product={product} price={price} />
+      <TradeInSection productType={product.productType} />
 
       {showOptions && (
         <div className="mt-6 space-y-5">
