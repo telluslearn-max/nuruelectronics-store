@@ -48,6 +48,8 @@ export type Product = {
   options: { id: string; name: string; values: string[] }[];
   /** Structured spec metafields (namespace "specs") — populated on the single-product fetch, and on list fetches that opt in via `includeSpecs`. */
   specs?: ProductSpec[];
+  /** From the "availability.release_date" metafield — set only on tag:coming-soon products. */
+  releaseDate?: string;
 };
 
 export type CartLine = {
@@ -65,6 +67,18 @@ export type CartLine = {
       images: ProductImage[];
     };
   };
+};
+
+export type Article = {
+  id: string;
+  handle: string;
+  title: string;
+  excerpt: string;
+  contentHtml: string;
+  publishedAt: string;
+  image?: { url: string; altText: string | null; width: number; height: number } | null;
+  tags: string[];
+  author?: string;
 };
 
 export type Cart = {

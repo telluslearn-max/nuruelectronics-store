@@ -1,4 +1,4 @@
-import type { Cart, Product } from "./types";
+import type { Article, Cart, Product } from "./types";
 
 function money(amount: string): { amount: string; currencyCode: string } {
   return { amount, currencyCode: "USD" };
@@ -469,6 +469,72 @@ export const mockProducts: Product[] = [
       { key: "ram", value: "6GB" },
       { key: "storage", value: "256GB" },
     ],
+  },
+  {
+    id: "gid://mock/Product/19",
+    handle: "galaxy-s27-ultra",
+    title: "Galaxy S27 Ultra",
+    description:
+      "Samsung's next flagship, announced ahead of launch with a redesigned camera system and a faster on-device chip.",
+    descriptionHtml:
+      "<p>Samsung's next flagship, announced ahead of launch with a redesigned camera system and a faster on-device chip.</p>",
+    availableForSale: false,
+    productType: "Smartphones",
+    tags: ["mock", "coming-soon"],
+    priceRange: { minVariantPrice: money("1299.00"), maxVariantPrice: money("1299.00") },
+    images: [],
+    variants: [
+      {
+        id: "gid://mock/ProductVariant/20",
+        title: "Default",
+        availableForSale: false,
+        price: money("1299.00"),
+        selectedOptions: [{ name: "Title", value: "Default" }],
+      },
+    ],
+    options: [{ id: "1", name: "Title", values: ["Default"] }],
+    specs: [
+      { key: "processor", value: "Snapdragon 8 Gen 5" },
+      { key: "ram", value: "16GB" },
+      { key: "storage", value: "512GB" },
+    ],
+    releaseDate: "2026-09-15",
+  },
+];
+
+export const mockArticles: Article[] = [
+  {
+    id: "gid://mock/Article/1",
+    handle: "how-to-pick-your-next-smartphone",
+    title: "How to Pick Your Next Smartphone",
+    excerpt: "A quick guide to matching a phone's specs to how you actually use it.",
+    contentHtml:
+      "<p>Camera quality, battery life, and storage matter more than raw benchmark scores for most shoppers. Here's what to actually weigh before you buy.</p><p>Start with how you use your phone day to day, then work backward to the specs that matter for that.</p>",
+    publishedAt: "2026-06-02T09:00:00Z",
+    tags: ["guides"],
+    author: "NURU Team",
+  },
+  {
+    id: "gid://mock/Article/2",
+    handle: "genuine-vs-grey-market-electronics",
+    title: "Genuine vs. Grey-Market Electronics: What's the Difference?",
+    excerpt: "Why warranty coverage and authenticity checks matter more than a lower price tag.",
+    contentHtml:
+      "<p>Every product NURU sells is checked before it ships and backed by manufacturer warranty. Here's why that matters when you're comparing prices across sellers.</p>",
+    publishedAt: "2026-05-14T09:00:00Z",
+    tags: ["guides"],
+    author: "NURU Team",
+  },
+  {
+    id: "gid://mock/Article/3",
+    handle: "getting-the-most-out-of-fast-charging",
+    title: "Getting the Most Out of Fast Charging",
+    excerpt: "Wattage, cables, and charger compatibility — a practical rundown.",
+    contentHtml:
+      "<p>Fast charging depends on your phone, your charger, and your cable all supporting the same standard. Here's how to make sure yours actually line up.</p>",
+    publishedAt: "2026-04-28T09:00:00Z",
+    tags: ["guides"],
+    author: "NURU Team",
   },
 ];
 
