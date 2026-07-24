@@ -1,6 +1,4 @@
-import { SITE_URL } from "@/lib/site";
-
-const WHATSAPP_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER;
+import { buildWhatsAppUrl, productUrl } from "@/lib/whatsapp";
 
 export function WhatsAppIcon({ className }: { className?: string }) {
   return (
@@ -24,11 +22,10 @@ export function WhatsAppOrderButton({
   productHandle: string;
   compact?: boolean;
 }) {
-  if (!WHATSAPP_NUMBER) return null;
+  const message = `Hi! I'd like to order ${productTitle}${variantLabel ? ` (${variantLabel})` : ""} - ${price}. ${productUrl(productHandle)}`;
+  const href = buildWhatsAppUrl(message);
 
-  const productUrl = `${SITE_URL}/products/${productHandle}`;
-  const message = `Hi! I'd like to order ${productTitle}${variantLabel ? ` (${variantLabel})` : ""} - ${price}. ${productUrl}`;
-  const href = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
+  if (!href) return null;
 
   return (
     <a

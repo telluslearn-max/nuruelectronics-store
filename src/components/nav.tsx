@@ -133,6 +133,9 @@ export function Nav({
             </button>
           </div>
         </div>
+        <div className="mt-3 md:hidden">
+          <SearchBox />
+        </div>
       </div>
 
       {/* Desktop: flat bar with hover/click mega-menu dropdowns */}

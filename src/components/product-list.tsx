@@ -11,12 +11,14 @@ export function ProductList({
   initialEndCursor,
   searchTerm,
   sort,
+  quickAdd = true,
 }: {
   initialProducts: Product[];
   initialHasNextPage: boolean;
   initialEndCursor: string | null;
   searchTerm?: string;
   sort?: { sortKey: "PRICE"; reverse: boolean };
+  quickAdd?: boolean;
 }) {
   const [products, setProducts] = useState(initialProducts);
   const [hasNextPage, setHasNextPage] = useState(initialHasNextPage);
@@ -38,7 +40,7 @@ export function ProductList({
       <p className="mb-8 text-neutral-500">
         Showing {products.length} {products.length === 1 ? "product" : "products"}
       </p>
-      <ProductGrid products={products} />
+      <ProductGrid products={products} quickAdd={quickAdd} />
       {hasNextPage && (
         <div className="mt-10 flex justify-center">
           <button

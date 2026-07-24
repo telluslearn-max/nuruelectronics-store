@@ -2,10 +2,15 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AddToCartButton } from "@/components/cart/add-to-cart-button";
+import { BnplSection } from "@/components/bnpl-section";
 import { useCart } from "@/components/cart/cart-context";
+import { ProductBadges } from "@/components/product-badges";
 import { ProductDeliveryCard } from "@/components/product-delivery-card";
+import { TradeInSection } from "@/components/trade-in-section";
 import { WhatsAppOrderButton } from "@/components/whatsapp-order-button";
+import { getProductBadges } from "@/lib/badges";
 import { formatPrice } from "@/lib/format";
+import { getSavings } from "@/lib/pricing";
 import type { Product, ProductVariant } from "@/lib/shopify/types";
 
 function variantLabel(variant: ProductVariant | undefined) {
@@ -38,6 +43,15 @@ export function ProductOptions({ product }: { product: Product }) {
 
   const showOptions = product.options.some((option) => option.values.length > 1);
   const price = selectedVariant?.price ?? product.priceRange.minVariantPrice;
+  const compareAtPrice = selectedVariant?.compareAtPrice ?? product.compareAtPriceRange?.minVariantPrice;
+  const savings = getSavings(price, compareAtPrice);
+  const badges = getProductBadges({
+    tags: product.tags,
+    availableForSale: selectedVariant?.availableForSale ?? false,
+    price,
+    compareAtPrice,
+    variant: "inline",
+  });
 
   useEffect(() => {
     const el = buyBlockRef.current;
@@ -80,11 +94,22 @@ export function ProductOptions({ product }: { product: Product }) {
 
   return (
     <div>
+      <ProductBadges variant="inline" badges={badges} />
       <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
         <p className="text-lg text-neutral-700">
           {formatPrice(price.amount, price.currencyCode)}{" "}
           <span className="text-xs font-normal text-neutral-400" title="VAT is calculated and added at checkout.">excl. VAT</span>
         </p>
+        {savings && compareAtPrice && (
+          <p className="flex items-center gap-1.5">
+            <span className="text-sm text-neutral-400 line-through">
+              {formatPrice(compareAtPrice.amount, compareAtPrice.currencyCode)}
+            </span>
+            <span className="rounded-control bg-emerald-100 px-1.5 py-0.5 text-xs font-medium text-emerald-700">
+              Save {formatPrice(savings.save.amount, savings.save.currencyCode)}
+            </span>
+          </p>
+        )}
         <span
           className={`text-sm font-medium ${
             selectedVariant?.availableForSale ? "text-accent" : "text-neutral-400"
@@ -96,6 +121,8 @@ export function ProductOptions({ product }: { product: Product }) {
       <div className="mt-4">
         <ProductDeliveryCard />
       </div>
+      <BnplSection product={product} price={price} />
+      <TradeInSection productType={product.productType} />
 
       {showOptions && (
         <div className="mt-6 space-y-5">

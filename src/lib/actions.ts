@@ -89,8 +89,8 @@ export async function searchSuggestions(term: string): Promise<SearchSuggestion[
 }
 
 export async function getProductsByHandles(handles: string[]): Promise<Product[]> {
-  const results = await Promise.all(handles.map((handle) => getProductByHandle(handle)));
-  return results.filter((p): p is Product => p !== null);
+  const products = await Promise.all(handles.map((handle) => getProductByHandle(handle)));
+  return products.filter((p): p is Product => p !== null);
 }
 
 export async function loadMoreProducts(
