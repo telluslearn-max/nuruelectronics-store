@@ -97,7 +97,8 @@ export default async function HomePage() {
               <p className="text-sm font-medium uppercase tracking-wide text-accent">
                 Genuine electronics. Delivered fast.
               </p>
-              <h1 className="mt-2 text-title sm:text-display">{hero.title}</h1>
+              <h1 className="sr-only">NURU — genuine electronics, delivered fast across Kenya</h1>
+              <h2 className="mt-2 text-title sm:text-display">{hero.title}</h2>
               <p className="mt-4 max-w-md text-neutral-400">{firstSentence(hero.description)}</p>
               {heroPrice && (
                 <p className="mt-4 text-lg font-medium">
