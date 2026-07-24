@@ -36,10 +36,19 @@
 
 /* A few components use literal Tailwind neutral shades (not the semantic
    tokens above) for light-gray surfaces — e.g. RelatedCategories' callout
-   card. Those don't repaint from the variable override, so they get a
-   targeted dark-scope override here instead. */
+   card, product image frames, and the no-photo placeholder art's gradient.
+   Those don't repaint from the variable override, so they get a targeted
+   dark-scope override here instead. */
 .theme-gaming-dark .bg-neutral-50 {
   background-color: rgba(255, 255, 255, 0.04);
+}
+.theme-gaming-dark .bg-neutral-100 {
+  background-color: rgba(255, 255, 255, 0.07);
+}
+/* Placeholder art's gradient (product-media.tsx) — its icon/text already use
+   text-neutral-300, which reads fine against a dark background as-is. */
+.theme-gaming-dark .bg-gradient-to-br {
+  background-image: linear-gradient(to bottom right, #1c1c1e, #050505);
 }
 
 @theme inline {
