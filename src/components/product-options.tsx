@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AddToCartButton } from "@/components/cart/add-to-cart-button";
 import { useCart } from "@/components/cart/cart-context";
+import { ProductDeliveryCard } from "@/components/product-delivery-card";
 import { WhatsAppOrderButton } from "@/components/whatsapp-order-button";
 import { formatPrice } from "@/lib/format";
 import type { Product, ProductVariant } from "@/lib/shopify/types";
@@ -92,9 +93,9 @@ export function ProductOptions({ product }: { product: Product }) {
           {selectedVariant?.availableForSale ? "In stock" : "Out of stock"}
         </span>
       </div>
-      <p className="mt-1 text-sm text-neutral-500">
-        Same-day delivery in Nairobi &bull; Countrywide shipping available
-      </p>
+      <div className="mt-4">
+        <ProductDeliveryCard />
+      </div>
 
       {showOptions && (
         <div className="mt-6 space-y-5">

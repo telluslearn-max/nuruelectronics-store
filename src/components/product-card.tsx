@@ -1,5 +1,7 @@
 import Link from "next/link";
+import { ColorSwatches } from "@/components/color-swatches";
 import { CompareToggleButton } from "@/components/compare/compare-toggle-button";
+import { WishlistToggleButton } from "@/components/wishlist/wishlist-toggle-button";
 import { formatPrice } from "@/lib/format";
 import type { Product } from "@/lib/shopify/types";
 import { ProductMedia } from "./product-media";
@@ -7,6 +9,7 @@ import { ProductMedia } from "./product-media";
 export function ProductCard({ product }: { product: Product }) {
   const image = product.images[0];
   const price = product.priceRange.minVariantPrice;
+  const colorOption = product.options.find((o) => o.name === "Color");
 
   return (
     <Link href={`/products/${product.handle}`} className="group block">
@@ -23,7 +26,8 @@ export function ProductCard({ product }: { product: Product }) {
             Sold out
           </span>
         )}
-        <div className="absolute right-3 top-3">
+        <div className="absolute right-3 top-3 flex flex-col gap-2">
+          <WishlistToggleButton product={product} />
           <CompareToggleButton product={product} />
         </div>
       </div>
@@ -33,6 +37,7 @@ export function ProductCard({ product }: { product: Product }) {
           {formatPrice(price.amount, price.currencyCode)}
         </p>
       </div>
+      {colorOption && colorOption.values.length > 0 && <ColorSwatches values={colorOption.values} />}
     </Link>
   );
 }
