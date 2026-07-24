@@ -184,9 +184,9 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
       groupChips={
         <>
           {groupChips}
-          {isGamesGroup && <p className="mb-3 text-sm font-medium text-neutral-400">Genres</p>}
+          {isGamesGroup && <p className="mb-3 text-base font-semibold">Genres</p>}
           {genreNav}
-          {isGamesGroup && <p className="mb-3 text-sm font-medium text-neutral-400">Collections</p>}
+          {isGamesGroup && <p className="mb-3 mt-2 text-base font-semibold">Collections</p>}
           {collectionNav}
         </>
       }
