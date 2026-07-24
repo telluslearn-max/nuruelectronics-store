@@ -2,10 +2,13 @@ import { GoogleAnalytics } from "@/components/analytics/google-analytics";
 import { AnnouncementBar } from "@/components/announcement-bar";
 import { CartProvider } from "@/components/cart/cart-context";
 import { CartDrawer } from "@/components/cart/cart-drawer";
+import { CompareProvider } from "@/components/compare/compare-context";
+import { CompareTray } from "@/components/compare/compare-tray";
 import { ConciergeWidget } from "@/components/concierge/concierge-widget";
 import { Footer } from "@/components/footer";
 import { MobileTabBar } from "@/components/mobile-tab-bar";
 import { Nav } from "@/components/nav";
+import { WishlistProvider } from "@/components/wishlist/wishlist-context";
 import { getCart } from "@/lib/actions";
 import { getConversationHistory } from "@/lib/concierge/history";
 import { isConciergeConfigured } from "@/lib/concierge/vertex-client";
@@ -29,20 +32,25 @@ export default async function StorefrontLayout({
 
   return (
     <CartProvider initialCart={cart}>
-      <a
-        href="#main"
-        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-control focus:bg-foreground focus:px-4 focus:py-2 focus:text-sm focus:text-background"
-      >
-        Skip to content
-      </a>
-      <GoogleAnalytics />
-      <AnnouncementBar />
-      <Nav authEnabled={isCustomerAuthConfigured} customerName={customer?.displayName ?? null} />
-      <main id="main" className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 pb-40 md:pb-24">{children}</main>
-      <Footer />
-      <CartDrawer />
-      <ConciergeWidget enabled={isConciergeConfigured} initialMessages={conciergeHistory} />
-      <MobileTabBar authEnabled={isCustomerAuthConfigured} customerName={customer?.displayName ?? null} />
+      <CompareProvider>
+        <WishlistProvider>
+          <a
+            href="#main"
+            className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-control focus:bg-foreground focus:px-4 focus:py-2 focus:text-sm focus:text-background"
+          >
+            Skip to content
+          </a>
+          <GoogleAnalytics />
+          <AnnouncementBar />
+          <Nav authEnabled={isCustomerAuthConfigured} customerName={customer?.displayName ?? null} />
+          <main id="main" className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 pb-40 md:pb-24">{children}</main>
+          <Footer />
+          <CartDrawer />
+          <ConciergeWidget enabled={isConciergeConfigured} initialMessages={conciergeHistory} />
+          <MobileTabBar authEnabled={isCustomerAuthConfigured} customerName={customer?.displayName ?? null} />
+          <CompareTray />
+        </WishlistProvider>
+      </CompareProvider>
     </CartProvider>
   );
 }

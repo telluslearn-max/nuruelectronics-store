@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { Breadcrumb } from "@/components/breadcrumb";
 import { BuyersGuide } from "@/components/buyers-guide";
 import { BuyItWith } from "@/components/buy-it-with";
+import { CompareToggleButton } from "@/components/compare/compare-toggle-button";
+import { WishlistToggleButton } from "@/components/wishlist/wishlist-toggle-button";
 import { ExUkCrossSellBanner } from "@/components/ex-uk-cross-sell-banner";
 import { Faq, type FaqItem } from "@/components/faq";
 import { ProductCarousel } from "@/components/product-carousel";
@@ -212,7 +214,13 @@ export default async function ProductPage({ params }: ProductPageProps) {
         />
 
         <div>
-          <h1 className="text-title">{product.title}</h1>
+          <div className="flex items-start justify-between gap-3">
+            <h1 className="text-title">{product.title}</h1>
+            <div className="flex shrink-0 gap-2">
+              <WishlistToggleButton product={product} />
+              <CompareToggleButton product={product} />
+            </div>
+          </div>
           <ProductOptions product={product} />
           {exUkCounterpart && (
             <ExUkCrossSellBanner

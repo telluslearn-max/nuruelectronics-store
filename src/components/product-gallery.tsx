@@ -5,6 +5,22 @@ import { useState } from "react";
 import type { ProductImage } from "@/lib/shopify/types";
 import { ProductMedia } from "./product-media";
 
+function ChevronLeftIcon() {
+  return (
+    <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12.5 4 6 10l6.5 6" />
+    </svg>
+  );
+}
+
+function ChevronRightIcon() {
+  return (
+    <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M7.5 4 14 10l-6.5 6" />
+    </svg>
+  );
+}
+
 export function ProductGallery({
   images,
   title,
@@ -17,6 +33,10 @@ export function ProductGallery({
   const [activeIndex, setActiveIndex] = useState(0);
   const active = images[activeIndex];
 
+  function step(direction: 1 | -1) {
+    setActiveIndex((i) => (i + direction + images.length) % images.length);
+  }
+
   return (
     <div>
       <div className="relative aspect-square overflow-hidden rounded-card bg-neutral-100">
@@ -27,6 +47,26 @@ export function ProductGallery({
           sizes="(min-width: 768px) 50vw, 100vw"
           priority
         />
+        {images.length > 1 && (
+          <>
+            <button
+              type="button"
+              onClick={() => step(-1)}
+              aria-label="Previous image"
+              className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full border border-border-subtle bg-background/90 p-2 shadow-md backdrop-blur-sm transition hover:border-foreground"
+            >
+              <ChevronLeftIcon />
+            </button>
+            <button
+              type="button"
+              onClick={() => step(1)}
+              aria-label="Next image"
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full border border-border-subtle bg-background/90 p-2 shadow-md backdrop-blur-sm transition hover:border-foreground"
+            >
+              <ChevronRightIcon />
+            </button>
+          </>
+        )}
       </div>
 
       {images.length > 1 && (

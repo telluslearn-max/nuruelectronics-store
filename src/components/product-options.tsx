@@ -5,6 +5,7 @@ import { AddToCartButton } from "@/components/cart/add-to-cart-button";
 import { BnplSection } from "@/components/bnpl-section";
 import { useCart } from "@/components/cart/cart-context";
 import { ProductBadges } from "@/components/product-badges";
+import { ProductDeliveryCard } from "@/components/product-delivery-card";
 import { TradeInSection } from "@/components/trade-in-section";
 import { WhatsAppOrderButton } from "@/components/whatsapp-order-button";
 import { getProductBadges } from "@/lib/badges";
@@ -117,9 +118,9 @@ export function ProductOptions({ product }: { product: Product }) {
           {selectedVariant?.availableForSale ? "In stock" : "Out of stock"}
         </span>
       </div>
-      <p className="mt-1 text-sm text-neutral-500">
-        Same-day delivery in Nairobi &bull; Countrywide shipping available
-      </p>
+      <div className="mt-4">
+        <ProductDeliveryCard />
+      </div>
       <BnplSection product={product} price={price} />
       <TradeInSection productType={product.productType} />
 

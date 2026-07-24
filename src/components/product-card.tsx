@@ -1,7 +1,10 @@
 import Link from "next/link";
 import { QuickAddToCartButton } from "@/components/cart/quick-add-button";
+import { ColorSwatches } from "@/components/color-swatches";
+import { CompareToggleButton } from "@/components/compare/compare-toggle-button";
 import { gradeForProduct } from "@/components/ex-uk/condition-grade";
 import { ProductBadges } from "@/components/product-badges";
+import { WishlistToggleButton } from "@/components/wishlist/wishlist-toggle-button";
 import { calculateBnplPlan, isBnplEligibleProduct } from "@/lib/bnpl";
 import { getProductBadges } from "@/lib/badges";
 import { formatPrice } from "@/lib/format";
@@ -18,6 +21,7 @@ export function ProductCard({ product, quickAdd = false }: { product: Product; q
   const bnplPlan = isBnplEligibleProduct(product.tags)
     ? calculateBnplPlan(Number(price.amount), "weekly")
     : null;
+  const colorOption = product.options.find((o) => o.name === "Color");
 
   return (
     <Link href={`/products/${product.handle}`} className="group block">
@@ -39,6 +43,10 @@ export function ProductCard({ product, quickAdd = false }: { product: Product; q
             variant: "card",
           })}
         />
+        <div className="absolute right-3 top-3 flex flex-col gap-2">
+          <WishlistToggleButton product={product} />
+          <CompareToggleButton product={product} />
+        </div>
       </div>
       <div className="mt-3 space-y-1">
         <h3 className="line-clamp-2 text-sm font-medium leading-snug">{product.title}</h3>
@@ -63,6 +71,7 @@ export function ProductCard({ product, quickAdd = false }: { product: Product; q
         )}
         {quickAdd && <QuickAddToCartButton product={product} className="mt-2" />}
       </div>
+      {colorOption && colorOption.values.length > 0 && <ColorSwatches values={colorOption.values} />}
     </Link>
   );
 }

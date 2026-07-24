@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { getNavEntries } from "@/lib/nav-entries";
+import { useWishlist } from "./wishlist/wishlist-context";
 import { useCart } from "./cart/cart-context";
 import { SearchBox } from "./search-box";
 
@@ -24,6 +25,14 @@ function ChevronIcon({ className }: { className?: string }) {
   );
 }
 
+function HeartIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 20.5s-7.5-4.7-10-9.3C.6 8 1.9 4.5 5 3.4c2-.7 4 0 5.5 1.9C12 3.4 14 2.7 16 3.4c3.1 1.1 4.4 4.6 3 7.8-2.5 4.6-10 9.3-10 9.3Z" />
+    </svg>
+  );
+}
+
 export function Nav({
   authEnabled,
   customerName,
@@ -32,6 +41,7 @@ export function Nav({
   customerName: string | null;
 }) {
   const { cart, openCart } = useCart();
+  const { items: wishlistItems } = useWishlist();
   const pathname = usePathname();
   const itemCount = cart?.totalQuantity ?? 0;
   const [openId, setOpenId] = useState<string | null>(null);
@@ -97,6 +107,18 @@ export function Nav({
                 {customerName ? customerName.split(" ")[0] : "Sign in"}
               </Link>
             )}
+            <Link
+              href="/account"
+              aria-label={`Wishlist${wishlistItems.length > 0 ? `, ${wishlistItems.length} items` : ""}`}
+              className="relative shrink-0 rounded-control border border-border-subtle p-2 transition hover:border-foreground"
+            >
+              <HeartIcon className="h-5 w-5" />
+              {wishlistItems.length > 0 && (
+                <span className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-control bg-accent text-xs text-accent-foreground">
+                  {wishlistItems.length}
+                </span>
+              )}
+            </Link>
             <button
               onClick={openCart}
               aria-label={`Open cart${itemCount > 0 ? `, ${itemCount} items` : ""}`}
