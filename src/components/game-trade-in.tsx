@@ -7,7 +7,7 @@ import { buildWhatsAppUrl, productUrl } from "@/lib/whatsapp";
 const TRADE_OPTIONS = [
   { key: "new", label: "New game" },
   { key: "used", label: "Used game" },
-  { key: "credit", label: "Cash / store credit" },
+  { key: "credit", label: "Cash or credit" },
 ] as const;
 
 type TradeOptionKey = (typeof TRADE_OPTIONS)[number]["key"];

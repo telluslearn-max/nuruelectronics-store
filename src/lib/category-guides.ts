@@ -343,6 +343,10 @@ export const categoryGuides: CategoryGuide[] = [
         point: "Storage fills up fast",
         why: "Modern game installs are large — check a console's usable storage against how many games you actually plan to keep installed at once, not just the number on the box.",
       },
+      {
+        point: "Disc platform and condition",
+        why: "A physical disc only works on the platform it was sold for, and a Used Disc costs less but may not include unredeemed digital extras or online passes — check both before buying secondhand or switching consoles.",
+      },
     ],
     budgetTiers: [
       { label: "Entry", description: "Handheld or budget console gaming with basic controllers — portable consoles, entry peripherals." },
@@ -353,6 +357,7 @@ export const categoryGuides: CategoryGuide[] = [
       "Buying a console for its exclusives without checking whether the friends you play with are on the same platform.",
       "Upgrading peripherals before checking whether storage is the actual bottleneck for a growing game library.",
       "Choosing a gaming headset for streaming or recording when a standalone mic would sound noticeably better.",
+      "Buying a Used Disc expecting the same digital bonus content or online pass as a New Disc — check what's actually included first.",
     ],
     faqs: [
       {
@@ -366,6 +371,10 @@ export const categoryGuides: CategoryGuide[] = [
       {
         q: "Is a gaming headset good enough for streaming?",
         a: "It's convenient, but a standalone microphone usually sounds noticeably better for voice if streaming or recording quality matters to you — see the Audio category for options.",
+      },
+      {
+        q: "Can I trade in a game I already own?",
+        a: "Yes — use the Trade-In option on any game's page to swap it toward a new game, a used game, or cash/store credit.",
       },
     ],
   },

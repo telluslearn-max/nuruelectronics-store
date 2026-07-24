@@ -68,7 +68,7 @@ export function GameTags({ product }: { product: Product }) {
 
   const candidates: (TagRow | false | undefined | "")[] = [
     genre && { key: "genre", icon: <GenreIcon />, label: genre.label },
-    ageRating && { key: "age", icon: <AgeBadge value={ageRating} />, label: `Rated ${ageRating}` },
+    ageRating && { key: "age", icon: <AgeBadge value={ageRating} />, label: ageRating },
     languageCount > 0 && {
       key: "languages",
       icon: <GlobeIcon />,
@@ -83,7 +83,7 @@ export function GameTags({ product }: { product: Product }) {
   return (
     <div className="mt-8 divide-y divide-border-subtle border-y border-border-subtle">
       {rows.map((row) => (
-        <div key={row.key} className="flex items-center gap-3 py-3">
+        <div key={row.key} className="flex items-start gap-3 py-3">
           {row.icon}
           <p className="text-sm">{row.label}</p>
         </div>

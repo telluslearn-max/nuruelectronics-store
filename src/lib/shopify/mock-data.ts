@@ -625,7 +625,7 @@ export const mockProducts: Product[] = [
       { key: "publisher", value: "Nuru Play" },
       { key: "developer", value: "Nuru Play" },
       { key: "release_date", value: "14 Jun, 2024" },
-      { key: "multiplayer", value: "Local co-op, Split screen" },
+      { key: "multiplayer", value: "Local co-op, Split-screen" },
       { key: "age_rating", value: "PEGI 3" },
       { key: "languages", value: "English, French, Swahili" },
     ],

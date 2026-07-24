@@ -150,7 +150,7 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
     <FilterTiles
       items={gameGenres}
       activeSlug={activeGenre?.slug}
-      allLabel="All Games"
+      allLabel="All Genres"
       hrefFor={(slug) =>
         buildHref(category.slug, activeGroup!.slug, sortSlug, slug, activeCollection?.slug)
       }
@@ -161,7 +161,7 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
     <FilterTiles
       items={gameCollections}
       activeSlug={activeCollection?.slug}
-      allLabel="All Games"
+      allLabel="All Collections"
       hrefFor={(slug) =>
         buildHref(category.slug, activeGroup!.slug, sortSlug, activeGenre?.slug, slug)
       }
