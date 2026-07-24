@@ -4,6 +4,7 @@ import { useState } from "react";
 import {
   BNPL_PLANS,
   calculateBnplPlan,
+  getBnplComingSoonBrand,
   isBnplComingSoonProduct,
   isBnplEligibleProduct,
   type BnplPlanId,
@@ -23,10 +24,23 @@ export function BnplSection({ product, price }: { product: Product; price: Money
 
   if (!isBnplEligibleProduct(product.tags)) {
     if (isBnplComingSoonProduct(product.tags)) {
+      const brand = getBnplComingSoonBrand(product.tags) ?? product.title;
+      const waitlistMessage = `Hi! I'd like to join the waitlist for BNPL on ${brand}. Please notify me when it's available.\n${productUrl(product.handle)}`;
+      const waitlistHref = buildWhatsAppUrl(waitlistMessage);
       return (
         <div className="mt-4 rounded-card border border-border-subtle p-4">
           <p className="text-sm font-medium">Buy Now, Pay Later</p>
           <p className="mt-1 text-xs text-neutral-500">Coming soon for this brand.</p>
+          {waitlistHref && (
+            <a
+              href={waitlistHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-3 flex w-full items-center justify-center gap-2 rounded-control border border-border-subtle px-6 py-3 text-sm font-medium text-[#25D366] transition hover:border-foreground"
+            >
+              Notify me on WhatsApp
+            </a>
+          )}
         </div>
       );
     }

@@ -59,3 +59,9 @@ export function isBnplEligibleProduct(tags: string[]): boolean {
 export function isBnplComingSoonProduct(tags: string[]): boolean {
   return tags.some((tag) => BNPL_COMING_SOON_BRAND_TAGS.includes(tag));
 }
+
+/** Human-readable brand name for a coming-soon product's matched tag, if any. */
+export function getBnplComingSoonBrand(tags: string[]): string | undefined {
+  const tag = BNPL_COMING_SOON_BRAND_TAGS.find((t) => tags.includes(t));
+  return tag ? tag.charAt(0).toUpperCase() + tag.slice(1) : undefined;
+}
