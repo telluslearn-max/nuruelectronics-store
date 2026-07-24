@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { BentoGrid } from "@/components/bento-grid";
+import { ComingSoonCarousel } from "@/components/coming-soon-carousel";
 import { Faq } from "@/components/faq";
 import { ProductMedia } from "@/components/product-media";
 import { SectionHeading } from "@/components/section-heading";
 import { TrustBadges } from "@/components/trust-badges";
 import { categories } from "@/lib/categories";
 import { formatPrice } from "@/lib/format";
-import { getProducts } from "@/lib/shopify";
+import { getComingSoonProducts, getProducts } from "@/lib/shopify";
 import type { Product } from "@/lib/shopify/types";
 
 // Hand-picked, cross-category — not just phones. Pulled from groups that
@@ -61,7 +62,7 @@ function FeatureCard({ product }: { product: Product }) {
 }
 
 export default async function HomePage() {
-  const [flagshipPage, categoryHeroPages] = await Promise.all([
+  const [flagshipPage, categoryHeroPages, comingSoonProducts] = await Promise.all([
     getProducts({
       searchTerm: "product_type:Smartphones",
       sortKey: "PRICE",
@@ -73,6 +74,7 @@ export default async function HomePage() {
         getProducts({ searchTerm: category.query, sortKey: "BEST_SELLING", first: 1 }),
       ),
     ),
+    getComingSoonProducts(),
   ]);
 
   const [hero, ...features] = flagshipPage.products;
@@ -166,6 +168,24 @@ export default async function HomePage() {
                 {collection.label}
               </Link>
             ))}
+          </div>
+        </section>
+      )}
+
+      {comingSoonProducts.length > 0 && (
+        <section className="mt-16">
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <SectionHeading
+              eyebrow="Confirmed. Not yet released."
+              title="Coming soon"
+              subtitle="Phones and electronics landing at NURU with a confirmed release date."
+            />
+            <Link href="/coming-soon" className="text-sm font-medium text-accent hover:opacity-80">
+              See all
+            </Link>
+          </div>
+          <div className="mt-6">
+            <ComingSoonCarousel products={comingSoonProducts} />
           </div>
         </section>
       )}

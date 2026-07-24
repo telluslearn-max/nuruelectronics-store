@@ -1,11 +1,11 @@
 import type { MetadataRoute } from "next";
 import { categories } from "@/lib/categories";
 import { ecosystems, kits } from "@/lib/collections";
-import { getAllProductHandles } from "@/lib/shopify";
+import { getAllProductHandles, getArticles } from "@/lib/shopify";
 import { CONTENT_REVISION_DATE, SITE_URL } from "@/lib/site";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const handles = await getAllProductHandles();
+  const [handles, articles] = await Promise.all([getAllProductHandles(), getArticles()]);
 
   return [
     { url: SITE_URL, lastModified: CONTENT_REVISION_DATE, changeFrequency: "daily", priority: 1 },
@@ -21,6 +21,30 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: "weekly",
       priority: 0.5,
     },
+    {
+      url: `${SITE_URL}/about`,
+      lastModified: CONTENT_REVISION_DATE,
+      changeFrequency: "monthly",
+      priority: 0.5,
+    },
+    {
+      url: `${SITE_URL}/blog`,
+      lastModified: CONTENT_REVISION_DATE,
+      changeFrequency: "weekly",
+      priority: 0.6,
+    },
+    {
+      url: `${SITE_URL}/coming-soon`,
+      lastModified: CONTENT_REVISION_DATE,
+      changeFrequency: "daily",
+      priority: 0.6,
+    },
+    ...articles.map((article) => ({
+      url: `${SITE_URL}/blog/${article.handle}`,
+      lastModified: article.publishedAt,
+      changeFrequency: "monthly" as const,
+      priority: 0.5,
+    })),
     ...categories.map((category) => ({
       url: `${SITE_URL}/category/${category.slug}`,
       lastModified: CONTENT_REVISION_DATE,

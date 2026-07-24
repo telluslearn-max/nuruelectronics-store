@@ -38,6 +38,16 @@ export function FooterLinks() {
               Search
             </Link>
           </li>
+          <li>
+            <Link href="/about" className="hover:text-foreground">
+              About us
+            </Link>
+          </li>
+          <li>
+            <Link href="/blog" className="hover:text-foreground">
+              Blog
+            </Link>
+          </li>
         </ul>
       </div>
     </div>
