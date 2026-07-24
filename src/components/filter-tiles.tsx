@@ -1,41 +1,44 @@
 import Link from "next/link";
-import { gameGenres } from "@/lib/categories";
 import { ArtGlyph } from "./product-media";
 
 /**
- * Genre browsing for the Gaming category's "Games" group. Unlike
- * `CollectionTiles`, these link via query params (?group=games&genre=...)
- * rather than path segments, so it can't reuse that component directly.
+ * Shared tile-grid nav for the Gaming category's "Games" group facets
+ * (genre, editorial collection). Links via query params rather than path
+ * segments, so it can't reuse the plain `CollectionTiles`.
  */
-export function GenreTiles({
-  basePath,
-  activeGenre,
+export function FilterTiles({
+  items,
+  activeSlug,
+  hrefFor,
+  allLabel,
 }: {
-  basePath: string;
-  activeGenre?: string;
+  items: { slug: string; label: string }[];
+  activeSlug?: string;
+  hrefFor: (slug?: string) => string;
+  allLabel: string;
 }) {
   return (
     <div className="mb-8 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
       <Link
-        href={basePath}
+        href={hrefFor(undefined)}
         className={`group flex flex-col items-center gap-3 rounded-card border p-6 text-center transition ${
-          !activeGenre ? "border-foreground" : "border-border-subtle hover:border-foreground"
+          !activeSlug ? "border-foreground" : "border-border-subtle hover:border-foreground"
         }`}
       >
         <ArtGlyph
           kind="gaming"
           className={`h-14 w-14 transition ${
-            !activeGenre ? "text-foreground" : "text-neutral-400 group-hover:text-foreground"
+            !activeSlug ? "text-foreground" : "text-neutral-400 group-hover:text-foreground"
           }`}
         />
-        <p className="text-sm font-medium">All Games</p>
+        <p className="text-sm font-medium">{allLabel}</p>
       </Link>
-      {gameGenres.map((genre) => {
-        const isActive = activeGenre === genre.slug;
+      {items.map((item) => {
+        const isActive = activeSlug === item.slug;
         return (
           <Link
-            key={genre.slug}
-            href={`${basePath}&genre=${genre.slug}`}
+            key={item.slug}
+            href={hrefFor(item.slug)}
             className={`group flex flex-col items-center gap-3 rounded-card border p-6 text-center transition ${
               isActive ? "border-foreground" : "border-border-subtle hover:border-foreground"
             }`}
@@ -46,7 +49,7 @@ export function GenreTiles({
                 isActive ? "text-foreground" : "text-neutral-400 group-hover:text-foreground"
               }`}
             />
-            <p className="text-sm font-medium">{genre.label}</p>
+            <p className="text-sm font-medium">{item.label}</p>
           </Link>
         );
       })}

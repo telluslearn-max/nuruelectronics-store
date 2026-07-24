@@ -482,7 +482,7 @@ export const mockProducts: Product[] = [
       "<p>The story of Cal Kestis continues in an epic new adventure across the galaxy.</p>",
     availableForSale: true,
     productType: "Games",
-    tags: ["mock", "genre-adventure"],
+    tags: ["mock", "genre-adventure", "collection-editors-choice"],
     priceRange: { minVariantPrice: money("54.99"), maxVariantPrice: money("69.99") },
     images: [
       { url: "https://picsum.photos/seed/jedi-survivor/800/1000", altText: null, width: 800, height: 1000 },
@@ -560,6 +560,74 @@ export const mockProducts: Product[] = [
       { key: "multiplayer", value: "Single Player" },
       { key: "age_rating", value: "PEGI 16" },
       { key: "languages", value: "English, French, German, Spanish, Italian, Japanese" },
+    ],
+  },
+  // A second Games entry with a different genre/collection mix, so the
+  // genre + collection tile filters have more than one item to distinguish
+  // locally.
+  {
+    id: "gid://mock/Product/20",
+    handle: "nebula-kart-rush",
+    title: "Nebula Kart Rush",
+    description: "A bright, pick-up-and-play kart racer for the whole family.",
+    descriptionHtml: "<p>A bright, pick-up-and-play kart racer for the whole family.</p>",
+    availableForSale: true,
+    productType: "Games",
+    tags: [
+      "mock",
+      "genre-racing",
+      "genre-casual",
+      "collection-beginner-friendly",
+      "collection-for-all-ages",
+      "collection-play-together",
+    ],
+    priceRange: { minVariantPrice: money("29.99"), maxVariantPrice: money("39.99") },
+    images: [
+      { url: "https://picsum.photos/seed/nebula-kart-rush/800/1000", altText: null, width: 800, height: 1000 },
+    ],
+    variants: [
+      {
+        id: "gid://mock/ProductVariant/26",
+        title: "Xbox / New Disc",
+        availableForSale: true,
+        price: money("39.99"),
+        selectedOptions: [
+          { name: "Platform", value: "Xbox" },
+          { name: "Condition", value: "New Disc" },
+        ],
+      },
+      {
+        id: "gid://mock/ProductVariant/27",
+        title: "Nintendo / New Disc",
+        availableForSale: true,
+        price: money("39.99"),
+        selectedOptions: [
+          { name: "Platform", value: "Nintendo" },
+          { name: "Condition", value: "New Disc" },
+        ],
+      },
+      {
+        id: "gid://mock/ProductVariant/28",
+        title: "Nintendo / Used Disc",
+        availableForSale: true,
+        price: money("29.99"),
+        selectedOptions: [
+          { name: "Platform", value: "Nintendo" },
+          { name: "Condition", value: "Used Disc" },
+        ],
+      },
+    ],
+    options: [
+      { id: "1", name: "Platform", values: ["Xbox", "Nintendo"] },
+      { id: "2", name: "Condition", values: ["New Disc", "Used Disc"] },
+    ],
+    specs: [
+      { key: "publisher", value: "Nuru Play" },
+      { key: "developer", value: "Nuru Play" },
+      { key: "release_date", value: "14 Jun, 2024" },
+      { key: "multiplayer", value: "Local co-op, Split screen" },
+      { key: "age_rating", value: "PEGI 3" },
+      { key: "languages", value: "English, French, Swahili" },
     ],
   },
 ];

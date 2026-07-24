@@ -394,6 +394,20 @@ export function genreForProductTags(tags: string[]) {
   return gameGenres.find((g) => tags.includes(`genre-${g.slug}`));
 }
 
+// Editorial shelves, same "Games" group scope as gameGenres above — a
+// second, independent facet (a game can be both RPG and Beginner Friendly),
+// so it's its own lookup rather than folded into gameGenres.
+export const gameCollections: { slug: string; label: string; query: string }[] = [
+  { slug: "editors-choice", label: "Editor's Choice", query: "tag:collection-editors-choice" },
+  { slug: "play-together", label: "Play Together", query: "tag:collection-play-together" },
+  { slug: "beginner-friendly", label: "Beginner Friendly", query: "tag:collection-beginner-friendly" },
+  { slug: "for-all-ages", label: "For All Ages", query: "tag:collection-for-all-ages" },
+];
+
+export function getGameCollection(slug: string) {
+  return gameCollections.find((c) => c.slug === slug);
+}
+
 /**
  * Cross-sell graph: each category points to its most relevant neighbors,
  * ranked, with a reason a shopper would actually care about. Not symmetric —
