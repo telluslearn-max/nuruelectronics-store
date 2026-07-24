@@ -2,6 +2,7 @@
 
 import { useTransition } from "react";
 import { addItem } from "@/lib/actions";
+import { trackEvent } from "@/lib/analytics/track-event";
 import { useCart } from "./cart-context";
 
 export function AddToCartButton({
@@ -35,6 +36,10 @@ export function AddToCartButton({
           const cart = await addItem(variantId, quantity);
           setCart(cart);
           openCart();
+          trackEvent("add_to_cart", {
+            currency: cart.cost.totalAmount.currencyCode,
+            items: [{ item_id: variantId, quantity }],
+          });
         });
       }}
       className="w-full rounded-control bg-accent px-6 py-3.5 text-sm font-medium text-accent-foreground transition hover:opacity-90 disabled:opacity-50"

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { BentoGrid } from "@/components/bento-grid";
 import { ComingSoonCarousel } from "@/components/coming-soon-carousel";
 import { Faq } from "@/components/faq";
+import { ForYouSection } from "@/components/for-you-section";
 import { ProductMedia } from "@/components/product-media";
 import { SectionHeading } from "@/components/section-heading";
 import { TrustBadges } from "@/components/trust-badges";
@@ -143,6 +144,8 @@ export default async function HomePage() {
       <section className="mt-16 border-y border-border-subtle py-10">
         <TrustBadges />
       </section>
+
+      <ForYouSection />
 
       <section className="mt-16">
         <SectionHeading

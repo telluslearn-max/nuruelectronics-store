@@ -31,10 +31,16 @@ export type ShopifyAdminOrder = {
   displayFinancialStatus: string;
   displayFulfillmentStatus: string;
   currentTotalPriceSet: { shopMoney: { amount: string; currencyCode: string } };
+  customAttributes: { key: string; value: string }[];
   customer: { id: string; email: string | null; displayName: string } | null;
   lineItems: Connection<ShopifyAdminOrderLineItem>;
   totalTaxSet?: { shopMoney: { amount: string; currencyCode: string } };
 };
+
+/** True when a Shopify order's cart attributes show the AI concierge helped build it (see markCartConciergeAssisted). */
+export function isConciergeAssistedOrder(order: Pick<ShopifyAdminOrder, "customAttributes">): boolean {
+  return order.customAttributes?.some((a) => a.key === "concierge_assisted" && a.value === "true") ?? false;
+}
 
 export type ShopifyAdminOrdersPage = {
   orders: ShopifyAdminOrder[];

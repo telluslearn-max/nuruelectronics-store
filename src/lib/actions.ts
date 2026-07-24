@@ -8,6 +8,7 @@ import {
   getProductByHandle,
   getProducts,
   removeFromCart as removeFromCartInShopify,
+  updateCartAttributes as updateCartAttributesInShopify,
   updateCartLine as updateCartLineInShopify,
 } from "./shopify";
 import type { ProductsPage } from "./shopify";
@@ -67,6 +68,12 @@ export async function updateItemQuantity(lineId: string, quantity: number): Prom
 export async function removeItem(lineId: string): Promise<Cart> {
   const cartId = await getOrCreateCartId();
   return removeFromCartInShopify(cartId, lineId);
+}
+
+/** Tags the current session's cart as AI-concierge-assisted, so completed orders carry it through to the AI-attribution report. */
+export async function markCartConciergeAssisted(): Promise<void> {
+  const cartId = await getOrCreateCartId();
+  await updateCartAttributesInShopify(cartId, [{ key: "concierge_assisted", value: "true" }]);
 }
 
 export type SearchSuggestion = {

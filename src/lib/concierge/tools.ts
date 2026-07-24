@@ -1,9 +1,13 @@
 import "server-only";
 import type { FunctionDeclaration } from "@google/genai";
-import { getCart } from "@/lib/actions";
+import { getCart, markCartConciergeAssisted } from "@/lib/actions";
+import { logAdminAction } from "@/lib/audit-log";
+import type { BnplPlanId } from "@/lib/bnpl";
 import type { Cart, Product } from "@/lib/shopify/types";
+import { explainBnplPlan } from "./bnpl-tool";
 import { addToCartTool, removeCartItem, updateCartItemQuantity } from "./cart-tools";
 import { compareProducts, getProductDetails, listKitsOrEcosystems, searchProducts } from "./catalog-tools";
+import { getExUkSavings } from "./ex-uk-tool";
 import type { ConciergeEvent } from "./types";
 import { buildWhatsAppHandoffMessage, isWhatsAppHandoffConfigured } from "./whatsapp-tool";
 
@@ -139,6 +143,33 @@ const updateCartQuantityDeclaration: FunctionDeclaration = {
   },
 };
 
+const getExUkSavingsDeclaration: FunctionDeclaration = {
+  name: "get_ex_uk_savings",
+  description:
+    "Look up the exact savings between an Ex-UK (unboxed, imported) unit and its equivalent brand-new listing, from either product's handle. Never state or estimate an Ex-UK savings amount/percent without calling this first.",
+  parametersJsonSchema: {
+    type: "object",
+    properties: {
+      handle: { type: "string", description: "Handle of either the Ex-UK unit or the equivalent new listing." },
+    },
+    required: ["handle"],
+  },
+};
+
+const explainBnplPlanDeclaration: FunctionDeclaration = {
+  name: "explain_bnpl_plan",
+  description:
+    "Look up the real Buy Now, Pay Later terms for a product by its handle — deposit, installment amount, and eligibility requirements. Never state BNPL numbers or eligibility without calling this first; BNPL is only live for some brands today.",
+  parametersJsonSchema: {
+    type: "object",
+    properties: {
+      handle: { type: "string", description: "The product handle to check BNPL terms for." },
+      planId: { type: "string", enum: ["weekly", "monthly"], description: "Defaults to \"weekly\" if not specified." },
+    },
+    required: ["handle"],
+  },
+};
+
 const openCheckoutDeclaration: FunctionDeclaration = {
   name: "open_checkout",
   description: "Surface the real checkout link once the shopper is ready to pay. Only call this once they've indicated they're done deciding.",
@@ -166,6 +197,8 @@ export const functionDeclarations: FunctionDeclaration[] = [
   getCartDeclaration,
   removeFromCartDeclaration,
   updateCartQuantityDeclaration,
+  explainBnplPlanDeclaration,
+  getExUkSavingsDeclaration,
   openCheckoutDeclaration,
   ...(isWhatsAppHandoffConfigured ? [openWhatsAppHandoffDeclaration] : []),
 ];
@@ -227,6 +260,15 @@ export async function dispatchTool(
       }
       try {
         const cart = await addToCartTool({ variantId, quantity });
+        // Best-effort attribution/audit — never let instrumentation failures block a real add-to-cart.
+        void markCartConciergeAssisted().catch((error) => console.error("markCartConciergeAssisted failed", error));
+        void logAdminAction({
+          action: "concierge.add_to_cart",
+          entityType: "cart",
+          entityId: cart.id,
+          summary: `AI concierge added variant ${variantId} (qty ${quantity}) to cart`,
+          metadata: { variantId, quantity },
+        }).catch((error) => console.error("logAdminAction failed", error));
         const line = cart.lines.find((l) => l.merchandise.id === variantId);
         return {
           resultForModel: {
@@ -291,11 +333,62 @@ export async function dispatchTool(
       }
     }
 
+    case "explain_bnpl_plan": {
+      const handle = typeof args.handle === "string" ? args.handle : "";
+      const planId: BnplPlanId = args.planId === "monthly" ? "monthly" : "weekly";
+      if (!handle) {
+        return { resultForModel: { error: "Missing handle." }, events: [] };
+      }
+      const result = await explainBnplPlan(handle, planId);
+      if ("applicationMessage" in result) {
+        return {
+          resultForModel: {
+            eligible: true,
+            plan: {
+              label: result.label,
+              itemPrice: result.itemPrice,
+              deposit: result.deposit,
+              installment: result.installment,
+              termCount: result.termCount,
+              termUnit: result.termUnit,
+              totalPayable: result.totalPayable,
+              currencyCode: result.currencyCode,
+            },
+            requirements: result.requirements,
+          },
+          events: [{ type: "whatsapp", message: result.applicationMessage }],
+        };
+      }
+      if ("waitlistMessage" in result) {
+        return {
+          resultForModel: { eligible: false, comingSoonBrand: result.comingSoonBrand },
+          events: [{ type: "whatsapp", message: result.waitlistMessage }],
+        };
+      }
+      return { resultForModel: result, events: [] };
+    }
+
+    case "get_ex_uk_savings": {
+      const handle = typeof args.handle === "string" ? args.handle : "";
+      if (!handle) {
+        return { resultForModel: { error: "Missing handle." }, events: [] };
+      }
+      const result = await getExUkSavings(handle);
+      return { resultForModel: result, events: [] };
+    }
+
     case "open_checkout": {
       const cart = await getCart();
       if (!cart || cart.lines.length === 0) {
         return { resultForModel: { error: "Cart is empty — nothing to check out yet." }, events: [] };
       }
+      void markCartConciergeAssisted().catch((error) => console.error("markCartConciergeAssisted failed", error));
+      void logAdminAction({
+        action: "concierge.open_checkout",
+        entityType: "cart",
+        entityId: cart.id,
+        summary: "AI concierge surfaced the checkout link",
+      }).catch((error) => console.error("logAdminAction failed", error));
       return { resultForModel: { ok: true, url: cart.checkoutUrl }, events: [{ type: "checkout", url: cart.checkoutUrl }] };
     }
 

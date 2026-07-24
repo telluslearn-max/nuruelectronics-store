@@ -692,10 +692,11 @@ export async function createDeliveryNote(orderId: string, formData: FormData): P
 export async function markDelivered(deliveryNoteId: string, formData: FormData): Promise<void> {
   await requireAdminSession();
   const receivedBy = String(formData.get("receivedBy") ?? "").trim() || null;
+  const riderId = String(formData.get("riderId") ?? "").trim() || null;
 
   const note = await prisma.deliveryNote.update({
     where: { id: deliveryNoteId },
-    data: { status: "delivered", receivedBy, deliveredAt: new Date() },
+    data: { status: "delivered", receivedBy, riderId, deliveredAt: new Date() },
   });
 
   revalidatePath(`/admin/orders/${note.orderId}`);

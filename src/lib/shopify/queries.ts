@@ -74,6 +74,10 @@ const cartFragment = /* GraphQL */ `
     id
     checkoutUrl
     totalQuantity
+    attributes {
+      key
+      value
+    }
     cost {
       subtotalAmount {
         amount
@@ -341,6 +345,17 @@ export const removeFromCartMutation = /* GraphQL */ `
   ${cartFragment}
   mutation removeFromCart($cartId: ID!, $lineIds: [ID!]!) {
     cartLinesRemove(cartId: $cartId, lineIds: $lineIds) {
+      cart {
+        ...cartFields
+      }
+    }
+  }
+`;
+
+export const cartAttributesUpdateMutation = /* GraphQL */ `
+  ${cartFragment}
+  mutation cartAttributesUpdate($cartId: ID!, $attributes: [AttributeInput!]!) {
+    cartAttributesUpdate(cartId: $cartId, attributes: $attributes) {
       cart {
         ...cartFields
       }

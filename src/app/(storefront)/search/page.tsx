@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { CategoryTiles } from "@/components/category-tiles";
 import { ProductList } from "@/components/product-list";
+import { isSemanticSearchReady, searchProductsSemantic } from "@/lib/search/semantic-search";
 import { getProducts } from "@/lib/shopify";
 
 type SearchPageProps = {
@@ -15,11 +16,26 @@ export async function generateMetadata({ searchParams }: SearchPageProps): Promi
   };
 }
 
+/**
+ * Semantic mode (when Vertex AI is configured and the catalog has been embedded — see
+ * src/lib/search/semantic-search.ts) ranks the whole catalog by meaning rather than Shopify's
+ * keyword match, so it fetches everything in one page rather than paginating via Shopify cursors,
+ * which aren't meaningful once results are re-sorted by similarity.
+ */
+async function findMatchingProducts(query: string) {
+  if (await isSemanticSearchReady()) {
+    const { products } = await getProducts({ first: 100 });
+    const ranked = await searchProductsSemantic(query, products);
+    return { products: ranked, hasNextPage: false, endCursor: null };
+  }
+  return getProducts({ searchTerm: query });
+}
+
 export default async function SearchPage({ searchParams }: SearchPageProps) {
   const { q } = await searchParams;
   const query = q?.trim() ?? "";
   const { products, hasNextPage, endCursor } = query
-    ? await getProducts({ searchTerm: query })
+    ? await findMatchingProducts(query)
     : { products: [], hasNextPage: false, endCursor: null };
 
   const showBrowseInstead = !query || products.length === 0;

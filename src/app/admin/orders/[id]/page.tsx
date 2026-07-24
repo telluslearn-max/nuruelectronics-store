@@ -63,6 +63,11 @@ export default async function AdminOrderHubPage({
 
   if (!order) notFound();
 
+  const riders =
+    order.deliveryNote?.status === "pending"
+      ? await prisma.employee.findMany({ where: { active: true }, orderBy: { name: "asc" } })
+      : [];
+
   const formatMoney = (amount: string | number) => formatPrice(String(amount), order.currencyCode);
   const acceptedEstimateWithoutInvoice = order.estimates.find((e) => e.status === "accepted") && !order.invoice;
   const itemsSubtotal = order.items.reduce((sum, item) => sum + Number(item.lineTotal), 0);
@@ -532,6 +537,17 @@ export default async function AdminOrderHubPage({
                 <div className="sm:w-56">
                   <label className="block text-xs text-neutral-500">Received by</label>
                   <input type="text" name="receivedBy" className={inputClass} />
+                </div>
+                <div className="sm:w-56">
+                  <label className="block text-xs text-neutral-500">Rider</label>
+                  <select name="riderId" className={inputClass} defaultValue="">
+                    <option value="">— Not tracked —</option>
+                    {riders.map((rider) => (
+                      <option key={rider.id} value={rider.id}>
+                        {rider.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <button type="submit" className={`${secondaryButtonClass} w-full sm:w-auto`}>
                   Mark delivered

@@ -204,6 +204,11 @@ model DeliveryNote {
   receivedBy      String?
   deliveredAt     DateTime?
   createdAt       DateTime       @default(now())
+
+  // Rider who completed the delivery (Employee with role "rider") — set when marking delivered,
+  // so gig-delivery volume/payouts can be reported (see riders-impact report).
+  riderId String?
+  rider   Employee? @relation(fields: [riderId], references: [id])
 }
 
 // One row per (type, year); atomically incremented in a transaction to mint numbers.
@@ -370,7 +375,8 @@ model Employee {
   active    Boolean  @default(true)
   createdAt DateTime @default(now())
 
-  payslips Payslip[]
+  payslips  Payslip[]
+  deliveries DeliveryNote[]
 }
 
 model PayRun {
@@ -439,6 +445,17 @@ model Settings {
   documentNumberPrefixBill         String?
   documentNumberPrefixPayslip      String?
   updatedAt                        DateTime @updatedAt
+}
+
+// ---------------------------------------------------------------------------
+// Product embeddings — Vertex AI text-embedding-004 vectors, keyed by Shopify
+// product handle, for semantic search (see src/lib/search/semantic-search.ts)
+// ---------------------------------------------------------------------------
+
+model ProductEmbedding {
+  handle    String   @id
+  embedding Float[]
+  updatedAt DateTime @updatedAt
 }
 
 // ---------------------------------------------------------------------------
