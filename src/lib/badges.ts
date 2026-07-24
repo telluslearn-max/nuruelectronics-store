@@ -4,6 +4,13 @@ import type { Money } from "./shopify/types";
 
 export type Badge = { key: string; label: string; className: string };
 
+// Digital gift cards only redeem on an account registered to a specific
+// store region — flagged here (not just in the spec table) so it's visible
+// while browsing, before a shopper adds the wrong region to their cart.
+const REGION_BADGE_LABELS: Record<string, string> = {
+  "region-us": "US Store Only",
+};
+
 export function getProductBadges(params: {
   tags: string[];
   availableForSale: boolean;
@@ -24,6 +31,11 @@ export function getProductBadges(params: {
   }
 
   const badges: Badge[] = [];
+
+  const regionTag = tags.find((t) => t in REGION_BADGE_LABELS);
+  if (regionTag) {
+    badges.push({ key: regionTag, label: REGION_BADGE_LABELS[regionTag], className: "bg-accent/10 text-accent" });
+  }
 
   const grade = gradeForProduct(tags);
   if (grade) {

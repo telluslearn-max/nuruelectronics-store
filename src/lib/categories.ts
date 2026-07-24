@@ -230,8 +230,14 @@ export const categories: Category[] = [
   {
     slug: "gaming",
     label: "Gaming",
-    types: ["Gaming Consoles", "Gaming Accessories", "Gaming Peripherals", "Games"],
-    query: productTypeQuery(["Gaming Consoles", "Gaming Accessories", "Gaming Peripherals", "Games"]),
+    types: ["Gaming Consoles", "Gaming Accessories", "Gaming Peripherals", "Games", "Gift Cards"],
+    query: productTypeQuery([
+      "Gaming Consoles",
+      "Gaming Accessories",
+      "Gaming Peripherals",
+      "Games",
+      "Gift Cards",
+    ]),
     blurb: "Consoles, controllers, and gear for every player.",
     art: "gaming",
     groups: [
@@ -247,6 +253,7 @@ export const categories: Category[] = [
         query: productTypeQuery(["Gaming Accessories"]),
       },
       { slug: "games", label: "Games", query: productTypeQuery(["Games"]) },
+      { slug: "gift-cards", label: "Gift Cards", query: productTypeQuery(["Gift Cards"]) },
       // Razer alone is 58% of this category's catalog. Razer also makes
       // gaming headsets categorized as Audio, so intersect with this
       // category's own types to keep the chip scoped to Gaming.

@@ -197,6 +197,8 @@ const specsMetafieldsBlock = `
     { namespace: "specs", key: "multiplayer" }
     { namespace: "specs", key: "age_rating" }
     { namespace: "specs", key: "languages" }
+    # Gift cards
+    { namespace: "specs", key: "region" }
   ]) {
     key
     value

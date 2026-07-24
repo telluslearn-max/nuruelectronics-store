@@ -630,6 +630,56 @@ export const mockProducts: Product[] = [
       { key: "languages", value: "English, French, Swahili" },
     ],
   },
+  // Digital gift card demo — Amount as a plain variant option (same generic
+  // mechanism as Platform/Condition above), region-us tag driving the "US
+  // Store Only" badge, and a region spec driving the PDP notice.
+  {
+    id: "gid://mock/Product/21",
+    handle: "psn-gift-card-us",
+    title: "PlayStation Network Gift Card (US)",
+    description: "Add funds to a US PlayStation Network account for games, add-ons, and subscriptions.",
+    descriptionHtml:
+      "<p>Add funds to a US PlayStation Network account for games, add-ons, and subscriptions.</p>",
+    availableForSale: true,
+    productType: "Gift Cards",
+    tags: ["mock", "region-us"],
+    priceRange: { minVariantPrice: money("10.00"), maxVariantPrice: money("100.00") },
+    images: [
+      { url: "https://picsum.photos/seed/psn-gift-card-us/800/1000", altText: null, width: 800, height: 1000 },
+    ],
+    variants: [
+      {
+        id: "gid://mock/ProductVariant/29",
+        title: "$10",
+        availableForSale: true,
+        price: money("10.00"),
+        selectedOptions: [{ name: "Amount", value: "$10" }],
+      },
+      {
+        id: "gid://mock/ProductVariant/30",
+        title: "$25",
+        availableForSale: true,
+        price: money("25.00"),
+        selectedOptions: [{ name: "Amount", value: "$25" }],
+      },
+      {
+        id: "gid://mock/ProductVariant/31",
+        title: "$50",
+        availableForSale: true,
+        price: money("50.00"),
+        selectedOptions: [{ name: "Amount", value: "$50" }],
+      },
+      {
+        id: "gid://mock/ProductVariant/32",
+        title: "$100",
+        availableForSale: true,
+        price: money("100.00"),
+        selectedOptions: [{ name: "Amount", value: "$100" }],
+      },
+    ],
+    options: [{ id: "1", name: "Amount", values: ["$10", "$25", "$50", "$100"] }],
+    specs: [{ key: "region", value: "United States" }],
+  },
 ];
 
 // In-memory mock cart store, keyed by cart id. Resets on server restart -

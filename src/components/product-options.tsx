@@ -4,12 +4,15 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { AddToCartButton } from "@/components/cart/add-to-cart-button";
 import { BnplSection } from "@/components/bnpl-section";
 import { useCart } from "@/components/cart/cart-context";
+import { DigitalDeliveryCard } from "@/components/digital-delivery-card";
 import { GameTradeIn } from "@/components/game-trade-in";
+import { GiftCardRegionNotice } from "@/components/gift-card-region-notice";
 import { ProductBadges } from "@/components/product-badges";
 import { ProductDeliveryCard } from "@/components/product-delivery-card";
 import { TradeInSection } from "@/components/trade-in-section";
 import { WhatsAppOrderButton } from "@/components/whatsapp-order-button";
 import { getProductBadges } from "@/lib/badges";
+import { isDigitalProduct } from "@/lib/digital-products";
 import { formatPrice } from "@/lib/format";
 import { getSavings } from "@/lib/pricing";
 import type { Product, ProductVariant } from "@/lib/shopify/types";
@@ -42,6 +45,7 @@ export function ProductOptions({ product }: { product: Product }) {
     [product.variants, selected],
   );
 
+  const region = product.specs?.find((s) => s.key === "region")?.value;
   const showOptions = product.options.some((option) => option.values.length > 1);
   const price = selectedVariant?.price ?? product.priceRange.minVariantPrice;
   const compareAtPrice = selectedVariant?.compareAtPrice ?? product.compareAtPriceRange?.minVariantPrice;
@@ -120,8 +124,9 @@ export function ProductOptions({ product }: { product: Product }) {
         </span>
       </div>
       <div className="mt-4">
-        <ProductDeliveryCard />
+        {isDigitalProduct(product.productType) ? <DigitalDeliveryCard /> : <ProductDeliveryCard />}
       </div>
+      {region && <GiftCardRegionNotice region={region} />}
       <BnplSection product={product} price={price} />
       <TradeInSection productType={product.productType} />
 
