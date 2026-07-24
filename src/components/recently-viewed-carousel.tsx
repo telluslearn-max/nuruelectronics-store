@@ -19,9 +19,14 @@ export function RecentlyViewedCarousel({ currentHandle }: { currentHandle: strin
       return;
     }
     let cancelled = false;
-    getProductsByHandles(handles).then((fetched) => {
-      if (!cancelled) setProducts(fetched);
-    });
+    getProductsByHandles(handles)
+      .then((fetched) => {
+        if (!cancelled) setProducts(fetched);
+      })
+      .catch((error) => {
+        console.error("Failed to load recently viewed products:", error);
+        if (!cancelled) setProducts([]);
+      });
     return () => {
       cancelled = true;
     };

@@ -95,9 +95,13 @@ export async function searchSuggestions(term: string): Promise<SearchSuggestion[
   }));
 }
 
+/** allSettled, not all — one failing handle lookup (stale/deleted product, transient error) shouldn't drop the whole batch for callers like recently-viewed/wishlist/for-you rails. */
 export async function getProductsByHandles(handles: string[]): Promise<Product[]> {
-  const products = await Promise.all(handles.map((handle) => getProductByHandle(handle)));
-  return products.filter((p): p is Product => p !== null);
+  const results = await Promise.allSettled(handles.map((handle) => getProductByHandle(handle)));
+  return results
+    .filter((r): r is PromiseFulfilledResult<Product | null> => r.status === "fulfilled")
+    .map((r) => r.value)
+    .filter((p): p is Product => p !== null);
 }
 
 export async function loadMoreProducts(

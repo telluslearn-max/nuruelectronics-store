@@ -49,10 +49,16 @@ export function HomeRecommendations() {
         : activeTab === "recently-viewed"
           ? getProductsByHandles(recentHandles)
           : getProductsByHandles(savedHandles);
-    load.then((fetched) => {
-      if (cancelled) return;
-      setProductsByTab((prev) => ({ ...prev, [activeTab]: fetched }));
-    });
+    load
+      .then((fetched) => {
+        if (cancelled) return;
+        setProductsByTab((prev) => ({ ...prev, [activeTab]: fetched }));
+      })
+      .catch((error) => {
+        console.error(`Failed to load "${activeTab}" recommendations:`, error);
+        if (cancelled) return;
+        setProductsByTab((prev) => ({ ...prev, [activeTab]: [] }));
+      });
     return () => {
       cancelled = true;
     };

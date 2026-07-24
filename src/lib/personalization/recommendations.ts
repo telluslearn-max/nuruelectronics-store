@@ -32,27 +32,34 @@ async function rankCandidatesWithGemini(recentTitles: string[], candidates: Prod
 export async function getPersonalizedHomepageProducts(recentHandles: string[]): Promise<Product[]> {
   if (recentHandles.length === 0 || !isConciergeConfigured) return [];
 
-  const recentProducts = (await Promise.all(recentHandles.map((h) => getProductByHandle(h)))).filter(
-    (p): p is Product => p !== null,
-  );
-  if (recentProducts.length === 0) return [];
-
-  const { products: candidatePool } = await getProducts({ first: CANDIDATE_POOL_SIZE });
-  const candidates = candidatePool.filter((p) => !recentHandles.includes(p.handle));
-  if (candidates.length === 0) return [];
-
-  let rankedHandles: string[] = [];
   try {
-    rankedHandles = await rankCandidatesWithGemini(
-      recentProducts.map((p) => p.title),
-      candidates,
+    const recentProducts = (await Promise.all(recentHandles.map((h) => getProductByHandle(h)))).filter(
+      (p): p is Product => p !== null,
     );
-  } catch (error) {
-    console.error("Gemini homepage ranking failed:", error);
-  }
+    if (recentProducts.length === 0) return [];
 
-  const byHandle = new Map(candidates.map((p) => [p.handle, p]));
-  const recommended = rankedHandles.map((h) => byHandle.get(h)).filter((p): p is Product => p !== undefined);
-  const result = recommended.length > 0 ? recommended : candidates.slice(0, RECOMMENDATION_COUNT);
-  return result.slice(0, RECOMMENDATION_COUNT);
+    const { products: candidatePool } = await getProducts({ first: CANDIDATE_POOL_SIZE });
+    const candidates = candidatePool.filter((p) => !recentHandles.includes(p.handle));
+    if (candidates.length === 0) return [];
+
+    let rankedHandles: string[] = [];
+    try {
+      rankedHandles = await rankCandidatesWithGemini(
+        recentProducts.map((p) => p.title),
+        candidates,
+      );
+    } catch (error) {
+      console.error("Gemini homepage ranking failed:", error);
+    }
+
+    const byHandle = new Map(candidates.map((p) => [p.handle, p]));
+    const recommended = rankedHandles.map((h) => byHandle.get(h)).filter((p): p is Product => p !== undefined);
+    const result = recommended.length > 0 ? recommended : candidates.slice(0, RECOMMENDATION_COUNT);
+    return result.slice(0, RECOMMENDATION_COUNT);
+  } catch (error) {
+    // Catalog fetch failures (Shopify hiccup, etc.) shouldn't surface as a rejected promise —
+    // the client has no error UI for this section, just an empty/omitted one.
+    console.error("Failed to build homepage recommendations:", error);
+    return [];
+  }
 }
