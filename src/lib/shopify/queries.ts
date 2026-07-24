@@ -199,7 +199,14 @@ const specsMetafieldsBlock = `
     { namespace: "specs", key: "languages" }
     # Gift cards
     { namespace: "specs", key: "region" }
+    # Coming-soon products only (tag:coming-soon) — a real future ship date,
+    # not parsed from the tag string. Namespace differs from the Games
+    # "release_date" spec above, which is why namespace is selected below —
+    # both share the bare key "release_date" and would be indistinguishable
+    # in the flat metafields response otherwise.
+    { namespace: "availability", key: "release_date" }
   ]) {
+    namespace
     key
     value
   }
@@ -232,6 +239,57 @@ export const getProductsWithSpecsQuery = /* GraphQL */ `
       pageInfo {
         hasNextPage
         endCursor
+      }
+    }
+  }
+`;
+
+const articleFragment = /* GraphQL */ `
+  fragment articleFields on Article {
+    id
+    handle
+    title
+    excerpt
+    contentHtml
+    publishedAt
+    tags
+    image {
+      url
+      altText
+      width
+      height
+    }
+    authorV2 {
+      name
+    }
+  }
+`;
+
+export const getArticlesQuery = /* GraphQL */ `
+  ${articleFragment}
+  query getArticles($blogHandle: String!, $first: Int = 12, $after: String) {
+    blog(handle: $blogHandle) {
+      articles(first: $first, after: $after, sortKey: PUBLISHED_AT, reverse: true) {
+        edges {
+          node {
+            ...articleFields
+          }
+        }
+        pageInfo {
+          hasNextPage
+          endCursor
+        }
+      }
+    }
+  }
+`;
+
+export const getArticleByHandleQuery = /* GraphQL */ `
+  ${articleFragment}
+  query getArticleByHandle($blogHandle: String!, $articleHandle: String!) {
+    blog(handle: $blogHandle) {
+      articleByHandle(handle: $articleHandle) {
+        ...articleFields
       }
     }
   }

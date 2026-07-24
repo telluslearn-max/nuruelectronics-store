@@ -1,21 +1,46 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { AddToCartButton } from "@/components/cart/add-to-cart-button";
 import { BnplSection } from "@/components/bnpl-section";
 import { useCart } from "@/components/cart/cart-context";
 import { DigitalDeliveryCard } from "@/components/digital-delivery-card";
 import { GameTradeIn } from "@/components/game-trade-in";
 import { GiftCardRegionNotice } from "@/components/gift-card-region-notice";
+import { NotifyMeButton } from "@/components/notify-me-button";
 import { ProductBadges } from "@/components/product-badges";
 import { ProductDeliveryCard } from "@/components/product-delivery-card";
 import { TradeInSection } from "@/components/trade-in-section";
 import { WhatsAppOrderButton } from "@/components/whatsapp-order-button";
+import { addItem } from "@/lib/actions";
 import { getProductBadges } from "@/lib/badges";
 import { isDigitalProduct } from "@/lib/digital-products";
+import { resolveSwatchColor } from "@/lib/color-swatches";
 import { formatPrice } from "@/lib/format";
 import { getSavings } from "@/lib/pricing";
 import type { Product, ProductVariant } from "@/lib/shopify/types";
+
+function formatReleaseDate(iso: string) {
+  return new Date(iso).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+}
+
+function ComingSoonPanel({ product }: { product: Product }) {
+  return (
+    <div className="mt-4 rounded-card border border-border-subtle p-6">
+      <p className="text-sm font-medium text-accent">Coming soon</p>
+      {product.releaseDate && (
+        <p className="mt-1 text-lg font-medium">Available {formatReleaseDate(product.releaseDate)}</p>
+      )}
+      <p className="mt-2 text-sm text-neutral-500">
+        This product hasn&apos;t launched yet. Message us on WhatsApp and we&apos;ll let you know the
+        moment it&apos;s available.
+      </p>
+      <div className="mt-4">
+        <NotifyMeButton productTitle={product.title} />
+      </div>
+    </div>
+  );
+}
 
 function variantLabel(variant: ProductVariant | undefined) {
   if (!variant) return undefined;
@@ -38,7 +63,8 @@ export function ProductOptions({ product }: { product: Product }) {
   const [quantity, setQuantity] = useState(1);
   const [buyBlockVisible, setBuyBlockVisible] = useState(true);
   const buyBlockRef = useRef<HTMLDivElement>(null);
-  const { isOpen: cartIsOpen } = useCart();
+  const { isOpen: cartIsOpen, setCart } = useCart();
+  const [isBuyingNow, startBuyNow] = useTransition();
 
   const selectedVariant = useMemo(
     () => product.variants.find((v) => variantMatches(v, selected)),
@@ -97,6 +123,28 @@ export function ProductOptions({ product }: { product: Product }) {
     };
   }, [showStickyBar]);
 
+  function buyNow() {
+    if (!selectedVariant) return;
+    startBuyNow(async () => {
+      const cart = await addItem(selectedVariant.id, quantity);
+      setCart(cart);
+      window.location.href = cart.checkoutUrl;
+    });
+  }
+
+  if (product.tags.includes("coming-soon")) {
+    return (
+      <div>
+        <ProductBadges variant="inline" badges={badges} />
+        <p className="mt-2 text-lg text-neutral-700">
+          {formatPrice(price.amount, price.currencyCode)}{" "}
+          <span className="text-xs font-normal text-neutral-400" title="VAT is calculated and added at checkout.">excl. VAT</span>
+        </p>
+        <ComingSoonPanel product={product} />
+      </div>
+    );
+  }
+
   return (
     <div>
       <ProductBadges variant="inline" badges={badges} />
@@ -123,6 +171,7 @@ export function ProductOptions({ product }: { product: Product }) {
           {selectedVariant?.availableForSale ? "In stock" : "Out of stock"}
         </span>
       </div>
+      {selectedVariant?.sku && <p className="mt-1 text-xs text-neutral-400">SKU: {selectedVariant.sku}</p>}
       <div className="mt-4">
         {isDigitalProduct(product.productType) ? <DigitalDeliveryCard /> : <ProductDeliveryCard />}
       </div>
@@ -156,7 +205,15 @@ export function ProductOptions({ product }: { product: Product }) {
                             : "border-border-subtle hover:border-foreground"
                         } ${!available ? "cursor-not-allowed opacity-40 line-through" : ""}`}
                       >
-                        <span className="block font-medium">{value}</span>
+                        <span className="flex items-center gap-2 font-medium">
+                          {option.name === "Color" && (
+                            <span
+                              className="h-4 w-4 shrink-0 rounded-full border border-border-subtle"
+                              style={{ backgroundColor: resolveSwatchColor(value) }}
+                            />
+                          )}
+                          {value}
+                        </span>
                         {valuePrice && (
                           <span
                             className={`mt-0.5 block text-xs ${
@@ -204,11 +261,25 @@ export function ProductOptions({ product }: { product: Product }) {
       </div>
 
       <div ref={buyBlockRef} className="mt-8 space-y-3">
-        <AddToCartButton
-          variantId={selectedVariant?.id}
-          availableForSale={selectedVariant?.availableForSale ?? false}
-          quantity={quantity}
-        />
+        <div className="flex gap-3">
+          <div className="flex-1">
+            <AddToCartButton
+              variantId={selectedVariant?.id}
+              availableForSale={selectedVariant?.availableForSale ?? false}
+              quantity={quantity}
+            />
+          </div>
+          {selectedVariant?.availableForSale && (
+            <button
+              type="button"
+              disabled={isBuyingNow}
+              onClick={buyNow}
+              className="flex-1 rounded-control border border-foreground px-6 py-3.5 text-sm font-medium transition hover:bg-foreground hover:text-background disabled:opacity-50"
+            >
+              {isBuyingNow ? "Redirecting..." : "Buy Now"}
+            </button>
+          )}
+        </div>
         <WhatsAppOrderButton
           productTitle={product.title}
           variantLabel={variantLabel(selectedVariant)}

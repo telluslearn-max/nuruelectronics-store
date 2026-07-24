@@ -1,8 +1,10 @@
 import "server-only";
-import type { Cart, CartLine, Product, ProductImage, ProductVariant } from "./types";
+import type { Article, Cart, CartLine, Product, ProductImage, ProductVariant } from "./types";
 import {
   addToCartMutation,
   createCartMutation,
+  getArticleByHandleQuery,
+  getArticlesQuery,
   getCartQuery,
   getProductByHandleQuery,
   getProductHandlesQuery,
@@ -13,6 +15,7 @@ import {
 } from "./queries";
 import {
   findMockVariant,
+  mockArticles,
   mockCarts,
   mockProducts,
   nextMockCartId,
@@ -31,6 +34,8 @@ function matchesClause(product: Product, rawClause: string): boolean {
   }
   return product.title.toLowerCase().includes(clause.toLowerCase());
 }
+
+const blogHandle = process.env.SHOPIFY_BLOG_HANDLE || "news";
 
 // Parses the simple query shapes this codebase generates (`product_type:"X"`,
 // `tag:X`, joined with " OR " and/or " AND ", with an optional single layer of
@@ -96,17 +101,23 @@ function reshapeVariants(variants: Connection<ProductVariant>): ProductVariant[]
   return variants.edges.map((edge) => edge.node);
 }
 
-function reshapeProduct(node: Omit<Product, "images" | "variants" | "specs"> & {
+function reshapeProduct(node: Omit<Product, "images" | "variants" | "specs" | "releaseDate"> & {
   images: Connection<ProductImage>;
   variants: Connection<ProductVariant>;
-  metafields?: ({ key: string; value: string } | null)[];
+  metafields?: ({ namespace: string; key: string; value: string } | null)[];
 }): Product {
   const { metafields, ...rest } = node;
+  const populated =
+    metafields?.filter((m): m is { namespace: string; key: string; value: string } => m !== null) ?? [];
   return {
     ...rest,
     images: reshapeImages(node.images),
     variants: reshapeVariants(node.variants),
-    specs: metafields?.filter((m): m is { key: string; value: string } => m !== null) ?? [],
+    // Both a Games spec and the coming-soon ship date use the bare key
+    // "release_date" in different namespaces — split on namespace, not key,
+    // so they can't shadow each other.
+    specs: populated.filter((m) => m.namespace === "specs").map(({ key, value }) => ({ key, value })),
+    releaseDate: populated.find((m) => m.namespace === "availability" && m.key === "release_date")?.value,
   };
 }
 
@@ -152,17 +163,32 @@ export async function getProducts(
      * page itself, and the ex-uk-counterpart lookup in src/lib/product-match.ts).
      */
     includeExUk?: boolean;
+    /**
+     * Coming-soon products (tag "coming-soon", not yet released) are excluded from every
+     * general browse/search surface by default, same reasoning as `includeExUk` — they're
+     * only meant to be discovered through the homepage teaser and the dedicated /coming-soon
+     * page. Pass true for those call sites (see `getComingSoonProducts` below).
+     */
+    includeComingSoon?: boolean;
   } = {},
 ): Promise<ProductsPage> {
-  const { after, searchTerm, sortKey, reverse, first, includeSpecs, includeExUk } = options;
+  const { after, searchTerm, sortKey, reverse, first, includeSpecs, includeExUk, includeComingSoon } = options;
   if (!isShopifyConfigured) {
     const products = mockProducts.filter((p) => {
       if (!includeExUk && p.tags.includes("ex-uk")) return false;
+      if (!includeComingSoon && p.tags.includes("coming-soon")) return false;
       return !searchTerm || matchesSearchTerm(p, searchTerm);
     });
     return { products, hasNextPage: false, endCursor: null };
   }
-  const effectiveQuery = includeExUk ? searchTerm : searchTerm ? `(${searchTerm}) AND -tag:ex-uk` : "-tag:ex-uk";
+  const exclusions = [
+    ...(includeExUk ? [] : ["-tag:ex-uk"]),
+    ...(includeComingSoon ? [] : ["-tag:coming-soon"]),
+  ];
+  const effectiveQuery =
+    [searchTerm ? `(${searchTerm})` : undefined, ...exclusions]
+      .filter((clause): clause is string => Boolean(clause))
+      .join(" AND ") || undefined;
   const data = await shopifyFetch<{
     products: PaginatedConnection<Parameters<typeof reshapeProduct>[0]>;
   }>(
@@ -175,6 +201,44 @@ export async function getProducts(
     hasNextPage: data.products.pageInfo.hasNextPage,
     endCursor: data.products.pageInfo.endCursor,
   };
+}
+
+export async function getComingSoonProducts(): Promise<Product[]> {
+  const { products } = await getProducts({
+    searchTerm: "tag:coming-soon",
+    includeComingSoon: true,
+    includeSpecs: true,
+  });
+  return products;
+}
+
+function reshapeArticle(node: Omit<Article, "author" | "tags"> & {
+  tags: string[];
+  authorV2?: { name: string } | null;
+}): Article {
+  const { authorV2, ...rest } = node;
+  return { ...rest, author: authorV2?.name };
+}
+
+export async function getArticles(options: { first?: number; after?: string } = {}): Promise<Article[]> {
+  if (!isShopifyConfigured) {
+    return mockArticles;
+  }
+  const data = await shopifyFetch<{
+    blog: { articles: PaginatedConnection<Parameters<typeof reshapeArticle>[0]> } | null;
+  }>(getArticlesQuery, { blogHandle, first: options.first, after: options.after }, { revalidate: 300 });
+  return data.blog?.articles.edges.map((edge) => reshapeArticle(edge.node)) ?? [];
+}
+
+export async function getArticleByHandle(handle: string): Promise<Article | null> {
+  if (!isShopifyConfigured) {
+    return mockArticles.find((a) => a.handle === handle) ?? null;
+  }
+  const data = await shopifyFetch<{
+    blog: { articleByHandle: Parameters<typeof reshapeArticle>[0] | null } | null;
+  }>(getArticleByHandleQuery, { blogHandle, articleHandle: handle }, { revalidate: 300 });
+  const article = data.blog?.articleByHandle;
+  return article ? reshapeArticle(article) : null;
 }
 
 export async function getAllProductHandles(): Promise<{ handle: string; updatedAt?: string }[]> {
