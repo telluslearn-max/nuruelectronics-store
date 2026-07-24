@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useTransition } from "react";
 import { removeItem, updateItemQuantity } from "@/lib/actions";
+import { trackEvent } from "@/lib/analytics/track-event";
 import { formatPrice } from "@/lib/format";
 import { ProductMedia } from "@/components/product-media";
 import { useCart } from "./cart-context";
@@ -152,6 +153,12 @@ export function CartDrawer() {
             </div>
             <a
               href={cart.checkoutUrl}
+              onClick={() =>
+                trackEvent("begin_checkout", {
+                  currency: cart.cost.totalAmount.currencyCode,
+                  value: Number(cart.cost.totalAmount.amount),
+                })
+              }
               className="block w-full rounded-control bg-accent px-6 py-3 text-center text-sm font-medium text-accent-foreground transition hover:opacity-90"
             >
               Checkout

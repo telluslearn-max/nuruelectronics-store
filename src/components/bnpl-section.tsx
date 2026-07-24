@@ -2,7 +2,10 @@
 
 import { useState } from "react";
 import {
+  BNPL_ELIGIBILITY_REQUIREMENTS,
   BNPL_PLANS,
+  buildBnplApplicationMessage,
+  buildBnplWaitlistMessage,
   calculateBnplPlan,
   getBnplComingSoonBrand,
   isBnplComingSoonProduct,
@@ -11,13 +14,7 @@ import {
 } from "@/lib/bnpl";
 import { formatPrice } from "@/lib/format";
 import type { Money, Product } from "@/lib/shopify/types";
-import { buildWhatsAppUrl, productUrl } from "@/lib/whatsapp";
-
-const ELIGIBILITY_REQUIREMENTS = [
-  "A valid national ID",
-  "3 months of M-Pesa statements",
-  "Must be 18 years or older",
-];
+import { buildWhatsAppUrl } from "@/lib/whatsapp";
 
 export function BnplSection({ product, price }: { product: Product; price: Money }) {
   const [planId, setPlanId] = useState<BnplPlanId>("weekly");
@@ -25,7 +22,7 @@ export function BnplSection({ product, price }: { product: Product; price: Money
   if (!isBnplEligibleProduct(product.tags)) {
     if (isBnplComingSoonProduct(product.tags)) {
       const brand = getBnplComingSoonBrand(product.tags) ?? product.title;
-      const waitlistMessage = `Hi! I'd like to join the waitlist for BNPL on ${brand}. Please notify me when it's available.\n${productUrl(product.handle)}`;
+      const waitlistMessage = buildBnplWaitlistMessage(product, brand);
       const waitlistHref = buildWhatsAppUrl(waitlistMessage);
       return (
         <div className="mt-4 rounded-card border border-border-subtle p-4">
@@ -49,10 +46,8 @@ export function BnplSection({ product, price }: { product: Product; price: Money
 
   const plan = calculateBnplPlan(Number(price.amount), planId);
   const fmt = (amount: number) => formatPrice(String(amount), price.currencyCode);
-  const termLabel = `${plan.termCount} ${plan.termUnit}${plan.termCount === 1 ? "" : "s"}`;
-  const installmentLabel = plan.termUnit === "week" ? "Weekly payment" : "Monthly payment";
 
-  const message = `Hi! I'd like to apply for BNPL on ${product.title} - ${fmt(plan.itemPrice)}.\nPlan: ${plan.label}, ${termLabel}\nDeposit: ${fmt(plan.deposit)}\n${installmentLabel}: ${fmt(plan.installment)}\n\nI understand I need to provide: a valid ID, 3 months of M-Pesa statements, and confirm I'm 18+.\n${productUrl(product.handle)}`;
+  const message = buildBnplApplicationMessage(product, price.currencyCode, plan);
   const whatsappHref = buildWhatsAppUrl(message);
 
   return (
@@ -87,7 +82,7 @@ export function BnplSection({ product, price }: { product: Product; price: Money
       </p>
 
       <ul className="mt-3 space-y-1 text-xs text-neutral-500">
-        {ELIGIBILITY_REQUIREMENTS.map((requirement) => (
+        {BNPL_ELIGIBILITY_REQUIREMENTS.map((requirement) => (
           <li key={requirement}>&bull; {requirement}</li>
         ))}
       </ul>

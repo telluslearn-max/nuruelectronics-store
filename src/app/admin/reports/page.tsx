@@ -7,6 +7,8 @@ export const metadata: Metadata = { title: "Reports" };
 const REPORTS = [
   { href: "/admin/reports/pnl", label: "Profit & Loss (Google Sheet sync)" },
   { href: "/admin/reports/sales", label: "Sales Register" },
+  { href: "/admin/reports/ai-attribution", label: "AI Concierge Attribution" },
+  { href: "/admin/reports/riders-impact", label: "Rider Job-Creation Impact" },
   { href: "/admin/reports/cash-book", label: "Cash Book" },
   { href: "/admin/reports/debtors", label: "Debtors Ledger" },
   { href: "/admin/reports/creditors", label: "Creditors Ledger" },

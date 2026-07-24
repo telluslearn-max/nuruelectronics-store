@@ -90,4 +90,6 @@ export type Cart = {
     totalAmount: Money;
   };
   lines: CartLine[];
+  /** Cart-level key/value tags, e.g. { key: "concierge_assisted", value: "true" } set when the AI concierge helps build the cart — flows through to the completed order's customAttributes. */
+  attributes: { key: string; value: string }[];
 };

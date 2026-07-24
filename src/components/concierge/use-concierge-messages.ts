@@ -2,6 +2,7 @@
 
 import { useCallback, useRef, useState } from "react";
 import { useCart } from "@/components/cart/cart-context";
+import { trackEvent } from "@/lib/analytics/track-event";
 import type { ConciergeEvent, ConciergeMessage } from "@/lib/concierge/types";
 import type { Product } from "@/lib/shopify/types";
 
@@ -29,7 +30,7 @@ export function makeMessageId(): string {
  * React's eager updater invocation, making state read back from a setState callback stale.
  */
 export function useConciergeMessages(initialMessages: ConciergeMessage[] = []) {
-  const { setCart } = useCart();
+  const { cart, setCart } = useCart();
   const [messages, setMessages] = useState<ConciergeDisplayMessage[]>(() =>
     initialMessages.map((m) => ({ id: makeMessageId(), role: m.role, text: m.text })),
   );
@@ -50,7 +51,13 @@ export function useConciergeMessages(initialMessages: ConciergeMessage[] = []) {
           if (event.type === "text-delta") return { ...m, text: m.text + event.text };
           if (event.type === "products") return { ...m, products: { mode: event.mode, products: event.products } };
           if (event.type === "whatsapp") return { ...m, whatsappMessage: event.message };
-          if (event.type === "checkout") return { ...m, checkoutUrl: event.url };
+          if (event.type === "checkout") {
+            trackEvent("begin_checkout", {
+              currency: cart?.cost.totalAmount.currencyCode,
+              value: cart ? Number(cart.cost.totalAmount.amount) : undefined,
+            });
+            return { ...m, checkoutUrl: event.url };
+          }
           if (event.type === "audio") return { ...m, audioUrl: `data:${event.mimeType};base64,${event.data}` };
           if (event.type === "error") return { ...m, text: m.text || event.message };
           return m;
@@ -58,7 +65,7 @@ export function useConciergeMessages(initialMessages: ConciergeMessage[] = []) {
       );
       if (event.type === "cart") setCart(event.cart);
     },
-    [setCart, updateMessages],
+    [cart, setCart, updateMessages],
   );
 
   return { messages, messagesRef, updateMessages, applyEventToMessage };

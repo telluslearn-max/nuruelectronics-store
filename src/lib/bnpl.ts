@@ -1,3 +1,6 @@
+import { formatPrice } from "./format";
+import { productUrl } from "./whatsapp";
+
 export type BnplPlanId = "weekly" | "monthly";
 
 type BnplPlanConfig = {
@@ -64,4 +67,30 @@ export function isBnplComingSoonProduct(tags: string[]): boolean {
 export function getBnplComingSoonBrand(tags: string[]): string | undefined {
   const tag = BNPL_COMING_SOON_BRAND_TAGS.find((t) => tags.includes(t));
   return tag ? tag.charAt(0).toUpperCase() + tag.slice(1) : undefined;
+}
+
+export const BNPL_ELIGIBILITY_REQUIREMENTS = [
+  "A valid national ID",
+  "3 months of M-Pesa statements",
+  "Must be 18 years or older",
+];
+
+/**
+ * The single source of truth for the BNPL WhatsApp application message — used by both the
+ * storefront BnplSection and the AI concierge's BNPL tool, so the two never drift apart.
+ */
+export function buildBnplApplicationMessage(
+  product: { title: string; handle: string },
+  currencyCode: string,
+  plan: BnplPlan,
+): string {
+  const fmt = (amount: number) => formatPrice(String(amount), currencyCode);
+  const termLabel = `${plan.termCount} ${plan.termUnit}${plan.termCount === 1 ? "" : "s"}`;
+  const installmentLabel = plan.termUnit === "week" ? "Weekly payment" : "Monthly payment";
+  return `Hi! I'd like to apply for BNPL on ${product.title} - ${fmt(plan.itemPrice)}.\nPlan: ${plan.label}, ${termLabel}\nDeposit: ${fmt(plan.deposit)}\n${installmentLabel}: ${fmt(plan.installment)}\n\nI understand I need to provide: a valid ID, 3 months of M-Pesa statements, and confirm I'm 18+.\n${productUrl(product.handle)}`;
+}
+
+/** Mirrors buildBnplApplicationMessage's waitlist copy in BnplSection, for a brand BNPL isn't live on yet. */
+export function buildBnplWaitlistMessage(product: { title: string; handle: string }, brand: string): string {
+  return `Hi! I'd like to join the waitlist for BNPL on ${brand}. Please notify me when it's available.\n${productUrl(product.handle)}`;
 }

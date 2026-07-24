@@ -2,6 +2,7 @@ import "server-only";
 import type { Article, Cart, CartLine, Product, ProductImage, ProductVariant } from "./types";
 import {
   addToCartMutation,
+  cartAttributesUpdateMutation,
   createCartMutation,
   getArticleByHandleQuery,
   getArticlesQuery,
@@ -290,6 +291,7 @@ export async function createCart(lines: { merchandiseId: string; quantity: numbe
       totalQuantity: 0,
       cost: { subtotalAmount: { amount: "0.00", currencyCode: "USD" }, totalAmount: { amount: "0.00", currencyCode: "USD" } },
       lines: cartLines,
+      attributes: [],
     });
     mockCarts.set(id, cart);
     return cart;
@@ -393,4 +395,23 @@ export async function removeFromCart(cartId: string, lineId: string): Promise<Ca
     { cartId, lineIds: [lineId] },
   );
   return reshapeCart(data.cartLinesRemove.cart);
+}
+
+/** Sets cart-level attributes (e.g. `concierge_assisted`) that flow through to the completed order's customAttributes. */
+export async function updateCartAttributes(
+  cartId: string,
+  attributes: { key: string; value: string }[],
+): Promise<Cart> {
+  if (!isShopifyConfigured) {
+    const cart = mockCarts.get(cartId);
+    if (!cart) throw new Error("Cart not found");
+    cart.attributes = attributes;
+    mockCarts.set(cartId, cart);
+    return cart;
+  }
+  const data = await shopifyFetch<{ cartAttributesUpdate: { cart: Parameters<typeof reshapeCart>[0] } }>(
+    cartAttributesUpdateMutation,
+    { cartId, attributes },
+  );
+  return reshapeCart(data.cartAttributesUpdate.cart);
 }

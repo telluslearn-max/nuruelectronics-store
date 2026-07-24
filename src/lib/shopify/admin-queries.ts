@@ -7,6 +7,10 @@ const orderFields = `
   currentTotalPriceSet {
     shopMoney { amount currencyCode }
   }
+  customAttributes {
+    key
+    value
+  }
   customer {
     id
     email
