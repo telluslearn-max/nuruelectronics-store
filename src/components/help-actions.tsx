@@ -49,13 +49,13 @@ export function HelpActions({ deliveryHref = "#delivery" }: { deliveryHref?: str
             <ChatIcon />
           </span>
           <div>
-            <h3 className="font-semibold">Chat with us</h3>
+            <h3 className="font-semibold">Message us on WhatsApp</h3>
             <p className="mt-1 text-sm text-neutral-500">
-              Message us on WhatsApp for advice before you buy.
+              Get advice on WhatsApp before you buy.
             </p>
           </div>
           <span className="mt-1 inline-flex items-center gap-1 text-sm font-medium text-accent">
-            Start chat
+            Message us
             <span aria-hidden="true" className="transition group-hover:translate-x-0.5">&rarr;</span>
           </span>
         </a>

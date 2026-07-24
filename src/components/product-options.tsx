@@ -192,6 +192,7 @@ export function ProductOptions({ product }: { product: Product }) {
                         key={value}
                         type="button"
                         disabled={!available}
+                        aria-pressed={isSelected}
                         onClick={() => setSelected((prev) => ({ ...prev, [option.name]: value }))}
                         className={`rounded-card border px-4 py-2.5 text-left text-sm transition ${
                           isSelected
