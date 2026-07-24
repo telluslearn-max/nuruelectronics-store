@@ -190,10 +190,23 @@ const specsMetafieldsBlock = `
     # Appliances & everything else
     { namespace: "specs", key: "energy_rating" }
     { namespace: "specs", key: "included_in_box" }
+    # Games
+    { namespace: "specs", key: "publisher" }
+    { namespace: "specs", key: "developer" }
+    { namespace: "specs", key: "release_date" }
+    { namespace: "specs", key: "multiplayer" }
+    { namespace: "specs", key: "age_rating" }
+    { namespace: "specs", key: "languages" }
+    # Gift cards
+    { namespace: "specs", key: "region" }
     # Coming-soon products only (tag:coming-soon) — a real future ship date,
-    # not parsed from the tag string.
+    # not parsed from the tag string. Namespace differs from the Games
+    # "release_date" spec above, which is why namespace is selected below —
+    # both share the bare key "release_date" and would be indistinguishable
+    # in the flat metafields response otherwise.
     { namespace: "availability", key: "release_date" }
   ]) {
+    namespace
     key
     value
   }

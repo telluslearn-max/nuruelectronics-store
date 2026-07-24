@@ -7,6 +7,8 @@ import { CompareToggleButton } from "@/components/compare/compare-toggle-button"
 import { WishlistToggleButton } from "@/components/wishlist/wishlist-toggle-button";
 import { ExUkCrossSellBanner } from "@/components/ex-uk-cross-sell-banner";
 import { Faq, type FaqItem } from "@/components/faq";
+import { GameTags } from "@/components/game-tags";
+import { GamingDarkTheme } from "@/components/gaming-theme";
 import { ProductCarousel } from "@/components/product-carousel";
 import { ProductCompareTable } from "@/components/product-compare-table";
 import { ProductGallery } from "@/components/product-gallery";
@@ -171,6 +173,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
         ]
       : []),
   ];
+  const isGaming = category?.slug === "gaming";
   const productUrl = `${SITE_URL}/products/${product.handle}`;
   const sku = product.variants.find((v) => v.sku)?.sku;
   const jsonLd = {
@@ -192,7 +195,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
         : "https://schema.org/OutOfStock",
     },
   };
-  return (
+  const content = (
     <div>
       <script
         type="application/ld+json"
@@ -241,6 +244,8 @@ export default async function ProductPage({ params }: ProductPageProps) {
 
       <BuyItWith current={product} extras={bundleExtras} />
 
+      {isGaming && <GameTags product={product} />}
+
       <ProductSpecs specs={product.specs ?? []} />
 
       {specsGuide.length > 0 && (
@@ -288,4 +293,6 @@ export default async function ProductPage({ params }: ProductPageProps) {
       </section>
     </div>
   );
+
+  return isGaming ? <GamingDarkTheme>{content}</GamingDarkTheme> : content;
 }

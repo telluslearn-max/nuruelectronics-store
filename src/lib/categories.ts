@@ -230,8 +230,14 @@ export const categories: Category[] = [
   {
     slug: "gaming",
     label: "Gaming",
-    types: ["Gaming Consoles", "Gaming Accessories", "Gaming Peripherals", "Games"],
-    query: productTypeQuery(["Gaming Consoles", "Gaming Accessories", "Gaming Peripherals", "Games"]),
+    types: ["Gaming Consoles", "Gaming Accessories", "Gaming Peripherals", "Games", "Gift Cards"],
+    query: productTypeQuery([
+      "Gaming Consoles",
+      "Gaming Accessories",
+      "Gaming Peripherals",
+      "Games",
+      "Gift Cards",
+    ]),
     blurb: "Consoles, controllers, and gear for every player.",
     art: "gaming",
     groups: [
@@ -247,6 +253,7 @@ export const categories: Category[] = [
         query: productTypeQuery(["Gaming Accessories"]),
       },
       { slug: "games", label: "Games", query: productTypeQuery(["Games"]) },
+      { slug: "gift-cards", label: "Gift Cards", query: productTypeQuery(["Gift Cards"]) },
       // Razer alone is 58% of this category's catalog. Razer also makes
       // gaming headsets categorized as Audio, so intersect with this
       // category's own types to keep the chip scoped to Gaming.
@@ -370,6 +377,42 @@ export const categories: Category[] = [
 
 export function getCategory(slug: string): Category | undefined {
   return categories.find((c) => c.slug === slug);
+}
+
+// Genre browsing only applies within the Gaming category's "Games" group, so
+// this lives as its own lookup rather than a generic sub-group concept on
+// every category's `groups`.
+export const gameGenres: { slug: string; label: string; query: string }[] = [
+  { slug: "action", label: "Action", query: "tag:genre-action" },
+  { slug: "adventure", label: "Adventure", query: "tag:genre-adventure" },
+  { slug: "casual", label: "Casual", query: "tag:genre-casual" },
+  { slug: "horror", label: "Horror", query: "tag:genre-horror" },
+  { slug: "indie", label: "Indie", query: "tag:genre-indie" },
+  { slug: "racing", label: "Racing", query: "tag:genre-racing" },
+  { slug: "rpg", label: "RPG", query: "tag:genre-rpg" },
+  { slug: "simulation", label: "Simulation", query: "tag:genre-simulation" },
+];
+
+export function getGameGenre(slug: string) {
+  return gameGenres.find((g) => g.slug === slug);
+}
+
+export function genreForProductTags(tags: string[]) {
+  return gameGenres.find((g) => tags.includes(`genre-${g.slug}`));
+}
+
+// Editorial shelves, same "Games" group scope as gameGenres above — a
+// second, independent facet (a game can be both RPG and Beginner Friendly),
+// so it's its own lookup rather than folded into gameGenres.
+export const gameCollections: { slug: string; label: string; query: string }[] = [
+  { slug: "editors-choice", label: "Editor's Choice", query: "tag:collection-editors-choice" },
+  { slug: "play-together", label: "Play Together", query: "tag:collection-play-together" },
+  { slug: "beginner-friendly", label: "Beginner Friendly", query: "tag:collection-beginner-friendly" },
+  { slug: "for-all-ages", label: "For All Ages", query: "tag:collection-for-all-ages" },
+];
+
+export function getGameCollection(slug: string) {
+  return gameCollections.find((c) => c.slug === slug);
 }
 
 /**

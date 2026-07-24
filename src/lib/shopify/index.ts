@@ -22,24 +22,32 @@ import {
   recalculateMockCart,
 } from "./mock-data";
 
+function matchesClause(product: Product, rawClause: string): boolean {
+  const clause = rawClause.trim();
+  if (clause.startsWith("product_type:")) {
+    const value = clause.slice("product_type:".length).replace(/^"|"$/g, "");
+    return product.productType.toLowerCase() === value.toLowerCase();
+  }
+  if (clause.startsWith("tag:")) {
+    const value = clause.slice("tag:".length).replace(/^"|"$/g, "");
+    return product.tags.some((tag) => tag.toLowerCase() === value.toLowerCase());
+  }
+  return product.title.toLowerCase().includes(clause.toLowerCase());
+}
+
 const blogHandle = process.env.SHOPIFY_BLOG_HANDLE || "news";
 
 // Parses the simple query shapes this codebase generates (`product_type:"X"`,
-// `tag:X`, joined with " OR ") so mock mode can exercise category/ecosystem/kit
-// filters locally. Falls back to a title-substring match for freeform text,
-// which is what the /search page passes.
+// `tag:X`, joined with " OR " and/or " AND ", with an optional single layer of
+// parens grouping one side of an AND — e.g. category/genre/collection facets
+// combined as `product_type:"Games" AND tag:genre-x AND tag:collection-y`) so
+// mock mode can exercise category/genre/collection/ecosystem/kit filters
+// locally. Falls back to a title-substring match for freeform text, which is
+// what the /search page passes.
 export function matchesSearchTerm(product: Product, searchTerm: string): boolean {
-  return searchTerm.split(" OR ").some((rawClause) => {
-    const clause = rawClause.trim();
-    if (clause.startsWith("product_type:")) {
-      const value = clause.slice("product_type:".length).replace(/^"|"$/g, "");
-      return product.productType.toLowerCase() === value.toLowerCase();
-    }
-    if (clause.startsWith("tag:")) {
-      const value = clause.slice("tag:".length).replace(/^"|"$/g, "");
-      return product.tags.some((tag) => tag.toLowerCase() === value.toLowerCase());
-    }
-    return product.title.toLowerCase().includes(clause.toLowerCase());
+  return searchTerm.split(" AND ").every((rawSide) => {
+    const side = rawSide.trim().replace(/^\(/, "").replace(/\)$/, "");
+    return side.split(" OR ").some((rawClause) => matchesClause(product, rawClause));
   });
 }
 
@@ -96,16 +104,20 @@ function reshapeVariants(variants: Connection<ProductVariant>): ProductVariant[]
 function reshapeProduct(node: Omit<Product, "images" | "variants" | "specs" | "releaseDate"> & {
   images: Connection<ProductImage>;
   variants: Connection<ProductVariant>;
-  metafields?: ({ key: string; value: string } | null)[];
+  metafields?: ({ namespace: string; key: string; value: string } | null)[];
 }): Product {
   const { metafields, ...rest } = node;
-  const populated = metafields?.filter((m): m is { key: string; value: string } => m !== null) ?? [];
+  const populated =
+    metafields?.filter((m): m is { namespace: string; key: string; value: string } => m !== null) ?? [];
   return {
     ...rest,
     images: reshapeImages(node.images),
     variants: reshapeVariants(node.variants),
-    specs: populated.filter((m) => m.key !== "release_date"),
-    releaseDate: populated.find((m) => m.key === "release_date")?.value,
+    // Both a Games spec and the coming-soon ship date use the bare key
+    // "release_date" in different namespaces — split on namespace, not key,
+    // so they can't shadow each other.
+    specs: populated.filter((m) => m.namespace === "specs").map(({ key, value }) => ({ key, value })),
+    releaseDate: populated.find((m) => m.namespace === "availability" && m.key === "release_date")?.value,
   };
 }
 

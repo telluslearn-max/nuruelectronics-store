@@ -30,6 +30,15 @@ export const SPEC_LABELS: Record<string, string> = {
   // Appliances & general
   energy_rating: "Energy Rating",
   included_in_box: "In the Box",
+  // Games
+  publisher: "Publisher",
+  developer: "Developer",
+  release_date: "Release Date",
+  multiplayer: "Multiplayer",
+  age_rating: "Age Rating",
+  languages: "Languages",
+  // Gift cards
+  region: "Region",
 };
 
 // Groups the flat SPEC_LABELS keys above into the categorized sections the
@@ -48,6 +57,12 @@ export const SPEC_CATEGORIES: SpecCategory[] = [
   },
   { id: "physical", label: "Physical", keys: ["dimensions", "weight", "material"] },
   { id: "general", label: "Appliances & General", keys: ["energy_rating", "included_in_box"] },
+  {
+    id: "game",
+    label: "Game Info",
+    keys: ["publisher", "developer", "release_date", "multiplayer", "age_rating", "languages"],
+  },
+  { id: "giftcard", label: "Gift Card Details", keys: ["region"] },
 ];
 
 function CategoryIcon({ id, className }: { id: string; className?: string }) {
@@ -99,6 +114,21 @@ function CategoryIcon({ id, className }: { id: string; className?: string }) {
       <>
         <circle cx="12" cy="12" r="9" />
         <path d="M12 11v5M12 8h.01" />
+      </>
+    ),
+    game: (
+      <>
+        <rect x="2.5" y="8" width="19" height="9" rx="4.5" />
+        <path d="M7 10.5v4M5 12.5h4" />
+        <circle cx="15.5" cy="11" r="0.75" fill="currentColor" stroke="none" />
+        <circle cx="18" cy="13.5" r="0.75" fill="currentColor" stroke="none" />
+      </>
+    ),
+    giftcard: (
+      <>
+        <rect x="3" y="8" width="18" height="12" rx="1.5" />
+        <path d="M3 12h18" />
+        <path d="M12 8c-1.5-3-4-4-5-2.5S8 8 12 8c4 0-.5-2.5-1.5-2.5S10.5 5 12 8Z" />
       </>
     ),
   };

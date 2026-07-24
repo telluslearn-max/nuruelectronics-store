@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { FeatureCarousel } from "@/components/feature-carousel";
+import { ProductCarousel } from "@/components/product-carousel";
 import { ProductList } from "@/components/product-list";
 import { RelatedCategories, type RelatedCategoryEntry } from "@/components/related-categories";
 import { SectionHeading } from "@/components/section-heading";
@@ -33,6 +34,7 @@ export function CollectionPage({
   buildHref,
   groupChips,
   flagshipProducts,
+  comingSoonProducts,
   relatedCategories,
   categoryNav,
   breadcrumb,
@@ -50,6 +52,8 @@ export function CollectionPage({
   groupChips?: ReactNode;
   /** Best-sellers shown as a highlight carousel above the full listing. */
   flagshipProducts?: Product[];
+  /** Pre-release titles shown as their own rail, gaming category only. */
+  comingSoonProducts?: Product[];
   /** Ranked complementary categories to cross-sell below the listing, most relevant first. */
   relatedCategories?: RelatedCategoryEntry[];
   /** "Shop by category" navigation shown at the very top of the page, above the flagship carousel. */
@@ -98,6 +102,15 @@ export function CollectionPage({
             </a>
           </div>
           <FeatureCarousel products={flagshipProducts} />
+        </section>
+      )}
+
+      {comingSoonProducts && comingSoonProducts.length > 0 && (
+        <section className="mb-12">
+          <SectionHeading eyebrow="Pre-order" title="Coming Soon" />
+          <div className="mt-4">
+            <ProductCarousel products={comingSoonProducts} />
+          </div>
         </section>
       )}
 

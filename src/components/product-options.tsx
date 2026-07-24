@@ -4,6 +4,9 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { AddToCartButton } from "@/components/cart/add-to-cart-button";
 import { BnplSection } from "@/components/bnpl-section";
 import { useCart } from "@/components/cart/cart-context";
+import { DigitalDeliveryCard } from "@/components/digital-delivery-card";
+import { GameTradeIn } from "@/components/game-trade-in";
+import { GiftCardRegionNotice } from "@/components/gift-card-region-notice";
 import { NotifyMeButton } from "@/components/notify-me-button";
 import { ProductBadges } from "@/components/product-badges";
 import { ProductDeliveryCard } from "@/components/product-delivery-card";
@@ -11,6 +14,7 @@ import { TradeInSection } from "@/components/trade-in-section";
 import { WhatsAppOrderButton } from "@/components/whatsapp-order-button";
 import { addItem } from "@/lib/actions";
 import { getProductBadges } from "@/lib/badges";
+import { isDigitalProduct } from "@/lib/digital-products";
 import { resolveSwatchColor } from "@/lib/color-swatches";
 import { formatPrice } from "@/lib/format";
 import { getSavings } from "@/lib/pricing";
@@ -67,6 +71,7 @@ export function ProductOptions({ product }: { product: Product }) {
     [product.variants, selected],
   );
 
+  const region = product.specs?.find((s) => s.key === "region")?.value;
   const showOptions = product.options.some((option) => option.values.length > 1);
   const price = selectedVariant?.price ?? product.priceRange.minVariantPrice;
   const compareAtPrice = selectedVariant?.compareAtPrice ?? product.compareAtPriceRange?.minVariantPrice;
@@ -168,8 +173,9 @@ export function ProductOptions({ product }: { product: Product }) {
       </div>
       {selectedVariant?.sku && <p className="mt-1 text-xs text-neutral-400">SKU: {selectedVariant.sku}</p>}
       <div className="mt-4">
-        <ProductDeliveryCard />
+        {isDigitalProduct(product.productType) ? <DigitalDeliveryCard /> : <ProductDeliveryCard />}
       </div>
+      {region && <GiftCardRegionNotice region={region} />}
       <BnplSection product={product} price={price} />
       <TradeInSection productType={product.productType} />
 
@@ -225,6 +231,10 @@ export function ProductOptions({ product }: { product: Product }) {
             );
           })}
         </div>
+      )}
+
+      {product.productType === "Games" && (
+        <GameTradeIn productTitle={product.title} productHandle={product.handle} />
       )}
 
       <div className="mt-6">

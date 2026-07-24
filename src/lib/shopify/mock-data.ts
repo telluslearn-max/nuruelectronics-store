@@ -470,8 +470,218 @@ export const mockProducts: Product[] = [
       { key: "storage", value: "256GB" },
     ],
   },
+  // Games PDP demo data: genre tag, Platform + Condition variant options, and
+  // the Games-specific spec metafields, so the gaming section's layout
+  // (genre tiles, tag-icon row, trade-in) can be reviewed locally.
   {
     id: "gid://mock/Product/19",
+    handle: "star-wars-jedi-survivor",
+    title: "STAR WARS Jedi: Survivor",
+    description: "The story of Cal Kestis continues in an epic new adventure across the galaxy.",
+    descriptionHtml:
+      "<p>The story of Cal Kestis continues in an epic new adventure across the galaxy.</p>",
+    availableForSale: true,
+    productType: "Games",
+    tags: ["mock", "genre-adventure", "collection-editors-choice"],
+    priceRange: { minVariantPrice: money("54.99"), maxVariantPrice: money("69.99") },
+    images: [
+      { url: "https://picsum.photos/seed/jedi-survivor/800/1000", altText: null, width: 800, height: 1000 },
+    ],
+    variants: [
+      {
+        id: "gid://mock/ProductVariant/20",
+        title: "Xbox / New Disc",
+        availableForSale: true,
+        price: money("69.99"),
+        selectedOptions: [
+          { name: "Platform", value: "Xbox" },
+          { name: "Condition", value: "New Disc" },
+        ],
+      },
+      {
+        id: "gid://mock/ProductVariant/21",
+        title: "Xbox / Used Disc",
+        availableForSale: true,
+        price: money("54.99"),
+        selectedOptions: [
+          { name: "Platform", value: "Xbox" },
+          { name: "Condition", value: "Used Disc" },
+        ],
+      },
+      {
+        id: "gid://mock/ProductVariant/22",
+        title: "PlayStation / New Disc",
+        availableForSale: true,
+        price: money("69.99"),
+        selectedOptions: [
+          { name: "Platform", value: "PlayStation" },
+          { name: "Condition", value: "New Disc" },
+        ],
+      },
+      {
+        id: "gid://mock/ProductVariant/23",
+        title: "PlayStation / Used Disc",
+        availableForSale: true,
+        price: money("54.99"),
+        selectedOptions: [
+          { name: "Platform", value: "PlayStation" },
+          { name: "Condition", value: "Used Disc" },
+        ],
+      },
+      {
+        id: "gid://mock/ProductVariant/24",
+        title: "Nintendo / New Disc",
+        availableForSale: true,
+        price: money("69.99"),
+        selectedOptions: [
+          { name: "Platform", value: "Nintendo" },
+          { name: "Condition", value: "New Disc" },
+        ],
+      },
+      {
+        id: "gid://mock/ProductVariant/25",
+        title: "Nintendo / Used Disc",
+        availableForSale: true,
+        price: money("54.99"),
+        selectedOptions: [
+          { name: "Platform", value: "Nintendo" },
+          { name: "Condition", value: "Used Disc" },
+        ],
+      },
+    ],
+    options: [
+      { id: "1", name: "Platform", values: ["Xbox", "PlayStation", "Nintendo"] },
+      { id: "2", name: "Condition", values: ["New Disc", "Used Disc"] },
+    ],
+    specs: [
+      { key: "publisher", value: "Deep Silver" },
+      { key: "developer", value: "Respawn Entertainment" },
+      { key: "release_date", value: "28 Apr, 2023" },
+      { key: "multiplayer", value: "Single Player" },
+      { key: "age_rating", value: "PEGI 16" },
+      { key: "languages", value: "English, French, German, Spanish, Italian, Japanese" },
+    ],
+  },
+  // A second Games entry with a different genre/collection mix, so the
+  // genre + collection tile filters have more than one item to distinguish
+  // locally.
+  {
+    id: "gid://mock/Product/20",
+    handle: "nebula-kart-rush",
+    title: "Nebula Kart Rush",
+    description: "A bright, pick-up-and-play kart racer for the whole family.",
+    descriptionHtml: "<p>A bright, pick-up-and-play kart racer for the whole family.</p>",
+    availableForSale: true,
+    productType: "Games",
+    tags: [
+      "mock",
+      "genre-racing",
+      "genre-casual",
+      "collection-beginner-friendly",
+      "collection-for-all-ages",
+      "collection-play-together",
+    ],
+    priceRange: { minVariantPrice: money("29.99"), maxVariantPrice: money("39.99") },
+    images: [
+      { url: "https://picsum.photos/seed/nebula-kart-rush/800/1000", altText: null, width: 800, height: 1000 },
+    ],
+    variants: [
+      {
+        id: "gid://mock/ProductVariant/26",
+        title: "Xbox / New Disc",
+        availableForSale: true,
+        price: money("39.99"),
+        selectedOptions: [
+          { name: "Platform", value: "Xbox" },
+          { name: "Condition", value: "New Disc" },
+        ],
+      },
+      {
+        id: "gid://mock/ProductVariant/27",
+        title: "Nintendo / New Disc",
+        availableForSale: true,
+        price: money("39.99"),
+        selectedOptions: [
+          { name: "Platform", value: "Nintendo" },
+          { name: "Condition", value: "New Disc" },
+        ],
+      },
+      {
+        id: "gid://mock/ProductVariant/28",
+        title: "Nintendo / Used Disc",
+        availableForSale: true,
+        price: money("29.99"),
+        selectedOptions: [
+          { name: "Platform", value: "Nintendo" },
+          { name: "Condition", value: "Used Disc" },
+        ],
+      },
+    ],
+    options: [
+      { id: "1", name: "Platform", values: ["Xbox", "Nintendo"] },
+      { id: "2", name: "Condition", values: ["New Disc", "Used Disc"] },
+    ],
+    specs: [
+      { key: "publisher", value: "Nuru Play" },
+      { key: "developer", value: "Nuru Play" },
+      { key: "release_date", value: "14 Jun, 2024" },
+      { key: "multiplayer", value: "Local co-op, Split-screen" },
+      { key: "age_rating", value: "PEGI 3" },
+      { key: "languages", value: "English, French, Swahili" },
+    ],
+  },
+  // Digital gift card demo — Amount as a plain variant option (same generic
+  // mechanism as Platform/Condition above), region-us tag driving the "US
+  // Store Only" badge, and a region spec driving the PDP notice.
+  {
+    id: "gid://mock/Product/21",
+    handle: "psn-gift-card-us",
+    title: "PlayStation Network Gift Card (US)",
+    description: "Add funds to a US PlayStation Network account for games, add-ons, and subscriptions.",
+    descriptionHtml:
+      "<p>Add funds to a US PlayStation Network account for games, add-ons, and subscriptions.</p>",
+    availableForSale: true,
+    productType: "Gift Cards",
+    tags: ["mock", "region-us"],
+    priceRange: { minVariantPrice: money("10.00"), maxVariantPrice: money("100.00") },
+    images: [
+      { url: "https://picsum.photos/seed/psn-gift-card-us/800/1000", altText: null, width: 800, height: 1000 },
+    ],
+    variants: [
+      {
+        id: "gid://mock/ProductVariant/29",
+        title: "$10",
+        availableForSale: true,
+        price: money("10.00"),
+        selectedOptions: [{ name: "Amount", value: "$10" }],
+      },
+      {
+        id: "gid://mock/ProductVariant/30",
+        title: "$25",
+        availableForSale: true,
+        price: money("25.00"),
+        selectedOptions: [{ name: "Amount", value: "$25" }],
+      },
+      {
+        id: "gid://mock/ProductVariant/31",
+        title: "$50",
+        availableForSale: true,
+        price: money("50.00"),
+        selectedOptions: [{ name: "Amount", value: "$50" }],
+      },
+      {
+        id: "gid://mock/ProductVariant/32",
+        title: "$100",
+        availableForSale: true,
+        price: money("100.00"),
+        selectedOptions: [{ name: "Amount", value: "$100" }],
+      },
+    ],
+    options: [{ id: "1", name: "Amount", values: ["$10", "$25", "$50", "$100"] }],
+    specs: [{ key: "region", value: "United States" }],
+  },
+  {
+    id: "gid://mock/Product/22",
     handle: "galaxy-s27-ultra",
     title: "Galaxy S27 Ultra",
     description:
@@ -485,7 +695,7 @@ export const mockProducts: Product[] = [
     images: [],
     variants: [
       {
-        id: "gid://mock/ProductVariant/20",
+        id: "gid://mock/ProductVariant/33",
         title: "Default",
         availableForSale: false,
         price: money("1299.00"),
