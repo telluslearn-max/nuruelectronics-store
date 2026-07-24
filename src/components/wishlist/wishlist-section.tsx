@@ -14,9 +14,14 @@ export function WishlistSection() {
   useEffect(() => {
     if (items.length === 0) return;
     let cancelled = false;
-    getProductsByHandles(items.map((i) => i.handle)).then((result) => {
-      if (!cancelled) setProducts(result);
-    });
+    getProductsByHandles(items.map((i) => i.handle))
+      .then((result) => {
+        if (!cancelled) setProducts(result);
+      })
+      .catch((error) => {
+        console.error("Failed to load saved items:", error);
+        if (!cancelled) setProducts([]);
+      });
     return () => {
       cancelled = true;
     };
