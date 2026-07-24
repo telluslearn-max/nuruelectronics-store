@@ -470,6 +470,98 @@ export const mockProducts: Product[] = [
       { key: "storage", value: "256GB" },
     ],
   },
+  // Games PDP demo data: genre tag, Platform + Condition variant options, and
+  // the Games-specific spec metafields, so the gaming section's layout
+  // (genre tiles, tag-icon row, trade-in) can be reviewed locally.
+  {
+    id: "gid://mock/Product/19",
+    handle: "star-wars-jedi-survivor",
+    title: "STAR WARS Jedi: Survivor",
+    description: "The story of Cal Kestis continues in an epic new adventure across the galaxy.",
+    descriptionHtml:
+      "<p>The story of Cal Kestis continues in an epic new adventure across the galaxy.</p>",
+    availableForSale: true,
+    productType: "Games",
+    tags: ["mock", "genre-adventure"],
+    priceRange: { minVariantPrice: money("54.99"), maxVariantPrice: money("69.99") },
+    images: [
+      { url: "https://picsum.photos/seed/jedi-survivor/800/1000", altText: null, width: 800, height: 1000 },
+    ],
+    variants: [
+      {
+        id: "gid://mock/ProductVariant/20",
+        title: "Xbox / New Disc",
+        availableForSale: true,
+        price: money("69.99"),
+        selectedOptions: [
+          { name: "Platform", value: "Xbox" },
+          { name: "Condition", value: "New Disc" },
+        ],
+      },
+      {
+        id: "gid://mock/ProductVariant/21",
+        title: "Xbox / Used Disc",
+        availableForSale: true,
+        price: money("54.99"),
+        selectedOptions: [
+          { name: "Platform", value: "Xbox" },
+          { name: "Condition", value: "Used Disc" },
+        ],
+      },
+      {
+        id: "gid://mock/ProductVariant/22",
+        title: "PlayStation / New Disc",
+        availableForSale: true,
+        price: money("69.99"),
+        selectedOptions: [
+          { name: "Platform", value: "PlayStation" },
+          { name: "Condition", value: "New Disc" },
+        ],
+      },
+      {
+        id: "gid://mock/ProductVariant/23",
+        title: "PlayStation / Used Disc",
+        availableForSale: true,
+        price: money("54.99"),
+        selectedOptions: [
+          { name: "Platform", value: "PlayStation" },
+          { name: "Condition", value: "Used Disc" },
+        ],
+      },
+      {
+        id: "gid://mock/ProductVariant/24",
+        title: "Nintendo / New Disc",
+        availableForSale: true,
+        price: money("69.99"),
+        selectedOptions: [
+          { name: "Platform", value: "Nintendo" },
+          { name: "Condition", value: "New Disc" },
+        ],
+      },
+      {
+        id: "gid://mock/ProductVariant/25",
+        title: "Nintendo / Used Disc",
+        availableForSale: true,
+        price: money("54.99"),
+        selectedOptions: [
+          { name: "Platform", value: "Nintendo" },
+          { name: "Condition", value: "Used Disc" },
+        ],
+      },
+    ],
+    options: [
+      { id: "1", name: "Platform", values: ["Xbox", "PlayStation", "Nintendo"] },
+      { id: "2", name: "Condition", values: ["New Disc", "Used Disc"] },
+    ],
+    specs: [
+      { key: "publisher", value: "Deep Silver" },
+      { key: "developer", value: "Respawn Entertainment" },
+      { key: "release_date", value: "28 Apr, 2023" },
+      { key: "multiplayer", value: "Single Player" },
+      { key: "age_rating", value: "PEGI 16" },
+      { key: "languages", value: "English, French, German, Spanish, Italian, Japanese" },
+    ],
+  },
 ];
 
 // In-memory mock cart store, keyed by cart id. Resets on server restart -

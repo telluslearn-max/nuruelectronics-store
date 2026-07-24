@@ -390,6 +390,10 @@ export function getGameGenre(slug: string) {
   return gameGenres.find((g) => g.slug === slug);
 }
 
+export function genreForProductTags(tags: string[]) {
+  return gameGenres.find((g) => tags.includes(`genre-${g.slug}`));
+}
+
 /**
  * Cross-sell graph: each category points to its most relevant neighbors,
  * ranked, with a reason a shopper would actually care about. Not symmetric —

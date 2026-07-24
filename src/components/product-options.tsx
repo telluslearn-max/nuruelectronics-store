@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { AddToCartButton } from "@/components/cart/add-to-cart-button";
 import { BnplSection } from "@/components/bnpl-section";
 import { useCart } from "@/components/cart/cart-context";
+import { GameTradeIn } from "@/components/game-trade-in";
 import { ProductBadges } from "@/components/product-badges";
 import { ProductDeliveryCard } from "@/components/product-delivery-card";
 import { TradeInSection } from "@/components/trade-in-section";
@@ -168,6 +169,10 @@ export function ProductOptions({ product }: { product: Product }) {
             );
           })}
         </div>
+      )}
+
+      {product.productType === "Games" && (
+        <GameTradeIn productTitle={product.title} productHandle={product.handle} />
       )}
 
       <div className="mt-6">

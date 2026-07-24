@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { Breadcrumb } from "@/components/breadcrumb";
 import { CategoryGuide } from "@/components/category-guide";
 import { chipClass, CollectionPage } from "@/components/collection-page";
+import { GamingDarkTheme } from "@/components/gaming-theme";
 import { GenreTiles } from "@/components/genre-tiles";
 import { getCategory, getGameGenre, getRelatedCategories } from "@/lib/categories";
 import { getCategoryGuide } from "@/lib/category-guides";
@@ -133,7 +134,7 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
     />
   );
 
-  return (
+  const page = (
     <CollectionPage
       title={category.label}
       blurb={category.blurb}
@@ -157,4 +158,6 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
       categoryGuide={guide && <CategoryGuide guide={guide} />}
     />
   );
+
+  return category.slug === "gaming" ? <GamingDarkTheme>{page}</GamingDarkTheme> : page;
 }
