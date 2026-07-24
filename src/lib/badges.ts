@@ -13,6 +13,12 @@ export function getProductBadges(params: {
 }): Badge[] {
   const { tags, availableForSale, price, compareAtPrice, variant } = params;
 
+  // Pre-release games are typically unavailable-for-sale (no inventory yet),
+  // so this must be checked before the sold-out short-circuit below.
+  if (tags.includes("coming-soon")) {
+    return [{ key: "coming-soon", label: "Coming Soon", className: "bg-accent/10 text-accent" }];
+  }
+
   if (!availableForSale) {
     return [{ key: "sold-out", label: "Sold out", className: "bg-background text-neutral-600" }];
   }

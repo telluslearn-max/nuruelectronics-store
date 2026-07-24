@@ -190,6 +190,13 @@ const specsMetafieldsBlock = `
     # Appliances & everything else
     { namespace: "specs", key: "energy_rating" }
     { namespace: "specs", key: "included_in_box" }
+    # Games
+    { namespace: "specs", key: "publisher" }
+    { namespace: "specs", key: "developer" }
+    { namespace: "specs", key: "release_date" }
+    { namespace: "specs", key: "multiplayer" }
+    { namespace: "specs", key: "age_rating" }
+    { namespace: "specs", key: "languages" }
   ]) {
     key
     value

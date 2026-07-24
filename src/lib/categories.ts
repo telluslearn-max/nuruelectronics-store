@@ -372,6 +372,24 @@ export function getCategory(slug: string): Category | undefined {
   return categories.find((c) => c.slug === slug);
 }
 
+// Genre browsing only applies within the Gaming category's "Games" group, so
+// this lives as its own lookup rather than a generic sub-group concept on
+// every category's `groups`.
+export const gameGenres: { slug: string; label: string; query: string }[] = [
+  { slug: "action", label: "Action", query: "tag:genre-action" },
+  { slug: "adventure", label: "Adventure", query: "tag:genre-adventure" },
+  { slug: "casual", label: "Casual", query: "tag:genre-casual" },
+  { slug: "horror", label: "Horror", query: "tag:genre-horror" },
+  { slug: "indie", label: "Indie", query: "tag:genre-indie" },
+  { slug: "racing", label: "Racing", query: "tag:genre-racing" },
+  { slug: "rpg", label: "RPG", query: "tag:genre-rpg" },
+  { slug: "simulation", label: "Simulation", query: "tag:genre-simulation" },
+];
+
+export function getGameGenre(slug: string) {
+  return gameGenres.find((g) => g.slug === slug);
+}
+
 /**
  * Cross-sell graph: each category points to its most relevant neighbors,
  * ranked, with a reason a shopper would actually care about. Not symmetric —
