@@ -1,6 +1,7 @@
 import { ProductCompareTable } from "@/components/product-compare-table";
 import { ConciergeCheckoutCta } from "./concierge-checkout-cta";
 import { ConciergeProductCard } from "./concierge-product-card";
+import { ConciergeProductRecommendations } from "./concierge-product-recommendations";
 import type { ConciergeDisplayMessage } from "./use-concierge-messages";
 import { ConciergeWhatsAppCta } from "./concierge-whatsapp-cta";
 
@@ -39,13 +40,14 @@ export function ConciergeMessage({
 
         {message.products &&
           (message.products.mode === "list" || message.products.products.length < 2) &&
-          message.products.products.length > 0 && (
-            <div className="mt-3 grid grid-cols-1 gap-4">
-              {message.products.products.slice(0, 6).map((product) => (
-                <ConciergeProductCard key={product.handle} product={product} />
-              ))}
+          message.products.products.length > 0 &&
+          (message.products.products.length === 1 ? (
+            <div className="mt-3">
+              <ConciergeProductCard product={message.products.products[0]} />
             </div>
-          )}
+          ) : (
+            <ConciergeProductRecommendations products={message.products.products} />
+          ))}
 
         {message.whatsappMessage && <ConciergeWhatsAppCta message={message.whatsappMessage} />}
 
