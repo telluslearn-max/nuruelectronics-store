@@ -21,11 +21,20 @@ export function SearchBox() {
     if (trimmed.length < 2) return;
     let cancelled = false;
     const timer = setTimeout(async () => {
-      const results = await searchSuggestions(trimmed);
-      if (cancelled) return;
-      setSuggestions(results);
-      setIsOpen(results.length > 0);
-      setActiveIndex(-1);
+      try {
+        const results = await searchSuggestions(trimmed);
+        if (cancelled) return;
+        setSuggestions(results);
+        setIsOpen(results.length > 0);
+        setActiveIndex(-1);
+      } catch (error) {
+        // A rejected search shouldn't surface as an unhandled promise rejection with the dropdown
+        // just silently never opening — log it and leave suggestions empty/closed instead.
+        console.error("Failed to load search suggestions:", error);
+        if (cancelled) return;
+        setSuggestions([]);
+        setIsOpen(false);
+      }
     }, 250);
     return () => {
       cancelled = true;

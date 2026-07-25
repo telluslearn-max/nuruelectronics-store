@@ -7,6 +7,7 @@ import { createFixedAsset, disposeFixedAsset, runMonthlyDepreciation } from "@/l
 import { parsePage, type PageSearchParams } from "@/lib/pagination";
 import { PaginationControls } from "@/components/admin/pagination-controls";
 import { FeedbackBanner } from "@/components/admin/feedback-banner";
+import { ConfirmSubmitButton } from "@/components/admin/confirm-submit-button";
 
 export const metadata: Metadata = { title: "Fixed Assets" };
 
@@ -127,9 +128,12 @@ export default async function AdminFixedAssetsPage({
                       <label className="block text-xs text-neutral-500">Disposal proceeds</label>
                       <input type="number" step="0.01" name="disposalValue" defaultValue={0} className={inputClass} />
                     </div>
-                    <button type="submit" className={secondaryButtonClass}>
+                    <ConfirmSubmitButton
+                      confirmMessage={`Dispose "${asset.name}"? This posts a disposal journal entry and can't be undone.`}
+                      className={secondaryButtonClass}
+                    >
                       Confirm disposal
-                    </button>
+                    </ConfirmSubmitButton>
                   </form>
                 </details>
               )}

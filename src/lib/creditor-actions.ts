@@ -5,7 +5,7 @@ import { prisma } from "./prisma";
 import { requireAdminSession } from "./admin-auth";
 import { mintDocumentNumber } from "./documents";
 import { ACCOUNTS, cashAccountForMethod, postJournalEntry } from "./ledger";
-import { redirectWithError, redirectWithSuccess } from "./admin-feedback";
+import { ActionGuardError, redirectWithError, redirectWithSuccess } from "./admin-feedback";
 import { logAdminAction } from "./audit-log";
 import type { ExpenseCategory } from "@prisma/client";
 import { EXPENSE_CATEGORIES, PAYMENT_METHODS, parseEnumField } from "./parse-enum";
@@ -85,45 +85,56 @@ export async function recordSupplierPayment(billId: string, formData: FormData):
     redirectWithError(`/admin/bills/${billId}`, "Payment amount must be greater than zero.");
   }
 
-  await prisma.$transaction(async (tx) => {
-    const payment = await tx.supplierPayment.create({
-      data: { billId, amount: amount.toFixed(2), method, reference, paidAt },
-    });
+  try {
+    await prisma.$transaction(async (tx) => {
+      const payment = await tx.supplierPayment.create({
+        data: { billId, amount: amount.toFixed(2), method, reference, paidAt },
+      });
 
-    // Atomic increment (rather than computing amountPaid from the `bill` read
-    // above, taken before this transaction opened) so two concurrent payments
-    // against the same bill can't clobber each other's contribution.
-    const updated = await tx.bill.update({
-      where: { id: billId },
-      data: { amountPaid: { increment: amount } },
-    });
-    await tx.bill.update({
-      where: { id: billId },
-      data: { status: nextBillStatus(updated.amount.toString(), Number(updated.amountPaid)) },
-    });
+      // Atomic increment (rather than computing amountPaid from the `bill` read
+      // above, taken before this transaction opened) so two concurrent payments
+      // against the same bill can't clobber each other's contribution.
+      const updated = await tx.bill.update({
+        where: { id: billId },
+        data: { amountPaid: { increment: amount } },
+      });
+      // Checked post-increment (inside the same transaction, under the row lock the increment
+      // just took) rather than against the pre-transaction `bill` read, so this can't race with
+      // a concurrent payment the way a pre-check against a stale total would.
+      if (Number(updated.amountPaid) > Number(updated.amount)) {
+        throw new ActionGuardError("That payment would overpay the bill — reduce the amount.", `/admin/bills/${billId}`);
+      }
+      await tx.bill.update({
+        where: { id: billId },
+        data: { status: nextBillStatus(updated.amount.toString(), Number(updated.amountPaid)) },
+      });
 
-    await postJournalEntry(tx, {
-      date: paidAt,
-      description: `Payment against bill ${bill.number}`,
-      sourceType: "supplier_payment",
-      sourceId: payment.id,
-      lines: [
-        { accountCode: ACCOUNTS.ACCOUNTS_PAYABLE, debit: amount },
-        { accountCode: cashAccountForMethod(method), credit: amount },
-      ],
-    });
+      await postJournalEntry(tx, {
+        date: paidAt,
+        description: `Payment against bill ${bill.number}`,
+        sourceType: "supplier_payment",
+        sourceId: payment.id,
+        lines: [
+          { accountCode: ACCOUNTS.ACCOUNTS_PAYABLE, debit: amount },
+          { accountCode: cashAccountForMethod(method), credit: amount },
+        ],
+      });
 
-    await logAdminAction(
-      {
-        action: "bill.recordPayment",
-        entityType: "bill",
-        entityId: billId,
-        summary: `Recorded payment of ${amount.toFixed(2)} against bill ${bill.number}`,
-        metadata: { amount, method, reference },
-      },
-      tx,
-    );
-  });
+      await logAdminAction(
+        {
+          action: "bill.recordPayment",
+          entityType: "bill",
+          entityId: billId,
+          summary: `Recorded payment of ${amount.toFixed(2)} against bill ${bill.number}`,
+          metadata: { amount, method, reference },
+        },
+        tx,
+      );
+    });
+  } catch (error) {
+    if (error instanceof ActionGuardError) redirectWithError(error.redirectPath, error.message);
+    throw error;
+  }
 
   revalidatePath(`/admin/bills/${billId}`);
   revalidatePath("/admin/bills");

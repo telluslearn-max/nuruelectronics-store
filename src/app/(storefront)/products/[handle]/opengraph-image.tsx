@@ -1,5 +1,6 @@
 import { ImageResponse } from "next/og";
 import { formatPrice } from "@/lib/format";
+import { OG_THEME } from "@/lib/og-theme";
 import { getProductByHandle } from "@/lib/shopify";
 
 export const alt = "Product";
@@ -20,8 +21,8 @@ export default async function Image({ params }: { params: Promise<{ handle: stri
           display: "flex",
           flexDirection: "column",
           justifyContent: "space-between",
-          backgroundColor: "#0a0a0a",
-          color: "#f5f5f7",
+          backgroundColor: OG_THEME.background,
+          color: OG_THEME.foreground,
           padding: 80,
         }}
       >
@@ -31,7 +32,7 @@ export default async function Image({ params }: { params: Promise<{ handle: stri
             style={{
               width: 10,
               height: 10,
-              backgroundColor: "#d4472e",
+              backgroundColor: OG_THEME.accent,
               marginTop: 38,
               marginLeft: 4,
             }}
@@ -42,7 +43,7 @@ export default async function Image({ params }: { params: Promise<{ handle: stri
             {product?.title ?? "NURU"}
           </div>
           {price && (
-            <div style={{ fontSize: 40, color: "#a1a1aa", marginTop: 20 }}>
+            <div style={{ fontSize: 40, color: OG_THEME.muted, marginTop: 20 }}>
               {`From ${formatPrice(price.amount, price.currencyCode)}`}
             </div>
           )}

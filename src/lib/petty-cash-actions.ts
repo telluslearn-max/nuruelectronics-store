@@ -5,6 +5,7 @@ import { prisma } from "./prisma";
 import { requireAdminSession } from "./admin-auth";
 import { ACCOUNTS, postJournalEntry } from "./ledger";
 import { redirectWithError, redirectWithSuccess } from "./admin-feedback";
+import { logAdminAction } from "./audit-log";
 
 export async function createPettyCashFund(formData: FormData): Promise<void> {
   await requireAdminSession();
@@ -37,6 +38,17 @@ export async function createPettyCashFund(formData: FormData): Promise<void> {
         { accountCode: ACCOUNTS.CASH, credit: floatAmount },
       ],
     });
+
+    await logAdminAction(
+      {
+        action: "pettyCash.createFund",
+        entityType: "pettyCashFund",
+        entityId: fund.id,
+        summary: `Created petty cash fund "${fund.name}" with float ${floatAmount.toFixed(2)}`,
+        metadata: { name: fund.name, floatAmount },
+      },
+      tx,
+    );
   });
 
   revalidatePath("/admin/petty-cash");
@@ -63,6 +75,17 @@ export async function replenishPettyCash(fundId: string, formData: FormData): Pr
         { accountCode: ACCOUNTS.CASH, credit: amount },
       ],
     });
+
+    await logAdminAction(
+      {
+        action: "pettyCash.replenish",
+        entityType: "pettyCashFund",
+        entityId: fundId,
+        summary: `Replenished petty cash fund by ${amount.toFixed(2)}`,
+        metadata: { fundId, amount },
+      },
+      tx,
+    );
   });
 
   revalidatePath("/admin/petty-cash");

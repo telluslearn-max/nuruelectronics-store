@@ -11,6 +11,20 @@ export const isEmailConfigured = Boolean(apiKey && from);
 
 const resend = apiKey ? new Resend(apiKey) : null;
 
+const HTML_ESCAPES: Record<string, string> = {
+  "&": "&amp;",
+  "<": "&lt;",
+  ">": "&gt;",
+  '"': "&quot;",
+  "'": "&#39;",
+};
+
+/** Escapes a value interpolated into an outgoing HTML email — customer/employee names are
+ * admin- or Shopify-sourced text, not markup, and must never be rendered as HTML. */
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>"']/g, (char) => HTML_ESCAPES[char]);
+}
+
 async function sendDocumentEmail(options: {
   to: string;
   subject: string;
@@ -45,7 +59,7 @@ export async function sendEstimateEmail(estimate: Estimate, customer: Customer, 
   await sendDocumentEmail({
     to: customer.email,
     subject: `Estimate ${estimate.number} from NURU`,
-    html: `<p>Hi ${customer.name ?? ""},</p><p>Please find attached estimate ${estimate.number}, valid until ${new Intl.DateTimeFormat("en-KE", { dateStyle: "medium" }).format(estimate.validUntil)}.</p><p>You can accept or decline it here: <a href="${link}">${link}</a></p>`,
+    html: `<p>Hi ${escapeHtml(customer.name ?? "")},</p><p>Please find attached estimate ${estimate.number}, valid until ${new Intl.DateTimeFormat("en-KE", { dateStyle: "medium" }).format(estimate.validUntil)}.</p><p>You can accept or decline it here: <a href="${link}">${link}</a></p>`,
     pdfBuffer,
     filename: `${estimate.number}.pdf`,
   });
@@ -56,7 +70,7 @@ export async function sendInvoiceEmail(invoice: Invoice, customer: Customer, pdf
   await sendDocumentEmail({
     to: customer.email,
     subject: `Invoice ${invoice.number} from NURU`,
-    html: `<p>Hi ${customer.name ?? ""},</p><p>Please find attached invoice ${invoice.number} for ${formatPrice(invoice.total.toString(), "KES")}.</p>`,
+    html: `<p>Hi ${escapeHtml(customer.name ?? "")},</p><p>Please find attached invoice ${invoice.number} for ${formatPrice(invoice.total.toString(), "KES")}.</p>`,
     pdfBuffer,
     filename: `${invoice.number}.pdf`,
   });
@@ -68,7 +82,7 @@ export async function sendInvoiceReminderEmail(invoice: Invoice, customer: Custo
   await sendDocumentEmail({
     to: customer.email,
     subject: `Reminder: Invoice ${invoice.number} is overdue`,
-    html: `<p>Hi ${customer.name ?? ""},</p><p>This is a reminder that invoice ${invoice.number} for ${formatPrice(balance.toFixed(2), "KES")} is overdue. Please find it attached.</p>`,
+    html: `<p>Hi ${escapeHtml(customer.name ?? "")},</p><p>This is a reminder that invoice ${invoice.number} for ${formatPrice(balance.toFixed(2), "KES")} is overdue. Please find it attached.</p>`,
     pdfBuffer,
     filename: `${invoice.number}.pdf`,
   });
@@ -79,7 +93,7 @@ export async function sendReceiptEmail(receipt: Receipt, customer: Customer, pdf
   await sendDocumentEmail({
     to: customer.email,
     subject: `Receipt ${receipt.number} from NURU`,
-    html: `<p>Hi ${customer.name ?? ""},</p><p>Thank you for your payment. Please find your receipt ${receipt.number} attached.</p>`,
+    html: `<p>Hi ${escapeHtml(customer.name ?? "")},</p><p>Thank you for your payment. Please find your receipt ${receipt.number} attached.</p>`,
     pdfBuffer,
     filename: `${receipt.number}.pdf`,
   });
@@ -90,7 +104,7 @@ export async function sendDeliveryNoteEmail(note: DeliveryNote, customer: Custom
   await sendDocumentEmail({
     to: customer.email,
     subject: `Delivery note ${note.number} from NURU`,
-    html: `<p>Hi ${customer.name ?? ""},</p><p>Please find attached delivery note ${note.number}.</p>`,
+    html: `<p>Hi ${escapeHtml(customer.name ?? "")},</p><p>Please find attached delivery note ${note.number}.</p>`,
     pdfBuffer,
     filename: `${note.number}.pdf`,
   });
@@ -101,7 +115,7 @@ export async function sendPayslipEmail(payslip: Payslip, employee: Employee, pdf
   await sendDocumentEmail({
     to: employee.email,
     subject: `Payslip ${payslip.number} from NURU`,
-    html: `<p>Hi ${employee.name},</p><p>Please find your payslip ${payslip.number} attached.</p>`,
+    html: `<p>Hi ${escapeHtml(employee.name)},</p><p>Please find your payslip ${payslip.number} attached.</p>`,
     pdfBuffer,
     filename: `${payslip.number}.pdf`,
   });

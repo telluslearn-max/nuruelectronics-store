@@ -34,12 +34,12 @@ export function WhatsAppOrderButton({
       rel="noopener noreferrer"
       className={
         compact
-          ? "flex h-11 w-11 shrink-0 items-center justify-center rounded-control border border-border-subtle text-[#25D366] transition hover:border-foreground"
+          ? "flex h-11 w-11 shrink-0 items-center justify-center rounded-control border border-border-subtle text-whatsapp transition hover:border-foreground"
           : "flex w-full items-center justify-center gap-2 rounded-control border border-border-subtle px-6 py-3.5 text-sm font-medium transition hover:border-foreground"
       }
       aria-label="Order via WhatsApp"
     >
-      <WhatsAppIcon className="h-5 w-5 shrink-0 text-[#25D366]" />
+      <WhatsAppIcon className="h-5 w-5 shrink-0 text-whatsapp" />
       {!compact && "Order via WhatsApp"}
     </a>
   );

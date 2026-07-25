@@ -5,6 +5,7 @@ import { useCallback, useRef, useState } from "react";
 import { isWhatsAppHandoffConfigured } from "@/lib/concierge/whatsapp-tool";
 import type { ConciergeEvent } from "@/lib/concierge/types";
 import { getPageContext } from "./page-context";
+import { ConciergeRequestError } from "./request-error";
 import { makeMessageId, type ConciergeMessageStore } from "./use-concierge-messages";
 
 const CANDIDATE_MIME_TYPES = [
@@ -92,7 +93,7 @@ export function useConciergeVoice(store: ConciergeMessageStore) {
         });
 
         if (!response.ok || !response.body) {
-          throw new Error(`Concierge request failed (${response.status}).`);
+          throw new ConciergeRequestError(response.status);
         }
 
         const reader = response.body.getReader();
@@ -112,19 +113,26 @@ export function useConciergeVoice(store: ConciergeMessageStore) {
         if (buffer.trim()) handleLine(buffer);
       } catch (err) {
         if (err instanceof DOMException && err.name === "AbortError") return;
+        const rateLimited = err instanceof ConciergeRequestError && err.rateLimited;
         const message = err instanceof Error ? err.message : "Something went wrong.";
-        // Same AI-unavailable handoff as the text-chat path (use-concierge-chat.ts) — hand off to
-        // a human via WhatsApp rather than leaving the shopper with just a raw error.
+        // Same rate-limit/unavailable handoff as the text-chat path (use-concierge-chat.ts) —
+        // hand off to a human via WhatsApp rather than leaving the shopper with just a raw error.
         updateMessages((prev) =>
           prev.map((m) => {
             if (m.id !== assistantId) return m;
             if (isWhatsAppHandoffConfigured) {
               return {
                 ...m,
-                text: m.text || "Sorry, I'm having trouble responding right now.",
+                text:
+                  m.text ||
+                  (rateLimited
+                    ? "You're sending messages a little fast for me to keep up — let's continue over WhatsApp."
+                    : "Sorry, I'm having trouble responding right now."),
                 whatsappMessage:
                   m.whatsappMessage ??
-                  "Hi! I was chatting with the shopping assistant on the site, but it's temporarily unavailable — could someone from the team help me?",
+                  (rateLimited
+                    ? "Hi! I was chatting with the shopping assistant on the site, but it asked me to slow down — could someone from the team help me instead?"
+                    : "Hi! I was chatting with the shopping assistant on the site, but it's temporarily unavailable — could someone from the team help me?"),
               };
             }
             return { ...m, text: m.text || `Sorry — ${message}` };

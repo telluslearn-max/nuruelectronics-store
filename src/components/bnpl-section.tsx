@@ -33,7 +33,7 @@ export function BnplSection({ product, price }: { product: Product; price: Money
               href={waitlistHref}
               target="_blank"
               rel="noopener noreferrer"
-              className="mt-3 flex w-full items-center justify-center gap-2 rounded-control border border-border-subtle px-6 py-3 text-sm font-medium text-[#25D366] transition hover:border-foreground"
+              className="mt-3 flex w-full items-center justify-center gap-2 rounded-control border border-border-subtle px-6 py-3 text-sm font-medium text-whatsapp transition hover:border-foreground"
             >
               Notify me on WhatsApp
             </a>
@@ -92,7 +92,7 @@ export function BnplSection({ product, price }: { product: Product; price: Money
           href={whatsappHref}
           target="_blank"
           rel="noopener noreferrer"
-          className="mt-3 flex w-full items-center justify-center gap-2 rounded-control border border-border-subtle px-6 py-3 text-sm font-medium text-[#25D366] transition hover:border-foreground"
+          className="mt-3 flex w-full items-center justify-center gap-2 rounded-control border border-border-subtle px-6 py-3 text-sm font-medium text-whatsapp transition hover:border-foreground"
         >
           Apply for BNPL via WhatsApp
         </a>

@@ -44,9 +44,14 @@ export function ExUkBottomTabBar() {
   const onMessages = pathname.startsWith("/ex-uk/messages");
 
   return (
-    <nav aria-label="Ex-UK" className="flex shrink-0 border-t border-border-subtle bg-background">
+    <nav
+      aria-label="Ex-UK"
+      className="flex shrink-0 border-t border-border-subtle bg-background"
+      style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+    >
       <Link
         href="/ex-uk"
+        aria-current={!onMessages ? "page" : undefined}
         className={`flex flex-1 flex-col items-center gap-0.5 py-2.5 text-xs ${
           !onMessages ? "text-accent" : "text-neutral-500"
         }`}
@@ -56,6 +61,7 @@ export function ExUkBottomTabBar() {
       </Link>
       <Link
         href="/ex-uk/messages"
+        aria-current={onMessages ? "page" : undefined}
         className={`relative flex flex-1 flex-col items-center gap-0.5 py-2.5 text-xs ${
           onMessages ? "text-accent" : "text-neutral-500"
         }`}

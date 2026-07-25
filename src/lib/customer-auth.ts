@@ -1,8 +1,8 @@
 import "server-only";
 import { randomBytes, createHash } from "node:crypto";
 import { cookies } from "next/headers";
+import { SITE_URL } from "./site";
 
-const SITE_URL = "https://www.nuruelectronics.com";
 const REDIRECT_URI = `${SITE_URL}/api/auth/callback`;
 const SCOPE = "openid email customer-account-api:full";
 

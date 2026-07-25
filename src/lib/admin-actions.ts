@@ -9,25 +9,9 @@ import { ACCOUNTS, cashAccountForMethod, postJournalEntry } from "./ledger";
 import { decrementVariantInventory, getShopifyOrderById } from "./shopify/admin-api";
 import { sendDeliveryNoteEmail as sendDeliveryNoteEmailMessage, sendEstimateEmail as sendEstimateEmailMessage, sendInvoiceEmail as sendInvoiceEmailMessage, sendReceiptEmail as sendReceiptEmailMessage } from "./email";
 import { renderDeliveryNotePdf, renderEstimatePdf, renderInvoicePdf, renderReceiptPdf } from "./pdf/render";
-import { redirectWithError, redirectWithSuccess } from "./admin-feedback";
+import { ActionGuardError, redirectWithError, redirectWithSuccess } from "./admin-feedback";
 import { logAdminAction } from "./audit-log";
 import { PAYMENT_METHODS, parseEnumField } from "./parse-enum";
-
-/**
- * Thrown by the "Silent" variant of an action that's also used by the bulk
- * runner (bulkRunPerType) — the bulk path just wants a plain throw to catch
- * and count as skipped, but the single-item public action needs the
- * redirect target to show the failure as an inline banner instead of
- * crashing to the error boundary.
- */
-class ActionGuardError extends Error {
-  constructor(
-    message: string,
-    public redirectPath: string,
-  ) {
-    super(message);
-  }
-}
 
 function parseLineItems(
   formData: FormData,
@@ -508,46 +492,60 @@ export async function recordPayment(invoiceId: string, formData: FormData): Prom
     redirectWithError(`/admin/orders/${invoice.orderId}`, "Payment amount must be greater than zero.");
   }
 
-  await prisma.$transaction(async (tx) => {
-    const number = await mintDocumentNumber(tx, "receipt");
-    const receipt = await tx.receipt.create({
-      data: { number, invoiceId, amount: amount.toFixed(2), method, reference, paidAt },
-    });
+  try {
+    await prisma.$transaction(async (tx) => {
+      const number = await mintDocumentNumber(tx, "receipt");
+      const receipt = await tx.receipt.create({
+        data: { number, invoiceId, amount: amount.toFixed(2), method, reference, paidAt },
+      });
 
-    // Atomic increment (rather than computing amountPaid from the `invoice` read
-    // above, taken before this transaction opened) so two concurrent payments
-    // against the same invoice can't clobber each other's contribution.
-    const updated = await tx.invoice.update({
-      where: { id: invoiceId },
-      data: { amountPaid: { increment: amount } },
-    });
-    await tx.invoice.update({
-      where: { id: invoiceId },
-      data: { status: nextInvoiceStatus(updated.total.toString(), Number(updated.amountPaid)) },
-    });
+      // Atomic increment (rather than computing amountPaid from the `invoice` read
+      // above, taken before this transaction opened) so two concurrent payments
+      // against the same invoice can't clobber each other's contribution.
+      const updated = await tx.invoice.update({
+        where: { id: invoiceId },
+        data: { amountPaid: { increment: amount } },
+      });
+      // Checked post-increment (inside the same transaction, under the row lock the increment
+      // just took) rather than against the pre-transaction `invoice` read, so this can't race
+      // with a concurrent payment the way a pre-check against a stale total would.
+      if (Number(updated.amountPaid) > Number(updated.total)) {
+        throw new ActionGuardError(
+          "That payment would overpay the invoice — reduce the amount.",
+          `/admin/orders/${invoice.orderId}`,
+        );
+      }
+      await tx.invoice.update({
+        where: { id: invoiceId },
+        data: { status: nextInvoiceStatus(updated.total.toString(), Number(updated.amountPaid)) },
+      });
 
-    await postJournalEntry(tx, {
-      date: paidAt,
-      description: `Receipt ${receipt.number} against invoice`,
-      sourceType: "receipt",
-      sourceId: receipt.id,
-      lines: [
-        { accountCode: cashAccountForMethod(method), debit: amount },
-        { accountCode: ACCOUNTS.ACCOUNTS_RECEIVABLE, credit: amount },
-      ],
-    });
+      await postJournalEntry(tx, {
+        date: paidAt,
+        description: `Receipt ${receipt.number} against invoice`,
+        sourceType: "receipt",
+        sourceId: receipt.id,
+        lines: [
+          { accountCode: cashAccountForMethod(method), debit: amount },
+          { accountCode: ACCOUNTS.ACCOUNTS_RECEIVABLE, credit: amount },
+        ],
+      });
 
-    await logAdminAction(
-      {
-        action: "invoice.recordPayment",
-        entityType: "invoice",
-        entityId: invoiceId,
-        summary: `Recorded payment of ${amount.toFixed(2)} against invoice ${invoice.number}`,
-        metadata: { amount, method, reference },
-      },
-      tx,
-    );
-  });
+      await logAdminAction(
+        {
+          action: "invoice.recordPayment",
+          entityType: "invoice",
+          entityId: invoiceId,
+          summary: `Recorded payment of ${amount.toFixed(2)} against invoice ${invoice.number}`,
+          metadata: { amount, method, reference },
+        },
+        tx,
+      );
+    });
+  } catch (error) {
+    if (error instanceof ActionGuardError) redirectWithError(error.redirectPath, error.message);
+    throw error;
+  }
 
   revalidatePath(`/admin/orders/${invoice.orderId}`);
   redirectWithSuccess(`/admin/orders/${invoice.orderId}`, "Payment recorded.");

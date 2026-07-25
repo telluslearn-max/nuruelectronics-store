@@ -5,6 +5,7 @@ import { prisma } from "./prisma";
 import { requireAdminSession } from "./admin-auth";
 import { ACCOUNTS, postJournalEntry } from "./ledger";
 import { redirectWithError, redirectWithSuccess } from "./admin-feedback";
+import { logAdminAction } from "./audit-log";
 import type { ExpenseCategory, ExpensePaymentSource } from "@prisma/client";
 import { EXPENSE_CATEGORIES, EXPENSE_PAYMENT_SOURCES, parseEnumField } from "./parse-enum";
 
@@ -62,6 +63,16 @@ export async function createExpense(formData: FormData): Promise<void> {
           { accountCode: ACCOUNTS.PETTY_CASH, credit: amount },
         ],
       });
+      await logAdminAction(
+        {
+          action: "expense.create",
+          entityType: "expense",
+          entityId: expense.id,
+          summary: `Recorded ${category} expense "${subcategory}" of ${amount.toFixed(2)} from petty cash`,
+          metadata: { category, subcategory, amount, paidFrom },
+        },
+        tx,
+      );
     });
   } else {
     await prisma.$transaction(async (tx) => {
@@ -78,6 +89,16 @@ export async function createExpense(formData: FormData): Promise<void> {
           { accountCode: cashAccountForSource(paidFrom), credit: amount },
         ],
       });
+      await logAdminAction(
+        {
+          action: "expense.create",
+          entityType: "expense",
+          entityId: expense.id,
+          summary: `Recorded ${category} expense "${subcategory}" of ${amount.toFixed(2)} from ${paidFrom}`,
+          metadata: { category, subcategory, amount, paidFrom },
+        },
+        tx,
+      );
     });
   }
 
