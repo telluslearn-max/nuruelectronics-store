@@ -10,6 +10,7 @@ import { GiftCardRegionNotice } from "@/components/gift-card-region-notice";
 import { NotifyMeButton } from "@/components/notify-me-button";
 import { ProductBadges } from "@/components/product-badges";
 import { ProductDeliveryCard } from "@/components/product-delivery-card";
+import { ProductSnapshot } from "@/components/product-snapshot";
 import { TradeInSection } from "@/components/trade-in-section";
 import { WhatsAppOrderButton } from "@/components/whatsapp-order-button";
 import { addItem } from "@/lib/actions";
@@ -172,6 +173,7 @@ export function ProductOptions({ product }: { product: Product }) {
         </span>
       </div>
       {selectedVariant?.sku && <p className="mt-1 text-xs text-neutral-400">SKU: {selectedVariant.sku}</p>}
+      <ProductSnapshot specs={product.specs ?? []} />
       <div className="mt-4">
         {isDigitalProduct(product.productType) ? <DigitalDeliveryCard /> : <ProductDeliveryCard />}
       </div>

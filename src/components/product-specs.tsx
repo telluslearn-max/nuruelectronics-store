@@ -65,7 +65,7 @@ export const SPEC_CATEGORIES: SpecCategory[] = [
   { id: "giftcard", label: "Gift Card Details", keys: ["region"] },
 ];
 
-function CategoryIcon({ id, className }: { id: string; className?: string }) {
+export function CategoryIcon({ id, className }: { id: string; className?: string }) {
   const paths: Record<string, React.ReactNode> = {
     compute: (
       <>

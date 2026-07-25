@@ -25,10 +25,13 @@ export function ProductGallery({
   images,
   title,
   productType,
+  overlayActions,
 }: {
   images: ProductImage[];
   title: string;
   productType?: string;
+  /** Wishlist/compare-style toggle buttons overlaid on the image, mobile only — desktop keeps its own placement beside the title. */
+  overlayActions?: React.ReactNode;
 }) {
   const [activeIndex, setActiveIndex] = useState(0);
   const active = images[activeIndex];
@@ -66,6 +69,9 @@ export function ProductGallery({
               <ChevronRightIcon />
             </button>
           </>
+        )}
+        {overlayActions && (
+          <div className="absolute right-3 top-3 flex flex-col gap-2 md:hidden">{overlayActions}</div>
         )}
       </div>
 
