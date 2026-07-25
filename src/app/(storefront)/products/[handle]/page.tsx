@@ -214,12 +214,18 @@ export default async function ProductPage({ params }: ProductPageProps) {
           images={product.images}
           title={product.title}
           productType={product.productType}
+          overlayActions={
+            <>
+              <WishlistToggleButton product={product} />
+              <CompareToggleButton product={product} />
+            </>
+          }
         />
 
         <div>
           <div className="flex items-start justify-between gap-3">
             <h1 className="text-title">{product.title}</h1>
-            <div className="flex shrink-0 gap-2">
+            <div className="hidden shrink-0 gap-2 md:flex">
               <WishlistToggleButton product={product} />
               <CompareToggleButton product={product} />
             </div>
