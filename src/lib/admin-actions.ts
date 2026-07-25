@@ -11,7 +11,7 @@ import { sendDeliveryNoteEmail as sendDeliveryNoteEmailMessage, sendEstimateEmai
 import { renderDeliveryNotePdf, renderEstimatePdf, renderInvoicePdf, renderReceiptPdf } from "./pdf/render";
 import { redirectWithError, redirectWithSuccess } from "./admin-feedback";
 import { logAdminAction } from "./audit-log";
-import type { PaymentMethod } from "@prisma/client";
+import { PAYMENT_METHODS, parseEnumField } from "./parse-enum";
 
 /**
  * Thrown by the "Silent" variant of an action that's also used by the bulk
@@ -499,7 +499,7 @@ export async function recordPayment(invoiceId: string, formData: FormData): Prom
   const invoice = await prisma.invoice.findUniqueOrThrow({ where: { id: invoiceId } });
 
   const amount = Number(formData.get("amount") ?? 0) || 0;
-  const method = String(formData.get("method")) as PaymentMethod;
+  const method = parseEnumField(formData, "method", PAYMENT_METHODS, `/admin/orders/${invoice.orderId}`);
   const reference = String(formData.get("reference") ?? "").trim() || null;
   const paidAtRaw = String(formData.get("paidAt") ?? "");
   const paidAt = paidAtRaw ? new Date(paidAtRaw) : new Date();
@@ -514,13 +514,16 @@ export async function recordPayment(invoiceId: string, formData: FormData): Prom
       data: { number, invoiceId, amount: amount.toFixed(2), method, reference, paidAt },
     });
 
-    const newAmountPaid = Number(invoice.amountPaid) + amount;
+    // Atomic increment (rather than computing amountPaid from the `invoice` read
+    // above, taken before this transaction opened) so two concurrent payments
+    // against the same invoice can't clobber each other's contribution.
+    const updated = await tx.invoice.update({
+      where: { id: invoiceId },
+      data: { amountPaid: { increment: amount } },
+    });
     await tx.invoice.update({
       where: { id: invoiceId },
-      data: {
-        amountPaid: newAmountPaid.toFixed(2),
-        status: nextInvoiceStatus(invoice.total.toString(), newAmountPaid),
-      },
+      data: { status: nextInvoiceStatus(updated.total.toString(), Number(updated.amountPaid)) },
     });
 
     await postJournalEntry(tx, {

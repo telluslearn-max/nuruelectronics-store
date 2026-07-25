@@ -9,6 +9,9 @@ import {
   constantTimeEqual,
   isValidAdminSessionValue,
 } from "./admin-session-token";
+import { getClientIp } from "./request-ip";
+
+export { getClientIp };
 
 const username = process.env.ADMIN_USERNAME;
 const password = process.env.ADMIN_PASSWORD;
@@ -25,11 +28,6 @@ export function verifyAdminCredentials(candidateUsername: string, candidatePassw
     constantTimeEqual(candidateUsername, username as string) &&
     constantTimeEqual(candidatePassword, password as string)
   );
-}
-
-export function getClientIp(request: Request): string {
-  const forwardedFor = request.headers.get("x-forwarded-for");
-  return forwardedFor?.split(",")[0]?.trim() || "unknown";
 }
 
 export async function isLoginLockedOut(ipAddress: string): Promise<boolean> {

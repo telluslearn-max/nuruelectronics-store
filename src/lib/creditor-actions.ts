@@ -7,7 +7,8 @@ import { mintDocumentNumber } from "./documents";
 import { ACCOUNTS, cashAccountForMethod, postJournalEntry } from "./ledger";
 import { redirectWithError, redirectWithSuccess } from "./admin-feedback";
 import { logAdminAction } from "./audit-log";
-import type { ExpenseCategory, PaymentMethod } from "@prisma/client";
+import type { ExpenseCategory } from "@prisma/client";
+import { EXPENSE_CATEGORIES, PAYMENT_METHODS, parseEnumField } from "./parse-enum";
 
 export async function createSupplier(formData: FormData): Promise<void> {
   await requireAdminSession();
@@ -33,7 +34,7 @@ export async function createBill(formData: FormData): Promise<void> {
 
   const supplierId = String(formData.get("supplierId") ?? "");
   const description = String(formData.get("description") ?? "").trim();
-  const category = String(formData.get("category")) as ExpenseCategory;
+  const category = parseEnumField(formData, "category", EXPENSE_CATEGORIES, "/admin/bills");
   const amount = Number(formData.get("amount") ?? 0) || 0;
   const billDate = new Date(String(formData.get("billDate") ?? ""));
   const dueAtRaw = String(formData.get("dueAt") ?? "");
@@ -75,7 +76,7 @@ export async function recordSupplierPayment(billId: string, formData: FormData):
   const bill = await prisma.bill.findUniqueOrThrow({ where: { id: billId } });
 
   const amount = Number(formData.get("amount") ?? 0) || 0;
-  const method = String(formData.get("method")) as PaymentMethod;
+  const method = parseEnumField(formData, "method", PAYMENT_METHODS, `/admin/bills/${billId}`);
   const reference = String(formData.get("reference") ?? "").trim() || null;
   const paidAtRaw = String(formData.get("paidAt") ?? "");
   const paidAt = paidAtRaw ? new Date(paidAtRaw) : new Date();
@@ -89,10 +90,16 @@ export async function recordSupplierPayment(billId: string, formData: FormData):
       data: { billId, amount: amount.toFixed(2), method, reference, paidAt },
     });
 
-    const newAmountPaid = Number(bill.amountPaid) + amount;
+    // Atomic increment (rather than computing amountPaid from the `bill` read
+    // above, taken before this transaction opened) so two concurrent payments
+    // against the same bill can't clobber each other's contribution.
+    const updated = await tx.bill.update({
+      where: { id: billId },
+      data: { amountPaid: { increment: amount } },
+    });
     await tx.bill.update({
       where: { id: billId },
-      data: { amountPaid: newAmountPaid.toFixed(2), status: nextBillStatus(bill.amount.toString(), newAmountPaid) },
+      data: { status: nextBillStatus(updated.amount.toString(), Number(updated.amountPaid)) },
     });
 
     await postJournalEntry(tx, {

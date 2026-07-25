@@ -7,7 +7,7 @@ import { ACCOUNTS, cashAccountForMethod, postJournalEntry } from "./ledger";
 import { getAccumulatedDepreciation, postMonthlyDepreciation } from "./depreciation";
 import { redirectWithError, redirectWithSuccess } from "./admin-feedback";
 import { logAdminAction } from "./audit-log";
-import type { PaymentMethod } from "@prisma/client";
+import { PAYMENT_METHODS, parseEnumField } from "./parse-enum";
 
 export async function createFixedAsset(formData: FormData): Promise<void> {
   await requireAdminSession();
@@ -18,7 +18,7 @@ export async function createFixedAsset(formData: FormData): Promise<void> {
   const purchaseCost = Number(formData.get("purchaseCost") ?? 0) || 0;
   const salvageValue = Number(formData.get("salvageValue") ?? 0) || 0;
   const usefulLifeYears = Number(formData.get("usefulLifeYears") ?? 0) || 0;
-  const paidFrom = String(formData.get("paidFrom")) as PaymentMethod;
+  const paidFrom = parseEnumField(formData, "paidFrom", PAYMENT_METHODS, "/admin/assets");
 
   if (!name || purchaseCost <= 0 || usefulLifeYears <= 0) {
     redirectWithError("/admin/assets", "A name, positive purchase cost, and useful life are required.");
