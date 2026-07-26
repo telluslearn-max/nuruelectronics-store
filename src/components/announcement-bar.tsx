@@ -4,6 +4,9 @@ import { useSyncExternalStore } from "react";
 
 const STORAGE_KEY = "nuru-announcement-dismissed";
 const MESSAGE = "100% genuine electronics, backed by manufacturer warranty — delivered fast across Kenya.";
+// Dismissal persists across browser sessions (localStorage, not sessionStorage), but only for a
+// week — so the bar resurfaces periodically rather than being gone forever after one dismiss.
+const DISMISS_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 const listeners = new Set<() => void>();
 
@@ -13,7 +16,10 @@ function subscribe(callback: () => void) {
 }
 
 function getSnapshot() {
-  return sessionStorage.getItem(STORAGE_KEY) === "1";
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if (!raw) return false;
+  const dismissedAt = Number(raw);
+  return Number.isFinite(dismissedAt) && Date.now() - dismissedAt < DISMISS_TTL_MS;
 }
 
 function getServerSnapshot() {
@@ -21,7 +27,7 @@ function getServerSnapshot() {
 }
 
 function dismiss() {
-  sessionStorage.setItem(STORAGE_KEY, "1");
+  localStorage.setItem(STORAGE_KEY, String(Date.now()));
   listeners.forEach((listener) => listener());
 }
 

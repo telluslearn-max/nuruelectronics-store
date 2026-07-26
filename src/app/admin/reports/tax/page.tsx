@@ -22,10 +22,13 @@ export default async function AdminTaxReportPage() {
 
   let shopifyError: string | null = null;
 
-  const [invoices, shopifyTax] = await Promise.all([
-    prisma.invoice.findMany({
+  // Aggregated at the DB level (not findMany + reduce) since this page only ever needs the sum
+  // and count, not the individual invoice rows — keeps memory flat regardless of invoice volume.
+  const [invoiceAgg, shopifyTax] = await Promise.all([
+    prisma.invoice.aggregate({
       where: { issuedAt: { gte: from, lt: to } },
-      select: { number: true, taxTotal: true, issuedAt: true },
+      _sum: { taxTotal: true },
+      _count: true,
     }),
     isShopifyAdminConfigured
       ? getShopifyTaxCollected(from, to).catch((error: unknown) => {
@@ -35,7 +38,7 @@ export default async function AdminTaxReportPage() {
       : Promise.resolve([]),
   ]);
 
-  const ownTaxTotal = invoices.reduce((sum, invoice) => sum + Number(invoice.taxTotal), 0);
+  const ownTaxTotal = Number(invoiceAgg._sum.taxTotal ?? 0);
   const shopifyTaxTotal = shopifyTax.reduce((sum, order) => sum + Number(order.totalTax.amount), 0);
 
   return (
@@ -50,7 +53,7 @@ export default async function AdminTaxReportPage() {
         <div className="rounded-card border border-border-subtle p-4">
           <p className="text-sm text-neutral-500">Tax on invoices (this system)</p>
           <p className="mt-1 text-lg font-medium">{formatPrice(ownTaxTotal.toFixed(2), "KES")}</p>
-          <p className="mt-1 text-sm text-neutral-500">{invoices.length} invoice(s)</p>
+          <p className="mt-1 text-sm text-neutral-500">{invoiceAgg._count} invoice(s)</p>
         </div>
         <div className="rounded-card border border-border-subtle p-4">
           <p className="text-sm text-neutral-500">Tax collected on Shopify orders</p>

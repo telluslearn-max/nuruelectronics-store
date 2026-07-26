@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { canAccessDocument } from "@/lib/document-access";
 import { renderEstimatePdf } from "@/lib/pdf/render";
+import { constantTimeEqual } from "@/lib/admin-session-token";
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -13,7 +14,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   if (!estimate) return new Response("Not found", { status: 404 });
 
   const authorized = token
-    ? token === estimate.accessToken
+    ? constantTimeEqual(token, estimate.accessToken)
     : await canAccessDocument(estimate.order.customer.email);
   if (!authorized) return new Response("Not found", { status: 404 });
 

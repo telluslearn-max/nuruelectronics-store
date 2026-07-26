@@ -1,9 +1,11 @@
 import { runConciergeTurn } from "@/lib/concierge/agent-loop";
 import { saveHistoryForCurrentCustomer } from "@/lib/concierge/history";
 import { parseConciergeMessages, parsePageContext } from "@/lib/concierge/parse-messages";
+import { isConciergeRateLimited } from "@/lib/concierge/rate-limit";
 import type { ConciergeMessage, ConciergePageContext } from "@/lib/concierge/types";
 import { isConciergeConfigured } from "@/lib/concierge/vertex-client";
 import { synthesizeSpeech, transcribeAudio } from "@/lib/concierge/voice";
+import { getClientIp } from "@/lib/request-ip";
 
 // Same runtime requirement as /api/concierge/chat — Vertex auth needs Node crypto, not edge.
 export const runtime = "nodejs";
@@ -40,6 +42,10 @@ function parseBody(body: unknown): VoiceTurnBody | { error: string } {
 export async function POST(request: Request): Promise<Response> {
   if (!isConciergeConfigured) {
     return new Response("Concierge not configured", { status: 503 });
+  }
+
+  if (await isConciergeRateLimited(getClientIp(request))) {
+    return new Response("Too many requests — please wait a moment and try again.", { status: 429 });
   }
 
   const rawBody = await request.text();

@@ -3,6 +3,7 @@ import { BentoGrid } from "@/components/bento-grid";
 import { ComingSoonCarousel } from "@/components/coming-soon-carousel";
 import { Faq } from "@/components/faq";
 import { HomeRecommendations } from "@/components/home-recommendations";
+import { ProductCarousel } from "@/components/product-carousel";
 import { ProductMedia } from "@/components/product-media";
 import { SectionHeading } from "@/components/section-heading";
 import { TrustBadges } from "@/components/trust-badges";
@@ -25,11 +26,11 @@ const POPULAR_COLLECTIONS: { categorySlug: string; groupSlug: string }[] = [
   { categorySlug: "appliances", groupSlug: "vision-plus" },
 ];
 
-const popularCollections = POPULAR_COLLECTIONS.map(({ categorySlug, groupSlug }) => {
+const popularCollectionGroups = POPULAR_COLLECTIONS.map(({ categorySlug, groupSlug }) => {
   const category = categories.find((c) => c.slug === categorySlug);
   const group = category?.groups?.find((g) => g.slug === groupSlug);
-  return group ? { href: `/category/${categorySlug}?group=${groupSlug}`, label: group.label } : undefined;
-}).filter((entry): entry is { href: string; label: string } => entry !== undefined);
+  return group ? { href: `/category/${categorySlug}?group=${groupSlug}`, label: group.label, query: group.query } : undefined;
+}).filter((entry): entry is { href: string; label: string; query: string } => entry !== undefined);
 
 function firstSentence(text: string) {
   const match = text.match(/^.*?[.!?](?:\s|$)/);
@@ -63,7 +64,14 @@ function FeatureCard({ product }: { product: Product }) {
 }
 
 export default async function HomePage() {
-  const [flagshipPage, categoryHeroPages, comingSoonProducts] = await Promise.all([
+  const [
+    flagshipPage,
+    categoryHeroPages,
+    comingSoonProducts,
+    bestSellersPage,
+    newArrivalsPage,
+    popularCollectionPages,
+  ] = await Promise.all([
     getProducts({
       searchTerm: "product_type:Smartphones",
       sortKey: "PRICE",
@@ -76,6 +84,11 @@ export default async function HomePage() {
       ),
     ),
     getComingSoonProducts(),
+    getProducts({ sortKey: "BEST_SELLING", first: 12 }),
+    getProducts({ sortKey: "CREATED_AT", reverse: true, first: 12 }),
+    Promise.all(
+      popularCollectionGroups.map((group) => getProducts({ searchTerm: group.query, first: 8 })),
+    ),
   ]);
 
   const [hero, ...features] = flagshipPage.products;
@@ -88,6 +101,10 @@ export default async function HomePage() {
     art: category.art,
     image: categoryHeroPages[i]?.products[0]?.images[0] ?? null,
   }));
+
+  const popularCollections = popularCollectionGroups
+    .map((group, i) => ({ ...group, products: popularCollectionPages[i]?.products ?? [] }))
+    .filter((collection) => collection.products.length > 0);
 
   return (
     <div>
@@ -141,9 +158,27 @@ export default async function HomePage() {
         </section>
       )}
 
+      {bestSellersPage.products.length > 0 && (
+        <section className="mt-16">
+          <SectionHeading eyebrow="Trending now" title="Best sellers" subtitle="What NURU shoppers are buying most." />
+          <div className="mt-6">
+            <ProductCarousel products={bestSellersPage.products} />
+          </div>
+        </section>
+      )}
+
       <section className="mt-16 border-y border-border-subtle py-10">
         <TrustBadges />
       </section>
+
+      {newArrivalsPage.products.length > 0 && (
+        <section className="mt-16">
+          <SectionHeading eyebrow="Just landed" title="New arrivals" subtitle="The newest additions to the NURU catalog." />
+          <div className="mt-6">
+            <ProductCarousel products={newArrivalsPage.products} />
+          </div>
+        </section>
+      )}
 
       <HomeRecommendations />
 
@@ -161,15 +196,19 @@ export default async function HomePage() {
       {popularCollections.length > 0 && (
         <section className="mt-16">
           <SectionHeading eyebrow="Quick discovery" title="Popular collections right now" />
-          <div className="mt-6 flex flex-wrap gap-3">
+          <div className="mt-8 space-y-10">
             {popularCollections.map((collection) => (
-              <Link
-                key={collection.href}
-                href={collection.href}
-                className="rounded-control border border-border-subtle px-5 py-2.5 text-sm font-medium transition hover:border-foreground"
-              >
-                {collection.label}
-              </Link>
+              <div key={collection.href}>
+                <div className="flex items-center justify-between gap-4">
+                  <h3 className="text-lg font-medium">{collection.label}</h3>
+                  <Link href={collection.href} className="text-sm font-medium text-accent hover:opacity-80">
+                    See all
+                  </Link>
+                </div>
+                <div className="mt-4">
+                  <ProductCarousel products={collection.products} />
+                </div>
+              </div>
             ))}
           </div>
         </section>

@@ -1,31 +1,4 @@
-// Copy/icons mirror trust-badges.tsx BADGES[0] and BADGES[1] — keep in sync
-// if delivery messaging changes. Duplicated rather than reusing TrustBadges
-// directly since that component's 4-item icon-on-top grid is a different
-// layout, used elsewhere, and shouldn't be reshaped for this page's needs.
-const DELIVERY_FACTS = [
-  {
-    title: "Fast Nairobi Delivery",
-    body: "Order today, unbox today in Nairobi.",
-    icon: (
-      <>
-        <rect x="2" y="8" width="12" height="8" rx="1" />
-        <path d="M14 11h4l3 3v2h-7" />
-        <circle cx="7" cy="18" r="1.6" />
-        <circle cx="17" cy="18" r="1.6" />
-      </>
-    ),
-  },
-  {
-    title: "Countrywide Shipping",
-    body: "We deliver to every corner of Kenya.",
-    icon: (
-      <>
-        <circle cx="12" cy="12" r="9" />
-        <path d="M3 12h18M12 3c2.5 2.5 3.8 5.7 3.8 9s-1.3 6.5-3.8 9c-2.5-2.5-3.8-5.7-3.8-9S9.5 5.5 12 3z" />
-      </>
-    ),
-  },
-];
+import { DELIVERY_FACTS } from "@/lib/delivery-facts";
 
 export function ProductDeliveryCard() {
   return (

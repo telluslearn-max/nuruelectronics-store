@@ -8,17 +8,24 @@
   --border-subtle: #e5e5e5;
   --surface-dark: #0a0a0a;
   --surface-dark-foreground: #f5f5f7;
+  /* WhatsApp's own brand green — fixed regardless of theme, same as --accent. */
+  --whatsapp: #25d366;
+  /* Ex-UK swipe deck's "NOPE" stamp — a neutral gray, independent of --accent (used by the "LOVE" stamp). */
+  --nope-stamp: #6b7280;
+  --nope-stamp-glow: rgba(107, 114, 128, 0.5);
   --radius-control: 999px;
   --radius-card: 0.75rem;
   /* Toggled by ProductOptions' IntersectionObserver when its sticky buy bar
      is visible, so the concierge FAB/panel can shift up to clear it. */
   --buy-bar-visible: 0;
   --dock-clear: 4.5rem;
+  --main-pb-base: 10rem;
 }
 
 @media (min-width: 768px) {
   :root {
     --dock-clear: 1.5rem;
+    --main-pb-base: 6rem;
   }
 }
 
@@ -51,6 +58,17 @@
   background-image: linear-gradient(to bottom right, #1c1c1e, #050505);
 }
 
+/* text-neutral-500/600 are ~4.2:1 and ~2.5:1 against this theme's near-black
+   background (well under the 4.5:1 minimum) — used pervasively as secondary/
+   caption text on gaming PDPs (specs, delivery, BNPL, trade-in). text-neutral-400
+   already clears ~7.9:1 here and needs no override. */
+.theme-gaming-dark .text-neutral-500 {
+  color: rgba(255, 255, 255, 0.55);
+}
+.theme-gaming-dark .text-neutral-600 {
+  color: rgba(255, 255, 255, 0.68);
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -59,6 +77,7 @@
   --color-border-subtle: var(--border-subtle);
   --color-surface-dark: var(--surface-dark);
   --color-surface-dark-foreground: var(--surface-dark-foreground);
+  --color-whatsapp: var(--whatsapp);
   --radius-control: var(--radius-control);
   --radius-card: var(--radius-card);
   --font-sans: var(--font-geist-sans);

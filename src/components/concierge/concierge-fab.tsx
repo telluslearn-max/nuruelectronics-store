@@ -24,7 +24,7 @@ export function ConciergeFab({
     <button
       type="button"
       onClick={onClick}
-      aria-label="Talk to an expert"
+      aria-label="Chat with our AI shopping concierge"
       className="relative flex h-14 w-14 animate-scale-in items-center justify-center rounded-full bg-accent text-accent-foreground shadow-lg transition hover:brightness-110"
     >
       <ChatBubbleIcon className="h-6 w-6" />

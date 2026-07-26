@@ -26,14 +26,14 @@ export function BnplSection({ product, price }: { product: Product; price: Money
       const waitlistHref = buildWhatsAppUrl(waitlistMessage);
       return (
         <div className="mt-4 rounded-card border border-border-subtle p-4">
-          <p className="text-sm font-medium">Buy Now, Pay Later</p>
+          <h3 className="text-sm font-medium">Buy Now, Pay Later</h3>
           <p className="mt-1 text-xs text-neutral-500">Coming soon for this brand.</p>
           {waitlistHref && (
             <a
               href={waitlistHref}
               target="_blank"
               rel="noopener noreferrer"
-              className="mt-3 flex w-full items-center justify-center gap-2 rounded-control border border-border-subtle px-6 py-3 text-sm font-medium text-[#25D366] transition hover:border-foreground"
+              className="mt-3 flex w-full items-center justify-center gap-2 rounded-control border border-border-subtle px-6 py-3 text-sm font-medium text-whatsapp transition hover:border-foreground"
             >
               Notify me on WhatsApp
             </a>
@@ -52,7 +52,7 @@ export function BnplSection({ product, price }: { product: Product; price: Money
 
   return (
     <div className="mt-4 rounded-card border border-border-subtle p-4">
-      <p className="text-sm font-medium">Buy Now, Pay Later</p>
+      <h3 className="text-sm font-medium">Buy Now, Pay Later</h3>
       <div className="mt-2 flex gap-2">
         {Object.values(BNPL_PLANS).map((config) => (
           <button
@@ -78,7 +78,8 @@ export function BnplSection({ product, price }: { product: Product; price: Money
         </span>
       </p>
       <p className="mt-1 text-xs text-neutral-500">
-        Total payable: {fmt(plan.totalPayable)} (includes interest on balance after deposit)
+        Total payable: {fmt(plan.totalPayable)} (includes {plan.effectiveRatePercent.toFixed(0)}% interest
+        on the balance after deposit)
       </p>
 
       <ul className="mt-3 space-y-1 text-xs text-neutral-500">
@@ -92,7 +93,7 @@ export function BnplSection({ product, price }: { product: Product; price: Money
           href={whatsappHref}
           target="_blank"
           rel="noopener noreferrer"
-          className="mt-3 flex w-full items-center justify-center gap-2 rounded-control border border-border-subtle px-6 py-3 text-sm font-medium text-[#25D366] transition hover:border-foreground"
+          className="mt-3 flex w-full items-center justify-center gap-2 rounded-control border border-border-subtle px-6 py-3 text-sm font-medium text-whatsapp transition hover:border-foreground"
         >
           Apply for BNPL via WhatsApp
         </a>

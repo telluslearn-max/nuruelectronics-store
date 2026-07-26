@@ -3,13 +3,14 @@ import { prisma } from "@/lib/prisma";
 import { getOverdueInvoices } from "@/lib/reports/overdue-invoices";
 import { renderInvoicePdf } from "@/lib/pdf/render";
 import { sendInvoiceReminderEmail } from "@/lib/email";
+import { constantTimeEqual } from "@/lib/admin-session-token";
 
 const REMINDER_THROTTLE_DAYS = 3;
 
 function isAuthorized(request: Request): boolean {
   const secret = process.env.CRON_SECRET;
   if (!secret) return false;
-  return request.headers.get("authorization") === `Bearer ${secret}`;
+  return constantTimeEqual(request.headers.get("authorization") ?? "", `Bearer ${secret}`);
 }
 
 async function runReminders() {
@@ -29,23 +30,28 @@ async function runReminders() {
       await sendInvoiceReminderEmail(invoice, invoice.order.customer, pdfBuffer);
       await prisma.invoice.update({ where: { id: invoice.id }, data: { lastReminderSentAt: new Date() } });
       sent++;
-    } catch {
-      // Missing customer email, email provider down, etc. — move on to the next candidate.
+    } catch (error) {
+      // Missing customer email, email provider down, etc. — log and move on to the next candidate.
+      console.error(`[cron:invoice-reminders] Failed to send reminder for invoice ${candidate.id}:`, error);
       failed++;
     }
   }
 
-  return { candidates: due.length, sent, failed };
+  const result = { candidates: due.length, sent, failed };
+  console.log("[cron:invoice-reminders]", result);
+  return result;
 }
 
 export async function GET(request: Request) {
   if (!isAuthorized(request)) return new Response("Unauthorized", { status: 401 });
-  const result = await runReminders();
-  return NextResponse.json(result);
+  try {
+    return NextResponse.json(await runReminders());
+  } catch (error) {
+    console.error("[cron:invoice-reminders] failed:", error);
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Unknown error" }, { status: 500 });
+  }
 }
 
 export async function POST(request: Request) {
-  if (!isAuthorized(request)) return new Response("Unauthorized", { status: 401 });
-  const result = await runReminders();
-  return NextResponse.json(result);
+  return GET(request);
 }

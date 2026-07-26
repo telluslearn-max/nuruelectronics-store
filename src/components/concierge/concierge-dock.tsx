@@ -21,6 +21,7 @@ export function ConciergeDock({ store }: { store: ConciergeMessageStore }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [hasOpened, setHasOpened] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const wasExpandedRef = useRef(false);
 
   useEffect(() => {
     if (!isExpanded) return;
@@ -38,6 +39,16 @@ export function ConciergeDock({ store }: { store: ConciergeMessageStore }) {
       document.removeEventListener("keydown", handleKeyDown);
       document.removeEventListener("pointerdown", handlePointerDown);
     };
+  }, [isExpanded]);
+
+  // The FAB unmounts while the sheet is open and remounts as a new element when it closes, so
+  // return focus to it by querying the stable container rather than holding a ref to the FAB
+  // button itself — otherwise closing via Escape/outside-click/collapse silently drops focus.
+  useEffect(() => {
+    if (wasExpandedRef.current && !isExpanded) {
+      containerRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
+    }
+    wasExpandedRef.current = isExpanded;
   }, [isExpanded]);
 
   return (

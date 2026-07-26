@@ -48,8 +48,19 @@ export function ConciergeInputBar({
         ? "Processing your message"
         : "Record a voice message";
 
+  // Voice and text are mutually exclusive turns — disable typing/sending while a recording is
+  // in progress or being transcribed, rather than letting both fire at once.
+  const isVoiceBusy = recordingState !== "idle";
+
   return (
     <div className="border-t border-border-subtle">
+      <div aria-live="polite" className="sr-only">
+        {recordingState === "recording"
+          ? "Recording your message."
+          : recordingState === "processing"
+            ? "Processing your recording."
+            : ""}
+      </div>
       {recordingState === "recording" && (
         <div className="flex items-center gap-2 px-3 pt-2 text-sm text-neutral-500">
           <span className="flex items-end gap-0.5" aria-hidden="true">
@@ -66,8 +77,9 @@ export function ConciergeInputBar({
           value={input}
           onChange={(e) => onInputChange(e.target.value)}
           onFocus={onFocus}
+          disabled={isVoiceBusy}
           placeholder="Ask anything…"
-          className="flex-1 rounded-control border border-border-subtle px-3.5 py-2.5 text-sm outline-none focus:border-foreground"
+          className="flex-1 rounded-control border border-border-subtle px-3.5 py-2.5 text-sm outline-none focus:border-foreground disabled:opacity-50"
         />
         {isVoiceSupported && (
           <button
@@ -87,7 +99,7 @@ export function ConciergeInputBar({
         )}
         <button
           type="submit"
-          disabled={!input.trim()}
+          disabled={!input.trim() || isVoiceBusy}
           className="rounded-control bg-foreground px-4 py-2.5 text-sm font-medium text-background transition disabled:opacity-40"
         >
           Send

@@ -1,7 +1,11 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
-import { prisma } from "@/lib/prisma";
+import { StatusPill } from "@/components/admin/status-pill";
+import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
+import { DownloadIcon } from "@/components/download-icon";
+import { WhatsAppIcon } from "@/components/whatsapp-order-button";
 import { formatPrice } from "@/lib/format";
+import { prisma } from "@/lib/prisma";
+import { buildWhatsAppUrl } from "@/lib/whatsapp";
 
 export const metadata: Metadata = {
   title: "Estimate",
@@ -32,7 +36,28 @@ export default async function PublicEstimatePage({
   });
 
   if (!estimate || !token || estimate.accessToken !== token) {
-    notFound();
+    const href = buildWhatsAppUrl(
+      "Hi! I'm having trouble accessing my estimate link — could you help me get a new one?",
+    );
+    return (
+      <div className="mx-auto max-w-md px-6 py-24 text-center">
+        <h1 className="text-title">Estimate link not found</h1>
+        <p className="mt-3 text-neutral-500">
+          This link may be invalid, expired, or already used. Contact us and we can send you a new one.
+        </p>
+        {href && (
+          <a
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-6 inline-flex items-center gap-2 rounded-control bg-accent px-6 py-3 text-sm font-medium text-accent-foreground transition hover:opacity-90"
+          >
+            <WhatsAppIcon className="h-4 w-4" />
+            Message us on WhatsApp
+          </a>
+        )}
+      </div>
+    );
   }
 
   const isExpired = isPastValidity(estimate.validUntil) && estimate.status !== "accepted" && estimate.status !== "declined";
@@ -66,31 +91,32 @@ export default async function PublicEstimatePage({
         <p className="text-lg font-medium text-foreground">Total: {formatMoney(estimate.total.toString())}</p>
       </div>
 
-      <p className="mt-6 text-sm">
-        Status: <span className="font-medium">{isExpired ? "expired" : estimate.status}</span>
-      </p>
+      <div className="mt-6 flex items-center gap-2 text-sm">
+        <span>Status:</span>
+        <StatusPill status={isExpired ? "expired" : estimate.status} />
+      </div>
 
       {canRespond ? (
         <div className="mt-8 flex gap-3">
           <form action={`/api/estimates/${estimate.id}/respond`} method="POST">
             <input type="hidden" name="token" value={token} />
             <input type="hidden" name="action" value="accept" />
-            <button
-              type="submit"
+            <ConfirmSubmitButton
+              confirmMessage="Accept this estimate? We'll be in touch to arrange next steps."
               className="rounded-control bg-foreground px-6 py-3 text-sm font-medium text-background transition hover:opacity-90"
             >
               Accept
-            </button>
+            </ConfirmSubmitButton>
           </form>
           <form action={`/api/estimates/${estimate.id}/respond`} method="POST">
             <input type="hidden" name="token" value={token} />
             <input type="hidden" name="action" value="decline" />
-            <button
-              type="submit"
+            <ConfirmSubmitButton
+              confirmMessage="Decline this estimate? This can't be undone."
               className="rounded-control border border-border-subtle px-6 py-3 text-sm font-medium transition hover:border-foreground"
             >
               Decline
-            </button>
+            </ConfirmSubmitButton>
           </form>
         </div>
       ) : (
@@ -103,8 +129,9 @@ export default async function PublicEstimatePage({
 
       <a
         href={`/api/estimates/${estimate.id}/pdf?token=${token}`}
-        className="mt-8 inline-block text-sm text-neutral-500 underline hover:text-foreground"
+        className="mt-8 inline-flex items-center gap-1.5 text-sm text-neutral-500 underline hover:text-foreground"
       >
+        <DownloadIcon className="h-4 w-4" />
         Download PDF
       </a>
     </div>

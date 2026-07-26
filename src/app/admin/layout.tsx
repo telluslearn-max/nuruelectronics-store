@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getAdminSession } from "@/lib/admin-auth";
+import { OG_THEME } from "@/lib/og-theme";
 import { BottomNav } from "@/components/admin/bottom-nav";
 import { SearchForm } from "@/components/admin/search-form";
 
@@ -34,9 +35,9 @@ const NAV_LINKS = [
 function BrandMark() {
   return (
     <svg width="30" height="30" viewBox="0 0 64 64" aria-hidden="true" className="shrink-0">
-      <rect width="64" height="64" rx="14" fill="#0a0a0a" />
-      <path d="M20 46V18h6l14 19V18h6v28h-6L26 27v19h-6z" fill="#f5f5f7" />
-      <rect x="42" y="40" width="6" height="6" fill="#d4472e" />
+      <rect width="64" height="64" rx="14" fill={OG_THEME.background} />
+      <path d="M20 46V18h6l14 19V18h6v28h-6L26 27v19h-6z" fill={OG_THEME.foreground} />
+      <rect x="42" y="40" width="6" height="6" fill={OG_THEME.accent} />
     </svg>
   );
 }

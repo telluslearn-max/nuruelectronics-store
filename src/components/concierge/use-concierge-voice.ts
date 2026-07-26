@@ -5,6 +5,7 @@ import { useCallback, useRef, useState } from "react";
 import { isWhatsAppHandoffConfigured } from "@/lib/concierge/whatsapp-tool";
 import type { ConciergeEvent } from "@/lib/concierge/types";
 import { getPageContext } from "./page-context";
+import { ConciergeRequestError } from "./request-error";
 import { makeMessageId, type ConciergeMessageStore } from "./use-concierge-messages";
 
 const CANDIDATE_MIME_TYPES = [
@@ -14,6 +15,10 @@ const CANDIDATE_MIME_TYPES = [
   "audio/ogg",
   "audio/mp4",
 ];
+
+// Auto-stops a forgotten-open recording rather than letting it (and the eventual upload) grow
+// unbounded.
+const MAX_RECORDING_MS = 60_000;
 
 function pickSupportedMimeType(): string | null {
   if (typeof MediaRecorder === "undefined") return null;
@@ -41,6 +46,7 @@ export function useConciergeVoice(store: ConciergeMessageStore) {
   const chunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
   const controllerRef = useRef<AbortController | null>(null);
+  const recordingTimeoutRef = useRef<number | null>(null);
   const pathname = usePathname();
 
   const isVoiceSupported =
@@ -92,7 +98,7 @@ export function useConciergeVoice(store: ConciergeMessageStore) {
         });
 
         if (!response.ok || !response.body) {
-          throw new Error(`Concierge request failed (${response.status}).`);
+          throw new ConciergeRequestError(response.status);
         }
 
         const reader = response.body.getReader();
@@ -112,19 +118,26 @@ export function useConciergeVoice(store: ConciergeMessageStore) {
         if (buffer.trim()) handleLine(buffer);
       } catch (err) {
         if (err instanceof DOMException && err.name === "AbortError") return;
+        const rateLimited = err instanceof ConciergeRequestError && err.rateLimited;
         const message = err instanceof Error ? err.message : "Something went wrong.";
-        // Same AI-unavailable handoff as the text-chat path (use-concierge-chat.ts) — hand off to
-        // a human via WhatsApp rather than leaving the shopper with just a raw error.
+        // Same rate-limit/unavailable handoff as the text-chat path (use-concierge-chat.ts) —
+        // hand off to a human via WhatsApp rather than leaving the shopper with just a raw error.
         updateMessages((prev) =>
           prev.map((m) => {
             if (m.id !== assistantId) return m;
             if (isWhatsAppHandoffConfigured) {
               return {
                 ...m,
-                text: m.text || "Sorry, I'm having trouble responding right now.",
+                text:
+                  m.text ||
+                  (rateLimited
+                    ? "You're sending messages a little fast for me to keep up — let's continue over WhatsApp."
+                    : "Sorry, I'm having trouble responding right now."),
                 whatsappMessage:
                   m.whatsappMessage ??
-                  "Hi! I was chatting with the shopping assistant on the site, but it's temporarily unavailable — could someone from the team help me?",
+                  (rateLimited
+                    ? "Hi! I was chatting with the shopping assistant on the site, but it asked me to slow down — could someone from the team help me instead?"
+                    : "Hi! I was chatting with the shopping assistant on the site, but it's temporarily unavailable — could someone from the team help me?"),
               };
             }
             return { ...m, text: m.text || `Sorry — ${message}` };
@@ -140,6 +153,12 @@ export function useConciergeVoice(store: ConciergeMessageStore) {
     [messagesRef, updateMessages, applyEventToMessage, pathname],
   );
 
+  const stopRecording = useCallback(() => {
+    if (mediaRecorderRef.current?.state === "recording") {
+      mediaRecorderRef.current.stop();
+    }
+  }, []);
+
   const startRecording = useCallback(async () => {
     if (!isVoiceSupported || recordingState !== "idle") return;
     const mimeType = pickSupportedMimeType();
@@ -154,6 +173,10 @@ export function useConciergeVoice(store: ConciergeMessageStore) {
         if (event.data.size > 0) chunksRef.current.push(event.data);
       };
       recorder.onstop = () => {
+        if (recordingTimeoutRef.current !== null) {
+          window.clearTimeout(recordingTimeoutRef.current);
+          recordingTimeoutRef.current = null;
+        }
         stopStream();
         const blob = new Blob(chunksRef.current, { type: mimeType });
         chunksRef.current = [];
@@ -162,16 +185,22 @@ export function useConciergeVoice(store: ConciergeMessageStore) {
       mediaRecorderRef.current = recorder;
       recorder.start();
       setRecordingState("recording");
-    } catch {
+      recordingTimeoutRef.current = window.setTimeout(() => stopRecording(), MAX_RECORDING_MS);
+    } catch (err) {
       stopStream();
+      const denied = err instanceof DOMException && err.name === "NotAllowedError";
+      updateMessages((prev) => [
+        ...prev,
+        {
+          id: makeMessageId(),
+          role: "model",
+          text: denied
+            ? "I couldn't access your microphone — check your browser's site permissions and try again, or type your question instead."
+            : "Something went wrong starting the recording — please try again or type your question instead.",
+        },
+      ]);
     }
-  }, [isVoiceSupported, recordingState, sendRecording, stopStream]);
-
-  const stopRecording = useCallback(() => {
-    if (mediaRecorderRef.current?.state === "recording") {
-      mediaRecorderRef.current.stop();
-    }
-  }, []);
+  }, [isVoiceSupported, recordingState, sendRecording, stopStream, stopRecording, updateMessages]);
 
   return { isVoiceSupported, recordingState, startRecording, stopRecording };
 }

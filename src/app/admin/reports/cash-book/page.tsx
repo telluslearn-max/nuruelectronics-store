@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { requireAdminSession } from "@/lib/admin-auth";
 import { formatPrice } from "@/lib/format";
 import { getCashBook } from "@/lib/reports/cash-book";
+import { NEGATIVE_MONEY_CLASS, POSITIVE_MONEY_CLASS } from "@/components/admin/money-colors";
 
 export const metadata: Metadata = { title: "Cash Book" };
 
@@ -38,8 +39,12 @@ export default async function AdminCashBookPage() {
                 </span>
               </span>
               <span className="text-right">
-                {row.inflow > 0 && <span className="block text-green-700">+{formatPrice(row.inflow.toFixed(2), "KES")}</span>}
-                {row.outflow > 0 && <span className="block text-red-600">-{formatPrice(row.outflow.toFixed(2), "KES")}</span>}
+                {row.inflow > 0 && (
+                  <span className={`block ${POSITIVE_MONEY_CLASS}`}>+{formatPrice(row.inflow.toFixed(2), "KES")}</span>
+                )}
+                {row.outflow > 0 && (
+                  <span className={`block ${NEGATIVE_MONEY_CLASS}`}>-{formatPrice(row.outflow.toFixed(2), "KES")}</span>
+                )}
               </span>
             </div>
             <p className="mt-2 text-right text-xs text-neutral-500">
@@ -51,7 +56,7 @@ export default async function AdminCashBookPage() {
       </ul>
 
       <div className="mt-6 hidden overflow-x-auto sm:block">
-        <table className="w-full min-w-[640px] text-sm">
+        <table className="w-full min-w-[640px] text-sm tabular-nums">
           <thead>
             <tr className="border-b border-border-subtle text-left text-xs text-neutral-500">
               <th className="py-2">Date</th>

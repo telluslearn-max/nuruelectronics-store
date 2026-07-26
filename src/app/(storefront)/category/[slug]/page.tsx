@@ -1,10 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Suspense } from "react";
 import { Breadcrumb } from "@/components/breadcrumb";
 import { CategoryGuide } from "@/components/category-guide";
-import { chipClass, CollectionPage } from "@/components/collection-page";
+import { CategorySkeleton } from "@/components/category-skeleton";
+import { chipClass, CollectionPage, parseSortSlug } from "@/components/collection-page";
 import { FilterTiles } from "@/components/filter-tiles";
+import { GamingCategorySkeleton } from "@/components/gaming-category-skeleton";
 import { GamingDarkTheme } from "@/components/gaming-theme";
 import {
   gameCollections,
@@ -13,14 +16,17 @@ import {
   getGameCollection,
   getGameGenre,
   getRelatedCategories,
+  type Category,
 } from "@/lib/categories";
 import { getCategoryGuide } from "@/lib/category-guides";
 import { getProducts } from "@/lib/shopify";
 import type { Product } from "@/lib/shopify/types";
 
+type CategorySearchParams = { group?: string; sort?: string; genre?: string; collection?: string };
+
 type CategoryPageProps = {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ group?: string; sort?: string; genre?: string; collection?: string }>;
+  searchParams: Promise<CategorySearchParams>;
 };
 
 function buildHref(
@@ -57,16 +63,20 @@ export async function generateMetadata({ params, searchParams }: CategoryPagePro
   return { title: category.label, description: category.blurb, alternates: { canonical } };
 }
 
-export default async function CategoryPage({ params, searchParams }: CategoryPageProps) {
-  const { slug } = await params;
-  const { group: groupSlug, sort: sortSlug, genre: genreSlug, collection: collectionSlug } =
-    await searchParams;
-  const category = getCategory(slug);
-
-  if (!category) {
-    notFound();
-  }
-
+/**
+ * Split out from CategoryPage so the Gaming category's dark theme wrapper (applied by the
+ * caller, synchronously, before this suspends on data) can show immediately — the Suspense
+ * fallback then renders on top of the already-dark panel instead of loading.tsx's light-mode
+ * skeleton flashing before the panel appears.
+ */
+async function CategoryContent({
+  category,
+  searchParams,
+}: {
+  category: Category;
+  searchParams: CategorySearchParams;
+}) {
+  const { group: groupSlug, sort: sortSlug, genre: genreSlug, collection: collectionSlug } = searchParams;
   const activeGroup = category.groups?.find((g) => g.slug === groupSlug);
   const isGamesGroup = activeGroup?.slug === "games";
   const activeGenre = isGamesGroup ? getGameGenre(genreSlug ?? "") : undefined;
@@ -74,12 +84,7 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
   const query = [activeGroup?.query ?? category.query, activeGenre?.query, activeCollection?.query]
     .filter(Boolean)
     .join(" AND ");
-  const sort =
-    sortSlug === "price-asc"
-      ? { sortKey: "PRICE" as const, reverse: false }
-      : sortSlug === "price-desc"
-        ? { sortKey: "PRICE" as const, reverse: true }
-        : undefined;
+  const sort = parseSortSlug(sortSlug);
 
   const relatedEdges = getRelatedCategories(category.slug);
   const guide = getCategoryGuide(category.slug);
@@ -198,5 +203,24 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
     />
   );
 
-  return category.slug === "gaming" ? <GamingDarkTheme>{page}</GamingDarkTheme> : page;
+  return page;
+}
+
+export default async function CategoryPage({ params, searchParams }: CategoryPageProps) {
+  const { slug } = await params;
+  const resolvedSearchParams = await searchParams;
+  const category = getCategory(slug);
+
+  if (!category) {
+    notFound();
+  }
+
+  const isGaming = category.slug === "gaming";
+  const content = (
+    <Suspense fallback={isGaming ? <GamingCategorySkeleton /> : <CategorySkeleton />}>
+      <CategoryContent category={category} searchParams={resolvedSearchParams} />
+    </Suspense>
+  );
+
+  return isGaming ? <GamingDarkTheme>{content}</GamingDarkTheme> : content;
 }

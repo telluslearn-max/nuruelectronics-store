@@ -60,12 +60,19 @@ function ConversationBody({
 
 /** A full-page (not modal) chat scoped to one product, with its own persisted history — the "individual inbox". */
 export function ExUkConversation({ product }: { product: Product }) {
-  const { threads, saveThread, hydrated } = useExUkInbox();
+  const { threads, saveThread, markRead, hydrated } = useExUkInbox();
 
   const initialMessages = useMemo(
     () => fromPersisted(threads[product.handle]?.messages ?? []),
     [threads, product.handle],
   );
+
+  // Marked read on open (not after the reply streams in) so a reply that arrives after the
+  // shopper navigates away still shows as unread on their next visit.
+  useEffect(() => {
+    if (!hydrated) return;
+    markRead(product.handle);
+  }, [hydrated, product.handle, markRead]);
 
   if (!hydrated) return null;
 

@@ -3,6 +3,7 @@ import { requireAdminSession } from "@/lib/admin-auth";
 import { getSettings } from "@/lib/settings";
 import { updateSettings } from "@/lib/settings-actions";
 import { FeedbackBanner } from "@/components/admin/feedback-banner";
+import { SubmitButton } from "@/components/admin/submit-button";
 
 export const metadata: Metadata = { title: "Settings" };
 
@@ -113,9 +114,7 @@ export default async function AdminSettingsPage({
           </div>
         </div>
 
-        <button type="submit" className={primaryButtonClass}>
-          Save settings
-        </button>
+        <SubmitButton className={primaryButtonClass}>Save settings</SubmitButton>
       </form>
     </div>
   );

@@ -5,7 +5,9 @@ import { prisma } from "./prisma";
 import { requireAdminSession } from "./admin-auth";
 import { ACCOUNTS, postJournalEntry } from "./ledger";
 import { redirectWithError, redirectWithSuccess } from "./admin-feedback";
+import { logAdminAction } from "./audit-log";
 import type { ExpenseCategory, ExpensePaymentSource } from "@prisma/client";
+import { EXPENSE_CATEGORIES, EXPENSE_PAYMENT_SOURCES, parseEnumField } from "./parse-enum";
 
 const EXPENSE_ACCOUNT_BY_SUBCATEGORY: Record<string, string> = {
   Personnel: ACCOUNTS.PERSONNEL_EXPENSE,
@@ -28,11 +30,11 @@ export async function createExpense(formData: FormData): Promise<void> {
   await requireAdminSession();
 
   const date = new Date(String(formData.get("date") ?? ""));
-  const category = String(formData.get("category")) as ExpenseCategory;
+  const category = parseEnumField(formData, "category", EXPENSE_CATEGORIES, "/admin/expenses");
   const subcategory = String(formData.get("subcategory") ?? "").trim();
   const amount = Number(formData.get("amount") ?? 0) || 0;
   const description = String(formData.get("description") ?? "").trim() || null;
-  const paidFrom = String(formData.get("paidFrom")) as ExpensePaymentSource;
+  const paidFrom = parseEnumField(formData, "paidFrom", EXPENSE_PAYMENT_SOURCES, "/admin/expenses");
 
   if (!subcategory || amount <= 0) {
     redirectWithError("/admin/expenses", "A subcategory and a positive amount are required.");
@@ -61,6 +63,16 @@ export async function createExpense(formData: FormData): Promise<void> {
           { accountCode: ACCOUNTS.PETTY_CASH, credit: amount },
         ],
       });
+      await logAdminAction(
+        {
+          action: "expense.create",
+          entityType: "expense",
+          entityId: expense.id,
+          summary: `Recorded ${category} expense "${subcategory}" of ${amount.toFixed(2)} from petty cash`,
+          metadata: { category, subcategory, amount, paidFrom },
+        },
+        tx,
+      );
     });
   } else {
     await prisma.$transaction(async (tx) => {
@@ -77,6 +89,16 @@ export async function createExpense(formData: FormData): Promise<void> {
           { accountCode: cashAccountForSource(paidFrom), credit: amount },
         ],
       });
+      await logAdminAction(
+        {
+          action: "expense.create",
+          entityType: "expense",
+          entityId: expense.id,
+          summary: `Recorded ${category} expense "${subcategory}" of ${amount.toFixed(2)} from ${paidFrom}`,
+          metadata: { category, subcategory, amount, paidFrom },
+        },
+        tx,
+      );
     });
   }
 

@@ -3,7 +3,9 @@ import Link from "next/link";
 import { formatPrice } from "@/lib/format";
 import type { Product } from "@/lib/shopify/types";
 
-export function HeroProductCard({ product }: { product: Product }) {
+/** Only used by ecosystem/[slug]/page.tsx's "Top picks" rail on featured-brand hub pages —
+    not a general-purpose homepage hero, despite the name this used to have. */
+export function EcosystemFlagshipCard({ product }: { product: Product }) {
   const price = product.priceRange.minVariantPrice;
   const image = product.images[0];
   return (

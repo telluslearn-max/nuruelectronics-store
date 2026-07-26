@@ -56,7 +56,7 @@ export function ProductGallery({
               type="button"
               onClick={() => step(-1)}
               aria-label="Previous image"
-              className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full border border-border-subtle bg-background/90 p-2 shadow-md backdrop-blur-sm transition hover:border-foreground"
+              className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full border border-border-subtle bg-background/90 p-3.5 shadow-md backdrop-blur-sm transition hover:border-foreground"
             >
               <ChevronLeftIcon />
             </button>
@@ -64,7 +64,7 @@ export function ProductGallery({
               type="button"
               onClick={() => step(1)}
               aria-label="Next image"
-              className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full border border-border-subtle bg-background/90 p-2 shadow-md backdrop-blur-sm transition hover:border-foreground"
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full border border-border-subtle bg-background/90 p-3.5 shadow-md backdrop-blur-sm transition hover:border-foreground"
             >
               <ChevronRightIcon />
             </button>

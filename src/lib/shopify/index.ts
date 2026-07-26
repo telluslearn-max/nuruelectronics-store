@@ -89,7 +89,13 @@ async function shopifyFetch<T>(
 
   const json = await res.json();
   if (json.errors) {
-    throw new Error(json.errors.map((e: { message: string }) => e.message).join("\n"));
+    // Shopify returns a GraphQL-style array of {message} for query errors, but a
+    // plain string (e.g. "Invalid API key or access token...") for REST-style
+    // auth rejections — handle both instead of assuming .map() is safe.
+    const message = Array.isArray(json.errors)
+      ? json.errors.map((e: { message: string }) => e.message).join("\n")
+      : String(json.errors);
+    throw new Error(message);
   }
   return json.data as T;
 }

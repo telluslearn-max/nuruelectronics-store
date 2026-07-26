@@ -14,6 +14,9 @@ export type ConciergeDisplayMessage = {
   whatsappMessage?: string;
   checkoutUrl?: string;
   audioUrl?: string;
+  /** A non-fatal error alongside an otherwise-successful reply (e.g. TTS synthesis failed after
+      the text reply already streamed in) — kept separate from `text` so it's shown, not dropped. */
+  errorNote?: string;
 };
 
 let nextId = 0;
@@ -59,7 +62,10 @@ export function useConciergeMessages(initialMessages: ConciergeMessage[] = []) {
             return { ...m, checkoutUrl: event.url };
           }
           if (event.type === "audio") return { ...m, audioUrl: `data:${event.mimeType};base64,${event.data}` };
-          if (event.type === "error") return { ...m, text: m.text || event.message };
+          // Don't let an existing reply swallow the error (e.g. TTS synthesis failing after the
+          // text already streamed in) — only fall back to using it as the message body when
+          // there's no text to show at all.
+          if (event.type === "error") return m.text ? { ...m, errorNote: event.message } : { ...m, text: event.message };
           return m;
         }),
       );

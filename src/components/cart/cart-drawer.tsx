@@ -5,12 +5,14 @@ import { removeItem, updateItemQuantity } from "@/lib/actions";
 import { trackEvent } from "@/lib/analytics/track-event";
 import { formatPrice } from "@/lib/format";
 import { ProductMedia } from "@/components/product-media";
+import { useFocusTrap } from "@/components/use-focus-trap";
 import { useCart } from "./cart-context";
 
 export function CartDrawer() {
   const { cart, setCart, isOpen, closeCart } = useCart();
   const [isPending, startTransition] = useTransition();
   const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const trapRef = useFocusTrap<HTMLDivElement>(isOpen);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -46,14 +48,17 @@ export function CartDrawer() {
         className="absolute inset-0 animate-fade-in bg-black/40"
         onClick={closeCart}
       />
-      <div className="relative flex w-full max-h-[75vh] animate-slide-up flex-col rounded-t-card border border-b-0 border-border-subtle bg-background shadow-xl md:h-full md:max-h-full md:max-w-md md:animate-slide-in md:rounded-t-none md:border-0">
+      <div
+        ref={trapRef}
+        className="relative flex w-full max-h-[75vh] animate-slide-up flex-col rounded-t-card border border-b-0 border-border-subtle bg-background shadow-xl md:h-full md:max-h-full md:max-w-md md:animate-slide-in md:rounded-t-none md:border-0"
+      >
         <div className="flex items-center justify-between border-b border-border-subtle p-4">
           <h2 className="text-lg font-semibold">Your Cart</h2>
           <button
             ref={closeButtonRef}
             onClick={closeCart}
             aria-label="Close cart"
-            className="flex h-9 w-9 items-center justify-center rounded-control text-2xl leading-none hover:bg-neutral-100"
+            className="flex h-11 w-11 items-center justify-center rounded-control text-2xl leading-none hover:bg-neutral-100"
           >
             &times;
           </button>
@@ -89,7 +94,7 @@ export function CartDrawer() {
                         <p className="text-sm text-neutral-500">{line.merchandise.title}</p>
                       )}
                       <div className="mt-auto flex items-center justify-between">
-                        <div className="flex items-center gap-1 rounded-control border border-border-subtle px-1">
+                        <div className="flex items-center gap-2 rounded-control border border-border-subtle px-1">
                           <button
                             disabled={isPending}
                             onClick={() =>
@@ -99,11 +104,13 @@ export function CartDrawer() {
                               })
                             }
                             aria-label="Decrease quantity"
-                            className="flex h-10 w-10 items-center justify-center text-sm disabled:opacity-50"
+                            className="flex h-11 w-11 items-center justify-center text-sm disabled:opacity-50"
                           >
                             -
                           </button>
-                          <span className="w-5 text-center text-sm">{line.quantity}</span>
+                          <span className="w-5 text-center text-sm" aria-live="polite">
+                            {line.quantity}
+                          </span>
                           <button
                             disabled={isPending}
                             onClick={() =>
@@ -113,7 +120,7 @@ export function CartDrawer() {
                               })
                             }
                             aria-label="Increase quantity"
-                            className="flex h-10 w-10 items-center justify-center text-sm disabled:opacity-50"
+                            className="flex h-11 w-11 items-center justify-center text-sm disabled:opacity-50"
                           >
                             +
                           </button>
@@ -146,7 +153,7 @@ export function CartDrawer() {
           <div className="border-t border-border-subtle p-4">
             <div className="mb-4 flex items-center justify-between text-sm">
               <span>Subtotal</span>
-              <span className="font-medium">
+              <span className="font-medium" aria-live="polite">
                 {formatPrice(cart.cost.subtotalAmount.amount, cart.cost.subtotalAmount.currencyCode)}{" "}
                 <span className="text-xs font-normal text-neutral-400" title="VAT is calculated and added at checkout.">excl. VAT</span>
               </span>

@@ -156,11 +156,18 @@ export const SwipeCard = forwardRef<
       <div
         ref={cardRef}
         role="group"
-        aria-label={`${product.title}, swipe right to love or left to pass`}
+        tabIndex={0}
+        aria-label={`${product.title}, swipe right to love or left to pass, or press Enter for details`}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onTap?.();
+          }
+        }}
         onTransitionEnd={() => {
           if (exiting) onSwiped(exiting);
         }}
@@ -179,8 +186,8 @@ export const SwipeCard = forwardRef<
         <Stamp
           label="NOPE"
           side="left"
-          color="#6b7280"
-          glow="rgba(107,114,128,0.5)"
+          color="var(--nope-stamp)"
+          glow="var(--nope-stamp-glow)"
           opacity={delta.x < 0 ? stampOpacity : 0}
           scale={stampScale}
         />

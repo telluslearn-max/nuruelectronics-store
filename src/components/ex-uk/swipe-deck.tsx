@@ -1,16 +1,18 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useRef, useState } from "react";
-import { WhatsAppOrderButton } from "@/components/whatsapp-order-button";
+import Link from "next/link";
+import { useMemo, useRef, useState } from "react";
+import { WhatsAppIcon, WhatsAppOrderButton } from "@/components/whatsapp-order-button";
 import { formatPrice } from "@/lib/format";
 import type { Savings } from "@/lib/product-match";
 import type { Product } from "@/lib/shopify/types";
+import { WHATSAPP_NUMBER } from "@/lib/whatsapp";
 import { HeartIcon, PassIcon } from "./action-icons";
 import { ExUkProductCard } from "./ex-uk-product-card";
 import { ExUkProductDetail } from "./ex-uk-product-detail";
 import { SwipeCard, type SwipeCardHandle } from "./swipe-card";
 import { useExUkMatches } from "./use-ex-uk-matches";
+import { useExUkSeen } from "./use-ex-uk-seen";
 
 function UndoIcon({ className }: { className?: string }) {
   return (
@@ -21,42 +23,100 @@ function UndoIcon({ className }: { className?: string }) {
   );
 }
 
+type LastAction = { direction: "left" | "right"; product: Product };
+
 export function SwipeDeck({
   products,
   savingsByHandle = {},
+  isFiltered = false,
+  onClearFilters,
+  highlightHandle,
 }: {
   products: Product[];
   savingsByHandle?: Record<string, Savings>;
+  /** Whether `products` already reflects an active category/price filter — changes the empty-state copy. */
+  isFiltered?: boolean;
+  onClearFilters?: () => void;
+  /** Handle deep-linked in from elsewhere (e.g. the concierge) — the matching card gets a visual badge. */
+  highlightHandle?: string | null;
 }) {
   const [index, setIndex] = useState(0);
   const [detailProduct, setDetailProduct] = useState<Product | null>(null);
-  const [lastPassed, setLastPassed] = useState<Product | null>(null);
-  const { addMatch } = useExUkMatches();
+  const [lastAction, setLastAction] = useState<LastAction | null>(null);
+  const [justMatched, setJustMatched] = useState<Product | null>(null);
+  const [announcement, setAnnouncement] = useState("");
+  const { addMatch, removeMatch } = useExUkMatches();
+  const { seen, markSeen, unmarkSeen } = useExUkSeen();
   const topCardRef = useRef<SwipeCardHandle>(null);
-  const router = useRouter();
 
-  const current = products[index];
-  const peekCards = products.slice(index + 1, index + 3);
+  // Cards already swiped in a previous visit (either direction) are filtered out here — not by
+  // the parent — so `index` keeps walking a single stable, order-preserving array rather than
+  // needing to be reconciled against a separately-filtered list.
+  const availableProducts = useMemo(() => products.filter((p) => !seen.has(p.handle)), [products, seen]);
+
+  const current = availableProducts[index];
+  const peekCards = availableProducts.slice(index + 1, index + 3);
 
   function handleSwiped(direction: "left" | "right") {
     setDetailProduct(null);
-    if (direction === "right" && current) {
+    if (!current) return;
+    markSeen(current.handle);
+    setLastAction({ direction, product: current });
+    if (direction === "right") {
       addMatch({ handle: current.handle, title: current.title, imageUrl: current.images[0]?.url ?? null });
-      router.push(`/ex-uk/messages/${current.handle}`);
-      return;
+      setJustMatched(current);
+      setAnnouncement(`Liked ${current.title}. It's a match!`);
+    } else {
+      setJustMatched(null);
+      setAnnouncement(`Passed on ${current.title}.`);
     }
-    if (current) setLastPassed(current);
     setIndex((i) => i + 1);
   }
 
   function handleUndo() {
-    if (!lastPassed) return;
-    setLastPassed(null);
+    if (!lastAction) return;
+    unmarkSeen(lastAction.product.handle);
+    if (lastAction.direction === "right") {
+      removeMatch(lastAction.product.handle);
+      setJustMatched(null);
+    }
+    setAnnouncement(
+      `Undid ${lastAction.direction === "right" ? "match with" : "pass on"} ${lastAction.product.title}.`,
+    );
+    setLastAction(null);
     setIndex((i) => Math.max(0, i - 1));
   }
 
   return (
     <div className="flex h-full flex-col px-2 pb-2 pt-2">
+      <div aria-live="polite" className="sr-only">
+        {announcement}
+      </div>
+
+      {justMatched && (
+        <div className="mb-2 flex shrink-0 items-center justify-between gap-2 rounded-card bg-accent/10 px-3 py-2 text-sm text-accent">
+          <span className="truncate">
+            It&apos;s a match! You liked <span className="font-medium">{justMatched.title}</span>.
+          </span>
+          <div className="flex shrink-0 items-center gap-3">
+            <Link
+              href={`/ex-uk/messages/${justMatched.handle}`}
+              className="font-medium underline underline-offset-2"
+            >
+              View chat
+            </Link>
+            <button
+              type="button"
+              aria-label="Dismiss match notice"
+              onClick={() => setJustMatched(null)}
+              className="text-accent/70 hover:text-accent"
+            >
+              &times;
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="relative flex-1">
         {peekCards
           .slice()
@@ -84,11 +144,31 @@ export function SwipeDeck({
             onSwiped={handleSwiped}
             onTap={() => setDetailProduct(current)}
           />
+        ) : products.length === 0 && isFiltered ? (
+          <div className="flex h-full flex-col items-center justify-center gap-2 rounded-card border border-dashed border-border-subtle p-8 text-center">
+            <p className="text-base font-medium">No units match your filters</p>
+            <p className="text-sm text-neutral-500">Try a different category or price range.</p>
+            {onClearFilters && (
+              <button
+                type="button"
+                onClick={onClearFilters}
+                className="mt-2 rounded-control border border-border-subtle px-4 py-2 text-sm font-medium transition hover:border-foreground"
+              >
+                Clear filters
+              </button>
+            )}
+          </div>
         ) : (
           <div className="flex h-full flex-col items-center justify-center gap-2 rounded-card border border-dashed border-border-subtle p-8 text-center">
             <p className="text-base font-medium">That&apos;s every Ex-UK unit for now</p>
             <p className="text-sm text-neutral-500">Check your matches in Messages, or check back soon for new stock.</p>
           </div>
+        )}
+
+        {current && highlightHandle && current.handle === highlightHandle && (
+          <span className="absolute left-3 top-3 z-20 rounded-control bg-accent px-2.5 py-1 text-xs font-medium text-accent-foreground shadow-sm">
+            Recommended for you
+          </span>
         )}
       </div>
 
@@ -96,9 +176,9 @@ export function SwipeDeck({
         <div className="flex shrink-0 items-center justify-center gap-4 py-3">
           <button
             type="button"
-            aria-label="Undo last pass"
+            aria-label="Undo last swipe"
             onClick={handleUndo}
-            disabled={!lastPassed}
+            disabled={!lastAction}
             className="flex h-11 w-11 items-center justify-center rounded-control border border-border-subtle text-neutral-500 transition hover:border-neutral-400 disabled:opacity-30"
           >
             <UndoIcon className="h-5 w-5" />
@@ -111,12 +191,22 @@ export function SwipeDeck({
           >
             <PassIcon className="h-6 w-6" />
           </button>
-          <WhatsAppOrderButton
-            productTitle={current.title}
-            price={formatPrice(current.priceRange.minVariantPrice.amount, current.priceRange.minVariantPrice.currencyCode)}
-            productHandle={current.handle}
-            compact
-          />
+          {WHATSAPP_NUMBER ? (
+            <WhatsAppOrderButton
+              productTitle={current.title}
+              price={formatPrice(current.priceRange.minVariantPrice.amount, current.priceRange.minVariantPrice.currencyCode)}
+              productHandle={current.handle}
+              compact
+            />
+          ) : (
+            <span
+              aria-hidden="true"
+              title="WhatsApp ordering isn't set up yet"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-control border border-dashed border-border-subtle text-neutral-300"
+            >
+              <WhatsAppIcon className="h-5 w-5" />
+            </span>
+          )}
           <button
             type="button"
             aria-label={`Love ${current.title}`}

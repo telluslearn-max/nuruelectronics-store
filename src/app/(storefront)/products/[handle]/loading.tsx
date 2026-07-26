@@ -5,6 +5,8 @@ export default function Loading() {
       <div>
         <div className="h-7 w-2/3 animate-pulse rounded bg-neutral-100" />
         <div className="mt-4 h-5 w-24 animate-pulse rounded bg-neutral-100" />
+        <div className="mt-4 h-24 w-full animate-pulse rounded-card bg-neutral-100" />
+        <div className="mt-4 h-20 w-full animate-pulse rounded-card bg-neutral-100" />
         <div className="mt-8 h-4 w-full animate-pulse rounded bg-neutral-100" />
         <div className="mt-2 h-4 w-5/6 animate-pulse rounded bg-neutral-100" />
         <div className="mt-8 h-12 w-full animate-pulse rounded-control bg-neutral-100" />

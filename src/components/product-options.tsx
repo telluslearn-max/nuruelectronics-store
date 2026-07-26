@@ -66,6 +66,7 @@ export function ProductOptions({ product }: { product: Product }) {
   const buyBlockRef = useRef<HTMLDivElement>(null);
   const { isOpen: cartIsOpen, setCart } = useCart();
   const [isBuyingNow, startBuyNow] = useTransition();
+  const [buyNowError, setBuyNowError] = useState<string | null>(null);
 
   const selectedVariant = useMemo(
     () => product.variants.find((v) => variantMatches(v, selected)),
@@ -126,10 +127,15 @@ export function ProductOptions({ product }: { product: Product }) {
 
   function buyNow() {
     if (!selectedVariant) return;
+    setBuyNowError(null);
     startBuyNow(async () => {
-      const cart = await addItem(selectedVariant.id, quantity);
-      setCart(cart);
-      window.location.href = cart.checkoutUrl;
+      try {
+        const cart = await addItem(selectedVariant.id, quantity);
+        setCart(cart);
+        window.location.href = cart.checkoutUrl;
+      } catch {
+        setBuyNowError("Couldn't start checkout — please try again, or order via WhatsApp below.");
+      }
     });
   }
 
@@ -179,7 +185,11 @@ export function ProductOptions({ product }: { product: Product }) {
       </div>
       {region && <GiftCardRegionNotice region={region} />}
       <BnplSection product={product} price={price} />
-      <TradeInSection productType={product.productType} />
+      <TradeInSection
+        productType={product.productType}
+        productTitle={product.title}
+        productHandle={product.handle}
+      />
 
       {showOptions && (
         <div className="mt-6 space-y-5">
@@ -250,7 +260,18 @@ export function ProductOptions({ product }: { product: Product }) {
           >
             &minus;
           </button>
-          <span className="w-6 text-center text-sm">{quantity}</span>
+          <input
+            type="number"
+            inputMode="numeric"
+            min={1}
+            value={quantity}
+            onChange={(event) => {
+              const parsed = Number.parseInt(event.target.value, 10);
+              setQuantity(Number.isFinite(parsed) && parsed > 0 ? parsed : 1);
+            }}
+            aria-label="Quantity"
+            className="w-10 border-0 bg-transparent text-center text-sm [appearance:textfield] focus:outline-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+          />
           <button
             type="button"
             onClick={() => setQuantity((q) => q + 1)}
@@ -282,6 +303,11 @@ export function ProductOptions({ product }: { product: Product }) {
             </button>
           )}
         </div>
+        {buyNowError && (
+          <p role="alert" className="text-xs text-red-600">
+            {buyNowError}
+          </p>
+        )}
         <WhatsAppOrderButton
           productTitle={product.title}
           variantLabel={variantLabel(selectedVariant)}

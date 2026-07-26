@@ -28,6 +28,8 @@ export type BnplPlan = {
   installment: number;
   termCount: number;
   termUnit: "week" | "month";
+  /** Percentage the balance is marked up by, e.g. 50 for a 1.5x multiplier. */
+  effectiveRatePercent: number;
 };
 
 export function calculateBnplPlan(itemPrice: number, planId: BnplPlanId): BnplPlan {
@@ -36,6 +38,7 @@ export function calculateBnplPlan(itemPrice: number, planId: BnplPlanId): BnplPl
   const balance = itemPrice - deposit;
   const totalPayable = balance * BNPL_BALANCE_MARKUP_MULTIPLIER;
   const installment = totalPayable / config.termCount;
+  const effectiveRatePercent = ((totalPayable - balance) / balance) * 100;
   return {
     planId,
     label: config.label,
@@ -46,6 +49,7 @@ export function calculateBnplPlan(itemPrice: number, planId: BnplPlanId): BnplPl
     installment,
     termCount: config.termCount,
     termUnit: config.termUnit,
+    effectiveRatePercent,
   };
 }
 

@@ -1,8 +1,8 @@
 import "server-only";
 import { randomBytes, createHash } from "node:crypto";
 import { cookies } from "next/headers";
+import { SITE_URL } from "./site";
 
-const SITE_URL = "https://www.nuruelectronics.com";
 const REDIRECT_URI = `${SITE_URL}/api/auth/callback`;
 const SCOPE = "openid email customer-account-api:full";
 
@@ -77,6 +77,7 @@ export async function buildAuthorizationUrl(): Promise<string> {
   cookieStore.set(OAUTH_COOKIE, JSON.stringify({ state, codeVerifier }), {
     httpOnly: true,
     sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
     maxAge: 600,
     path: "/",
   });
@@ -135,6 +136,7 @@ async function setSession(tokens: TokenResponse): Promise<void> {
   cookieStore.set(SESSION_COOKIE, JSON.stringify(session), {
     httpOnly: true,
     sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
     maxAge: 60 * 60 * 24 * 60,
     path: "/",
   });

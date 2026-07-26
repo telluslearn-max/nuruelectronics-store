@@ -56,6 +56,8 @@ export function ConciergeMessage({
         {message.audioUrl && (
           <audio className="mt-2 h-9 w-full" controls autoPlay={autoPlayAudio} src={message.audioUrl} />
         )}
+
+        {message.errorNote && <p className="mt-1.5 px-1 text-xs text-neutral-400">{message.errorNote}</p>}
       </div>
     </div>
   );

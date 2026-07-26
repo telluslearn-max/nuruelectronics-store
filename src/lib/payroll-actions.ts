@@ -9,7 +9,7 @@ import { renderPayslipPdf } from "./pdf/render";
 import { sendPayslipEmail as sendPayslipEmailMessage } from "./email";
 import { redirectWithError, redirectWithSuccess } from "./admin-feedback";
 import { logAdminAction } from "./audit-log";
-import type { PaymentMethod } from "@prisma/client";
+import { PAYMENT_METHODS, parseEnumField } from "./parse-enum";
 
 export async function createEmployee(formData: FormData): Promise<void> {
   await requireAdminSession();
@@ -87,7 +87,7 @@ export async function addPayslip(payRunId: string, formData: FormData): Promise<
 export async function finalizePayRun(payRunId: string, formData: FormData): Promise<void> {
   await requireAdminSession();
 
-  const paidFrom = String(formData.get("paidFrom")) as PaymentMethod;
+  const paidFrom = parseEnumField(formData, "paidFrom", PAYMENT_METHODS, `/admin/payroll/runs/${payRunId}`);
   const payRun = await prisma.payRun.findUniqueOrThrow({
     where: { id: payRunId },
     include: { payslips: { include: { deductions: true } } },

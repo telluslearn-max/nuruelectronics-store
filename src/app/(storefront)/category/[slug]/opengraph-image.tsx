@@ -1,6 +1,7 @@
 import { ImageResponse } from "next/og";
 import { getCategory } from "@/lib/categories";
 import { truncate } from "@/lib/format";
+import { OG_THEME } from "@/lib/og-theme";
 
 export const alt = "Category";
 export const size = { width: 1200, height: 630 };
@@ -19,8 +20,8 @@ export default async function Image({ params }: { params: Promise<{ slug: string
           display: "flex",
           flexDirection: "column",
           justifyContent: "space-between",
-          backgroundColor: "#0a0a0a",
-          color: "#f5f5f7",
+          backgroundColor: OG_THEME.background,
+          color: OG_THEME.foreground,
           padding: 80,
         }}
       >
@@ -30,7 +31,7 @@ export default async function Image({ params }: { params: Promise<{ slug: string
             style={{
               width: 10,
               height: 10,
-              backgroundColor: "#d4472e",
+              backgroundColor: OG_THEME.accent,
               marginTop: 38,
               marginLeft: 4,
             }}
@@ -41,7 +42,7 @@ export default async function Image({ params }: { params: Promise<{ slug: string
             {category?.label ?? "NURU"}
           </div>
           {category && (
-            <div style={{ fontSize: 34, color: "#a1a1aa", marginTop: 20, maxWidth: 900 }}>
+            <div style={{ fontSize: 34, color: OG_THEME.muted, marginTop: 20, maxWidth: 900 }}>
               {truncate(category.blurb, 90)}
             </div>
           )}

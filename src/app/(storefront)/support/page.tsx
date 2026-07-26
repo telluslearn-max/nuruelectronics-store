@@ -19,7 +19,10 @@ export default function SupportPage() {
         </span>
         <h1 className="mt-4 text-title sm:text-display">Support</h1>
         <p className="mt-2 text-neutral-500">Need help? Start here.</p>
-        <div className="mt-8">
+        <p className="mt-8 text-xs font-medium uppercase tracking-wide text-neutral-400">
+          Looking for a specific product?
+        </p>
+        <div className="mt-2">
           <SearchBox />
         </div>
       </div>

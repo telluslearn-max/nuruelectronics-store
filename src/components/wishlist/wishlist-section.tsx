@@ -1,31 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useMemo } from "react";
 import { ProductCard } from "@/components/product-card";
-import { getProductsByHandles } from "@/lib/actions";
-import type { Product } from "@/lib/shopify/types";
+import { useHandleProducts } from "@/components/use-handle-products";
 import { useWishlist } from "./wishlist-context";
 
 export function WishlistSection() {
   const { items } = useWishlist();
-  const [products, setProducts] = useState<Product[] | null>(null);
-
-  useEffect(() => {
-    if (items.length === 0) return;
-    let cancelled = false;
-    getProductsByHandles(items.map((i) => i.handle))
-      .then((result) => {
-        if (!cancelled) setProducts(result);
-      })
-      .catch((error) => {
-        console.error("Failed to load saved items:", error);
-        if (!cancelled) setProducts([]);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [items]);
+  const handles = useMemo(() => items.map((i) => i.handle), [items]);
+  const products = useHandleProducts(handles);
 
   return (
     <section>
@@ -37,7 +21,7 @@ export function WishlistSection() {
             Browse products
           </Link>
         </p>
-      ) : products === null ? (
+      ) : products === undefined ? (
         <p className="mt-3 text-neutral-500">Loading…</p>
       ) : (
         <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3">

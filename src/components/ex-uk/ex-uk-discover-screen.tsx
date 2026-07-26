@@ -7,6 +7,7 @@ import type { Savings } from "@/lib/product-match";
 import type { Product } from "@/lib/shopify/types";
 import { ExUkFilterSheet } from "./ex-uk-filter-sheet";
 import { ExUkTopBar } from "./ex-uk-top-bar";
+import { ExUkLocalStorageNotice } from "./local-storage-notice";
 import { SwipeDeck } from "./swipe-deck";
 
 function FilterIcon({ className }: { className?: string }) {
@@ -59,6 +60,11 @@ export function ExUkDiscoverScreen({
 
   const isFiltered = activeCategory !== null || maxPrice !== null;
 
+  function clearFilters() {
+    setActiveCategory(null);
+    setMaxPrice(null);
+  }
+
   return (
     <>
       <ExUkTopBar
@@ -77,8 +83,15 @@ export function ExUkDiscoverScreen({
           </button>
         }
       />
+      <ExUkLocalStorageNotice />
       <div className="flex flex-1 flex-col overflow-hidden">
-        <SwipeDeck products={filteredProducts} savingsByHandle={savingsByHandle} />
+        <SwipeDeck
+          products={filteredProducts}
+          savingsByHandle={savingsByHandle}
+          isFiltered={isFiltered}
+          onClearFilters={clearFilters}
+          highlightHandle={highlightHandle}
+        />
       </div>
 
       {filterOpen && (
@@ -86,6 +99,7 @@ export function ExUkDiscoverScreen({
           categories={availableCategories}
           activeCategory={activeCategory}
           maxPrice={maxPrice}
+          resultCount={filteredProducts.length}
           onChangeCategory={setActiveCategory}
           onChangeMaxPrice={setMaxPrice}
           onClose={() => setFilterOpen(false)}

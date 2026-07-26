@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { HeartIcon } from "./action-icons";
 import type { ExUkMatch } from "./use-ex-uk-matches";
 
 export function RecentMatchesRow({ matches }: { matches: ExUkMatch[] }) {
@@ -19,7 +20,7 @@ export function RecentMatchesRow({ matches }: { matches: ExUkMatch[] }) {
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={match.imageUrl} alt="" className="h-full w-full object-cover" />
               ) : (
-                "♥"
+                <HeartIcon className="h-6 w-6" />
               )}
             </span>
             <span className="max-w-[4.5rem] truncate text-neutral-600">{match.title}</span>

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { FooterLinks } from "@/components/footer-links";
+import { StatusPill } from "@/components/admin/status-pill";
 import { WishlistSection } from "@/components/wishlist/wishlist-section";
 import { formatPrice } from "@/lib/format";
 import { getCurrentCustomer } from "@/lib/customer";
@@ -15,18 +15,16 @@ function formatOrderDate(dateString: string) {
   return new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(new Date(dateString));
 }
 
-function formatStatus(status: string) {
-  return status
-    .toLowerCase()
-    .replace(/_/g, " ")
-    .replace(/^\w/, (c) => c.toUpperCase());
-}
-
 export default async function AccountPage({
   searchParams,
 }: {
   searchParams: Promise<{ error?: string }>;
 }) {
+  // Read before the early returns below — a failed OAuth login never sets a session cookie, so
+  // `customer` is always null on that path, and checking `error` after the `!customer` return
+  // meant this could never actually render.
+  const { error } = await searchParams;
+
   if (!isCustomerAuthConfigured) {
     return (
       <div>
@@ -45,9 +43,6 @@ export default async function AccountPage({
         <section className="mt-12 border-t border-border-subtle pt-8">
           <WishlistSection />
         </section>
-        <section className="mt-12 border-t border-border-subtle pt-8 md:hidden">
-          <FooterLinks />
-        </section>
       </div>
     );
   }
@@ -61,6 +56,11 @@ export default async function AccountPage({
           <p className="mt-2 max-w-sm text-neutral-500">
             Sign in to see your order history and manage your account.
           </p>
+          {error && (
+            <p role="alert" className="mt-4 max-w-sm rounded-card border border-border-subtle bg-neutral-50 px-4 py-3 text-sm text-neutral-600">
+              Something went wrong signing you in. Please try again.
+            </p>
+          )}
           <a
             href="/api/auth/login"
             className="mt-8 rounded-control bg-foreground px-6 py-3 text-sm font-medium text-background transition hover:opacity-90"
@@ -71,14 +71,9 @@ export default async function AccountPage({
         <section className="mt-12 border-t border-border-subtle pt-8">
           <WishlistSection />
         </section>
-        <section className="mt-12 border-t border-border-subtle pt-8 md:hidden">
-          <FooterLinks />
-        </section>
       </div>
     );
   }
-
-  const { error } = await searchParams;
 
   return (
     <div>
@@ -107,7 +102,7 @@ export default async function AccountPage({
       </div>
 
       {error && (
-        <p className="mt-6 rounded-card border border-border-subtle bg-neutral-50 px-4 py-3 text-sm text-neutral-600">
+        <p role="alert" className="mt-6 rounded-card border border-border-subtle bg-neutral-50 px-4 py-3 text-sm text-neutral-600">
           Something went wrong signing you in. Please try again.
         </p>
       )}
@@ -115,7 +110,15 @@ export default async function AccountPage({
       <div className="mt-10">
         <h2 className="text-lg font-medium">Order history</h2>
         {customer.orders.length === 0 ? (
-          <p className="mt-3 text-neutral-500">You haven&apos;t placed any orders yet.</p>
+          <div className="mt-3">
+            <p className="text-neutral-500">You haven&apos;t placed any orders yet.</p>
+            <Link
+              href="/shop"
+              className="mt-4 inline-block rounded-control border border-border-subtle px-5 py-2.5 text-sm font-medium transition hover:border-foreground"
+            >
+              Browse products
+            </Link>
+          </div>
         ) : (
           <ul className="mt-4 space-y-4">
             {customer.orders.map((order) => (
@@ -129,9 +132,9 @@ export default async function AccountPage({
                     <p className="font-medium">
                       {formatPrice(order.totalPrice.amount, order.totalPrice.currencyCode)}
                     </p>
-                    <p className="text-sm text-neutral-500">
-                      {formatStatus(order.fulfillmentStatus)}
-                    </p>
+                    <div className="mt-1">
+                      <StatusPill status={order.fulfillmentStatus.toLowerCase()} />
+                    </div>
                   </div>
                 </div>
                 <p className="mt-3 text-sm text-neutral-600">
@@ -145,10 +148,6 @@ export default async function AccountPage({
 
       <section className="mt-12 border-t border-border-subtle pt-8">
         <WishlistSection />
-      </section>
-
-      <section className="mt-12 border-t border-border-subtle pt-8 md:hidden">
-        <FooterLinks />
       </section>
     </div>
   );

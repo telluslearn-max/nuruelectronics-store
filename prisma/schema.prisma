@@ -112,6 +112,8 @@ model Order {
   estimates    Estimate[]
   invoice      Invoice?
   deliveryNote DeliveryNote?
+
+  @@index([customerId])
 }
 
 model OrderItem {
@@ -123,6 +125,8 @@ model OrderItem {
   quantity  Int
   unitPrice Decimal @db.Decimal(10, 2)
   lineTotal Decimal @db.Decimal(10, 2)
+
+  @@index([orderId])
 }
 
 // ---------------------------------------------------------------------------
@@ -146,6 +150,8 @@ model Estimate {
   sentAt        DateTime?
   respondedAt   DateTime?
   createdAt     DateTime       @default(now())
+
+  @@index([orderId])
 }
 
 // ---------------------------------------------------------------------------
@@ -185,6 +191,8 @@ model Receipt {
   reference String?
   paidAt    DateTime
   createdAt DateTime      @default(now())
+
+  @@index([invoiceId])
 }
 
 // ---------------------------------------------------------------------------
@@ -209,6 +217,8 @@ model DeliveryNote {
   // so gig-delivery volume/payouts can be reported (see riders-impact report).
   riderId String?
   rider   Employee? @relation(fields: [riderId], references: [id])
+
+  @@index([riderId])
 }
 
 // One row per (type, year); atomically incremented in a transaction to mint numbers.
@@ -301,6 +311,8 @@ model PettyCashEntry {
   description String
   date        DateTime
   createdAt   DateTime           @default(now())
+
+  @@index([fundId])
 }
 
 // ---------------------------------------------------------------------------
@@ -332,6 +344,8 @@ model Bill {
   createdAt   DateTime        @default(now())
 
   payments SupplierPayment[]
+
+  @@index([supplierId])
 }
 
 model SupplierPayment {
@@ -343,6 +357,8 @@ model SupplierPayment {
   reference String?
   paidAt    DateTime
   createdAt DateTime      @default(now())
+
+  @@index([billId])
 }
 
 // ---------------------------------------------------------------------------
@@ -402,6 +418,9 @@ model Payslip {
   createdAt  DateTime  @default(now())
 
   deductions PayslipDeduction[]
+
+  @@index([payRunId])
+  @@index([employeeId])
 }
 
 model PayslipDeduction {
@@ -423,6 +442,20 @@ model AdminLoginAttempt {
   createdAt DateTime @default(now())
 
   @@index([createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// AI concierge rate limiting — /api/concierge/chat and /voice-turn are
+// unauthenticated and each drive several paid Vertex/Gemini calls, so requests
+// are capped per IP over a sliding window (see src/lib/concierge/rate-limit.ts).
+// ---------------------------------------------------------------------------
+
+model ConciergeRequestLog {
+  id        String   @id @default(cuid())
+  ipAddress String
+  createdAt DateTime @default(now())
+
+  @@index([ipAddress, createdAt])
 }
 
 // ---------------------------------------------------------------------------

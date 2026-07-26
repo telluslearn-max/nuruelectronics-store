@@ -5,7 +5,19 @@ import { getAllProductHandles, getArticles } from "@/lib/shopify";
 import { CONTENT_REVISION_DATE, SITE_URL } from "@/lib/site";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const [handles, articles] = await Promise.all([getAllProductHandles(), getArticles()]);
+  // Each Shopify call is independently guarded so a transient Storefront API failure only drops
+  // that section's URLs (products, or blog posts) instead of 500ing the entire sitemap — the
+  // static category/ecosystem/kit entries below don't depend on Shopify at all.
+  const [handles, articles] = await Promise.all([
+    getAllProductHandles().catch((error: unknown) => {
+      console.error("[sitemap] Failed to load product handles:", error);
+      return [];
+    }),
+    getArticles().catch((error: unknown) => {
+      console.error("[sitemap] Failed to load blog articles:", error);
+      return [];
+    }),
+  ]);
 
   return [
     { url: SITE_URL, lastModified: CONTENT_REVISION_DATE, changeFrequency: "daily", priority: 1 },

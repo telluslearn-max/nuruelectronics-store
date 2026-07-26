@@ -56,7 +56,7 @@ export function GameTradeIn({ productTitle, productHandle }: { productTitle: str
         rel="noopener noreferrer"
         className="mt-3 flex w-full items-center justify-center gap-2 rounded-control border border-border-subtle px-4 py-2.5 text-sm font-medium transition hover:border-foreground"
       >
-        <WhatsAppIcon className="h-4 w-4 shrink-0 text-[#25D366]" />
+        <WhatsAppIcon className="h-4 w-4 shrink-0 text-whatsapp" />
         Start trade-in via WhatsApp
       </a>
     </div>

@@ -2,12 +2,15 @@
 
 import { useEffect, useRef, useState } from "react";
 import { ProductMedia } from "@/components/product-media";
-import { WhatsAppOrderButton } from "@/components/whatsapp-order-button";
+import { useFocusTrap } from "@/components/use-focus-trap";
+import { WhatsAppIcon, WhatsAppOrderButton } from "@/components/whatsapp-order-button";
 import { formatPrice } from "@/lib/format";
 import type { Savings } from "@/lib/product-match";
 import type { Product } from "@/lib/shopify/types";
+import { WHATSAPP_NUMBER } from "@/lib/whatsapp";
 import { HeartIcon, PassIcon } from "./action-icons";
 import { gradeForProduct } from "./condition-grade";
+import { BoxIcon, ConditionChipIconGlyph, CoinIcon, ShieldIcon } from "./detail-icons";
 import { InspectionAccordion } from "./inspection-accordion";
 import { sortSpecs } from "./spec-order";
 
@@ -30,6 +33,7 @@ export function ExUkProductDetail({
 }) {
   const [photoIndex, setPhotoIndex] = useState(0);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const trapRef = useFocusTrap<HTMLDivElement>(true);
   const image = product.images[photoIndex] ?? product.images[0];
   const price = product.priceRange.minVariantPrice;
   const specs = sortSpecs(product.specs);
@@ -46,6 +50,7 @@ export function ExUkProductDetail({
 
   return (
     <div
+      ref={trapRef}
       role="dialog"
       aria-modal="true"
       aria-label={`${product.title} details`}
@@ -111,9 +116,15 @@ export function ExUkProductDetail({
             <p className="shrink-0 text-lg font-medium">{formatPrice(price.amount, price.currencyCode)}</p>
           </div>
 
-          <div className="mt-2 space-y-1 text-sm text-neutral-600">
-            <p>📦 Unboxed · imported from the UK</p>
-            <p>🛡️ 1-year warranty included</p>
+          <div className="mt-2 space-y-1.5 text-sm text-neutral-600">
+            <p className="flex items-center gap-1.5">
+              <BoxIcon className="h-4 w-4 shrink-0 text-neutral-400" />
+              Unboxed · imported from the UK
+            </p>
+            <p className="flex items-center gap-1.5">
+              <ShieldIcon className="h-4 w-4 shrink-0 text-neutral-400" />
+              1-year warranty included
+            </p>
           </div>
 
           <div className="mt-3 flex flex-wrap gap-2">
@@ -122,12 +133,13 @@ export function ExUkProductDetail({
                 grade ? grade.badgeClass : "bg-accent/10 text-accent"
               }`}
             >
-              {grade && <span className={`h-2 w-2 rounded-full ${grade.dotClass}`} aria-hidden="true" />}
-              {grade ? `${grade.label} — ${grade.description}` : "✅ Condition: Fully tested & unboxed"}
+              <span className={`h-2 w-2 rounded-full ${grade ? grade.dotClass : "bg-accent"}`} aria-hidden="true" />
+              {grade ? `${grade.label} — ${grade.description}` : "Condition: Fully tested & unboxed"}
             </span>
             {savings && (
-              <span className="inline-flex items-center rounded-control bg-green-600/10 px-3 py-1.5 text-sm font-medium text-green-700">
-                💰 Save {formatPrice(savings.amount, savings.currencyCode)} ({savings.percent}%) vs new
+              <span className="inline-flex items-center gap-1.5 rounded-control bg-green-600/10 px-3 py-1.5 text-sm font-medium text-green-700">
+                <CoinIcon className="h-4 w-4 shrink-0" />
+                Save {formatPrice(savings.amount, savings.currencyCode)} ({savings.percent}%) vs new
               </span>
             )}
           </div>
@@ -136,10 +148,11 @@ export function ExUkProductDetail({
             <div className="mt-2 flex flex-wrap gap-1.5">
               {grade.chips.map((chip) => (
                 <span
-                  key={chip}
-                  className="rounded-control border border-border-subtle px-2 py-1 text-xs text-neutral-600"
+                  key={chip.label}
+                  className="inline-flex items-center gap-1 rounded-control border border-border-subtle px-2 py-1 text-xs text-neutral-600"
                 >
-                  {chip}
+                  <ConditionChipIconGlyph icon={chip.icon} className="h-3.5 w-3.5 shrink-0" />
+                  {chip.label}
                 </span>
               ))}
             </div>
@@ -186,12 +199,22 @@ export function ExUkProductDetail({
         >
           <PassIcon className="h-6 w-6" />
         </button>
-        <WhatsAppOrderButton
-          productTitle={product.title}
-          price={formatPrice(price.amount, price.currencyCode)}
-          productHandle={product.handle}
-          compact
-        />
+        {WHATSAPP_NUMBER ? (
+          <WhatsAppOrderButton
+            productTitle={product.title}
+            price={formatPrice(price.amount, price.currencyCode)}
+            productHandle={product.handle}
+            compact
+          />
+        ) : (
+          <span
+            aria-hidden="true"
+            title="WhatsApp ordering isn't set up yet"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-control border border-dashed border-border-subtle text-neutral-300"
+          >
+            <WhatsAppIcon className="h-5 w-5" />
+          </span>
+        )}
         <button
           type="button"
           aria-label={`Love ${product.title}`}
