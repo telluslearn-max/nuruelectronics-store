@@ -20,7 +20,7 @@ export function ConciergeMessageList({
   if (messages.length === 0) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
-        <p className="text-sm font-medium">Hi, I&apos;m your shopping concierge.</p>
+        <p className="text-sm font-medium">Hi, I&apos;m Nuru&apos;s AI shopping concierge.</p>
         <p className="text-sm text-neutral-500">
           Ask me to compare products, recommend something for your use case, or help you find the right kit.
         </p>
@@ -29,7 +29,7 @@ export function ConciergeMessageList({
   }
 
   return (
-    <div className="flex flex-col gap-4 p-4">
+    <div className="flex flex-col gap-4 p-4" aria-live="polite" aria-relevant="additions text">
       {messages.map((message, index) => (
         <ConciergeMessage key={message.id} message={message} autoPlayAudio={index === messages.length - 1} />
       ))}

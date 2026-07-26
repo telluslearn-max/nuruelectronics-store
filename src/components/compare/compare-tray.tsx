@@ -13,7 +13,7 @@ function ChevronIcon() {
 }
 
 export function CompareTray() {
-  const { items, clearCompare } = useCompare();
+  const { items, clearCompare, removeFromCompare } = useCompare();
   const pathname = usePathname();
 
   if (items.length === 0 || pathname === "/compare") return null;
@@ -34,23 +34,29 @@ export function CompareTray() {
         >
           &times;
         </button>
-        <div className="flex -space-x-3">
-          {items.map((item) =>
-            item.image ? (
-              // eslint-disable-next-line @next/next/no-img-element -- tiny stacked thumbnail, not worth next/image's overhead here
-              <img
-                key={item.handle}
-                src={item.image}
-                alt=""
-                className="h-9 w-9 rounded-full border-2 border-background bg-neutral-100 object-cover"
-              />
-            ) : (
-              <span
-                key={item.handle}
-                className="h-9 w-9 rounded-full border-2 border-background bg-neutral-100"
-              />
-            ),
-          )}
+        <div className="flex gap-1">
+          {items.map((item) => (
+            <div key={item.handle} className="relative">
+              {item.image ? (
+                // eslint-disable-next-line @next/next/no-img-element -- tiny stacked thumbnail, not worth next/image's overhead here
+                <img
+                  src={item.image}
+                  alt=""
+                  className="h-9 w-9 rounded-full border-2 border-background bg-neutral-100 object-cover"
+                />
+              ) : (
+                <span className="block h-9 w-9 rounded-full border-2 border-background bg-neutral-100" />
+              )}
+              <button
+                type="button"
+                onClick={() => removeFromCompare(item.handle)}
+                aria-label={`Remove ${item.title} from compare`}
+                className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full border border-background bg-neutral-700 text-[10px] leading-none text-white"
+              >
+                &times;
+              </button>
+            </div>
+          ))}
         </div>
         <Link href="/compare" className="flex items-center gap-1 text-sm font-medium">
           Compare ({items.length})

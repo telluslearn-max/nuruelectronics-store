@@ -16,6 +16,10 @@ const CANDIDATE_MIME_TYPES = [
   "audio/mp4",
 ];
 
+// Auto-stops a forgotten-open recording rather than letting it (and the eventual upload) grow
+// unbounded.
+const MAX_RECORDING_MS = 60_000;
+
 function pickSupportedMimeType(): string | null {
   if (typeof MediaRecorder === "undefined") return null;
   return CANDIDATE_MIME_TYPES.find((type) => MediaRecorder.isTypeSupported(type)) ?? null;
@@ -42,6 +46,7 @@ export function useConciergeVoice(store: ConciergeMessageStore) {
   const chunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
   const controllerRef = useRef<AbortController | null>(null);
+  const recordingTimeoutRef = useRef<number | null>(null);
   const pathname = usePathname();
 
   const isVoiceSupported =
@@ -148,6 +153,12 @@ export function useConciergeVoice(store: ConciergeMessageStore) {
     [messagesRef, updateMessages, applyEventToMessage, pathname],
   );
 
+  const stopRecording = useCallback(() => {
+    if (mediaRecorderRef.current?.state === "recording") {
+      mediaRecorderRef.current.stop();
+    }
+  }, []);
+
   const startRecording = useCallback(async () => {
     if (!isVoiceSupported || recordingState !== "idle") return;
     const mimeType = pickSupportedMimeType();
@@ -162,6 +173,10 @@ export function useConciergeVoice(store: ConciergeMessageStore) {
         if (event.data.size > 0) chunksRef.current.push(event.data);
       };
       recorder.onstop = () => {
+        if (recordingTimeoutRef.current !== null) {
+          window.clearTimeout(recordingTimeoutRef.current);
+          recordingTimeoutRef.current = null;
+        }
         stopStream();
         const blob = new Blob(chunksRef.current, { type: mimeType });
         chunksRef.current = [];
@@ -170,16 +185,22 @@ export function useConciergeVoice(store: ConciergeMessageStore) {
       mediaRecorderRef.current = recorder;
       recorder.start();
       setRecordingState("recording");
-    } catch {
+      recordingTimeoutRef.current = window.setTimeout(() => stopRecording(), MAX_RECORDING_MS);
+    } catch (err) {
       stopStream();
+      const denied = err instanceof DOMException && err.name === "NotAllowedError";
+      updateMessages((prev) => [
+        ...prev,
+        {
+          id: makeMessageId(),
+          role: "model",
+          text: denied
+            ? "I couldn't access your microphone — check your browser's site permissions and try again, or type your question instead."
+            : "Something went wrong starting the recording — please try again or type your question instead.",
+        },
+      ]);
     }
-  }, [isVoiceSupported, recordingState, sendRecording, stopStream]);
-
-  const stopRecording = useCallback(() => {
-    if (mediaRecorderRef.current?.state === "recording") {
-      mediaRecorderRef.current.stop();
-    }
-  }, []);
+  }, [isVoiceSupported, recordingState, sendRecording, stopStream, stopRecording, updateMessages]);
 
   return { isVoiceSupported, recordingState, startRecording, stopRecording };
 }
