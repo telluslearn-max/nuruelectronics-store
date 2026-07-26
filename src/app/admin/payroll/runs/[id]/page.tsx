@@ -1,10 +1,13 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireAdminSession } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
 import { formatPrice } from "@/lib/format";
 import { addPayslip, finalizePayRun, sendPayslipEmail } from "@/lib/payroll-actions";
+import { ConfirmSubmitButton } from "@/components/admin/confirm-submit-button";
 import { FeedbackBanner } from "@/components/admin/feedback-banner";
+import { StatusPill } from "@/components/admin/status-pill";
 
 export const metadata: Metadata = { title: "Pay Run" };
 
@@ -43,7 +46,10 @@ export default async function AdminPayRunDetailPage({
 
   return (
     <div>
-      <h2 className="text-lg font-medium">
+      <Link href="/admin/payroll/runs" className="text-sm text-neutral-500 hover:text-foreground">
+        &larr; Back to Pay Runs
+      </Link>
+      <h2 className="mt-2 text-lg font-medium">
         Pay run: {formatDate(payRun.periodStart)} – {formatDate(payRun.periodEnd)}
       </h2>
       <FeedbackBanner success={success} error={error} />
@@ -51,7 +57,9 @@ export default async function AdminPayRunDetailPage({
         Record-keeping only — gross pay and each deduction amount are entered by you or your accountant; this
         system does not compute statutory deductions.
       </p>
-      <p className="mt-2 text-sm">Status: {payRun.status}</p>
+      <p className="mt-2 flex items-center gap-2 text-sm">
+        Status: <StatusPill status={payRun.status} />
+      </p>
 
       <ul className="mt-6 space-y-3">
         {payRun.payslips.map((payslip) => (
@@ -133,9 +141,13 @@ export default async function AdminPayRunDetailPage({
                     <option value="mpesa">M-Pesa</option>
                   </select>
                 </div>
-                <button type="submit" className={secondaryButtonClass}>
+                <ConfirmSubmitButton
+                  confirmMessage="Finalize this pay run? This posts net pay to the ledger and can't be undone."
+                  className={secondaryButtonClass}
+                  pendingText="Finalizing…"
+                >
                   Finalize (posts to ledger)
-                </button>
+                </ConfirmSubmitButton>
               </form>
             </details>
           )}

@@ -50,7 +50,7 @@ export default async function AdminTrialBalancePage() {
       </ul>
 
       <div className="mt-6 hidden overflow-x-auto sm:block">
-        <table className="w-full min-w-[560px] text-sm">
+        <table className="w-full min-w-[560px] text-sm tabular-nums">
           <thead>
             <tr className="border-b border-border-subtle text-left text-xs text-neutral-500">
               <th className="py-2">Account</th>

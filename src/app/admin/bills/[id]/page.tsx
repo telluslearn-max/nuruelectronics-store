@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireAdminSession } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
@@ -40,8 +41,11 @@ export default async function AdminBillDetailPage({
 
   return (
     <div>
+      <Link href="/admin/bills" className="text-sm text-neutral-500 hover:text-foreground">
+        &larr; Back to Bills
+      </Link>
       <FeedbackBanner success={success} error={error} />
-      <h2 className="text-lg font-medium">{bill.number}</h2>
+      <h2 className="mt-2 text-lg font-medium">{bill.number}</h2>
       <p className="mt-1 text-sm text-neutral-500">
         {bill.supplier.name} · {bill.description} · Bill date {formatDate(bill.billDate)} · Due {formatDate(bill.dueAt)}
       </p>

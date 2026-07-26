@@ -10,15 +10,18 @@ export async function GET(request: Request) {
 
   let from: Date;
   let to: Date;
+  let period: string;
   if (granularity === "daily") {
     const month = searchParams.get("month") ?? `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
     const [year, monthNum] = month.split("-").map(Number);
     from = new Date(year, monthNum - 1, 1);
     to = new Date(year, monthNum, 1);
+    period = month;
   } else {
     const year = Number(searchParams.get("year") ?? now.getFullYear());
     from = new Date(year, 0, 1);
     to = new Date(year + 1, 0, 1);
+    period = String(year);
   }
 
   const pnl = await computePnl({ from, to, granularity });
@@ -27,7 +30,7 @@ export async function GET(request: Request) {
   return new Response(csv, {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
-      "Content-Disposition": `attachment; filename="pnl-${granularity}.csv"`,
+      "Content-Disposition": `attachment; filename="pnl-${granularity}-${period}.csv"`,
     },
   });
 }

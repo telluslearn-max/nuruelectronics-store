@@ -5,6 +5,7 @@ import { requireAdminSession } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
 import { updateCustomer } from "@/lib/customer-actions";
 import { FeedbackBanner } from "@/components/admin/feedback-banner";
+import { StatusPill } from "@/components/admin/status-pill";
 
 export const metadata: Metadata = { title: "Customer" };
 
@@ -42,7 +43,10 @@ export default async function AdminCustomerDetailPage({
 
   return (
     <div>
-      <h2 className="text-lg font-medium">{customer.name ?? customer.email}</h2>
+      <Link href="/admin/customers" className="text-sm text-neutral-500 hover:text-foreground">
+        &larr; Back to Customers
+      </Link>
+      <h2 className="mt-2 text-lg font-medium">{customer.name ?? customer.email}</h2>
       <FeedbackBanner success={success} error={error} />
 
       <details className="mt-6" open>
@@ -78,10 +82,10 @@ export default async function AdminCustomerDetailPage({
                 className="flex flex-wrap items-center justify-between gap-3 hover:opacity-80"
               >
                 <span className="block text-neutral-500">{formatDate(order.createdAt)}</span>
-                <span className="text-right text-neutral-500">
+                <span className="flex flex-col items-end gap-1 text-right text-neutral-500">
                   {order.estimates.length > 0 && <span className="block">{order.estimates.length} estimate(s)</span>}
-                  {order.invoice && <span className="block">Invoice {order.invoice.status}</span>}
-                  {order.deliveryNote && <span className="block">Delivery {order.deliveryNote.status}</span>}
+                  {order.invoice && <StatusPill status={order.invoice.status} />}
+                  {order.deliveryNote && <StatusPill status={order.deliveryNote.status} />}
                   {!order.invoice && order.estimates.length === 0 && !order.deliveryNote && "No documents yet"}
                 </span>
               </Link>

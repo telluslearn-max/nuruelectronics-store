@@ -13,14 +13,34 @@ export type PayrollRow = {
   netPay: number;
 };
 
-/** Every payslip across pay runs, newest first — the Payroll Register. */
-export async function getPayrollReport(): Promise<PayrollRow[]> {
-  const payslips = await prisma.payslip.findMany({
-    orderBy: { createdAt: "desc" },
-    include: { employee: true, payRun: true, deductions: true },
-  });
+/** Every payslip across pay runs, newest first — the Payroll Register. Optionally scoped to a
+    pay-period date range and/or a page of results. */
+export async function getPayrollReport(
+  options: { from?: Date; to?: Date; skip?: number; take?: number } = {},
+): Promise<{ rows: PayrollRow[]; totalCount: number }> {
+  const { from, to, skip, take } = options;
+  const where =
+    from || to
+      ? {
+          payRun: {
+            periodStart: from ? { gte: from } : undefined,
+            periodEnd: to ? { lte: to } : undefined,
+          },
+        }
+      : {};
 
-  return payslips.map((payslip) => ({
+  const [payslips, totalCount] = await Promise.all([
+    prisma.payslip.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      include: { employee: true, payRun: true, deductions: true },
+      skip,
+      take,
+    }),
+    prisma.payslip.count({ where }),
+  ]);
+
+  const rows = payslips.map((payslip) => ({
     id: payslip.id,
     number: payslip.number,
     employeeName: payslip.employee.name,
@@ -30,6 +50,8 @@ export async function getPayrollReport(): Promise<PayrollRow[]> {
     totalDeductions: payslip.deductions.reduce((sum, d) => sum + Number(d.amount), 0),
     netPay: Number(payslip.netPay),
   }));
+
+  return { rows, totalCount };
 }
 
 export function payrollReportToCsv(rows: PayrollRow[]): string {

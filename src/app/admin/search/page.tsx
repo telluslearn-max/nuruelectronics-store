@@ -121,7 +121,12 @@ export default async function AdminSearchPage({
       <div className="mt-6 space-y-8">
         {groups.map((group) => (
           <div key={group.type}>
-            <h3 className="text-sm font-medium text-neutral-500">{group.type}</h3>
+            <h3 className="text-sm font-medium text-neutral-500">
+              {group.type}
+              {group.results.length === RESULT_LIMIT && (
+                <span className="ml-2 font-normal text-neutral-400">(showing first {RESULT_LIMIT})</span>
+              )}
+            </h3>
             <ul className="mt-3 space-y-3">
               {group.results.map((result) => (
                 <li key={result.href + result.label} className="rounded-card border border-border-subtle p-4 text-sm">

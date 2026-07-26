@@ -5,6 +5,7 @@ import { isGoogleSheetsConfigured } from "@/lib/google-sheets";
 import { formatPrice } from "@/lib/format";
 import { syncPnlNow } from "@/lib/pnl-actions";
 import { FeedbackBanner } from "@/components/admin/feedback-banner";
+import { moneyColorClass } from "@/components/admin/money-colors";
 
 export const metadata: Metadata = { title: "Profit & Loss" };
 
@@ -120,6 +121,7 @@ export default async function AdminPnlPage({
             const values = pnl[key] as Record<string, number>;
             const value = values[selectedBucket] ?? 0;
             const isTotalRow = label.startsWith("TOTAL") || label.startsWith("PROFIT");
+            const isProfitRow = label.startsWith("PROFIT");
             return (
               <li
                 key={label}
@@ -128,7 +130,9 @@ export default async function AdminPnlPage({
                 }`}
               >
                 <span>{label}</span>
-                <span>{formatPrice(value.toFixed(2), "KES")}</span>
+                <span className={isProfitRow ? moneyColorClass(value) : undefined}>
+                  {formatPrice(value.toFixed(2), "KES")}
+                </span>
               </li>
             );
           })}
@@ -136,7 +140,7 @@ export default async function AdminPnlPage({
       </div>
 
       <div className="mt-6 hidden overflow-x-auto sm:block">
-        <table className="w-full min-w-[720px] text-sm">
+        <table className="w-full min-w-[720px] text-sm tabular-nums">
           <thead>
             <tr className="border-b border-border-subtle text-left text-xs text-neutral-500">
               <th className="py-2">Description</th>
@@ -153,15 +157,24 @@ export default async function AdminPnlPage({
               const values = pnl[key] as Record<string, number>;
               const total = pnl.buckets.reduce((sum, bucket) => sum + (values[bucket] ?? 0), 0);
               const isTotalRow = label.startsWith("TOTAL") || label.startsWith("PROFIT");
+              const isProfitRow = label.startsWith("PROFIT");
               return (
                 <tr key={label} className={`border-b border-border-subtle/60 ${isTotalRow ? "font-medium" : ""}`}>
                   <td className="py-2">{label}</td>
-                  {pnl.buckets.map((bucket) => (
-                    <td key={bucket} className="py-2 text-right">
-                      {formatPrice((values[bucket] ?? 0).toFixed(2), "KES")}
-                    </td>
-                  ))}
-                  <td className="py-2 text-right">{formatPrice(total.toFixed(2), "KES")}</td>
+                  {pnl.buckets.map((bucket) => {
+                    const bucketValue = values[bucket] ?? 0;
+                    return (
+                      <td
+                        key={bucket}
+                        className={`py-2 text-right ${isProfitRow ? moneyColorClass(bucketValue) : ""}`}
+                      >
+                        {formatPrice(bucketValue.toFixed(2), "KES")}
+                      </td>
+                    );
+                  })}
+                  <td className={`py-2 text-right ${isProfitRow ? moneyColorClass(total) : ""}`}>
+                    {formatPrice(total.toFixed(2), "KES")}
+                  </td>
                 </tr>
               );
             })}
