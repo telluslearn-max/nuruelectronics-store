@@ -69,6 +69,16 @@
   color: rgba(255, 255, 255, 0.68);
 }
 
+/* Seasonal theme (Dec 1–26; see src/lib/seasonal-theme.ts). Deliberately leaves
+   --background/--foreground/--border-subtle/--accent untouched — --accent (#d4472e) already
+   reads as a warm Christmas red, and touching it would re-tint the focus ring, every CTA, and
+   the "Coming Soon"/region badges (bg-accent/10 text-accent) sitewide. These vars are new and
+   additive, consumed only by AnnouncementBar's Christmas variant. */
+.theme-christmas {
+  --christmas-green: #146b3a;
+  --christmas-gold: #c9a227;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -78,6 +88,8 @@
   --color-surface-dark: var(--surface-dark);
   --color-surface-dark-foreground: var(--surface-dark-foreground);
   --color-whatsapp: var(--whatsapp);
+  --color-christmas-green: var(--christmas-green);
+  --color-christmas-gold: var(--christmas-gold);
   --radius-control: var(--radius-control);
   --radius-card: var(--radius-card);
   --font-sans: var(--font-geist-sans);
@@ -95,6 +107,7 @@
   --animate-slide-in: slide-in 0.3s ease-out both;
   --animate-slide-up: slide-up 0.3s ease-out both;
   --animate-scale-in: scale-in 0.18s ease-out both;
+  --animate-snowfall: snowfall linear infinite;
 
   @keyframes fade-up {
     from {
@@ -142,6 +155,18 @@
     to {
       opacity: 1;
       transform: scale(1) translateY(0);
+    }
+  }
+
+  /* --drift (per-flake, set inline by Snowfall) is the horizontal wander over the fall;
+     the existing global prefers-reduced-motion rule below zeroes this duration too, so
+     flakes freeze in place rather than needing a separate opt-out. */
+  @keyframes snowfall {
+    from {
+      transform: translate3d(0, -10%, 0);
+    }
+    to {
+      transform: translate3d(var(--drift, 0px), 110vh, 0);
     }
   }
 }
