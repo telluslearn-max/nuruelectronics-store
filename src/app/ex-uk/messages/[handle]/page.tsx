@@ -22,7 +22,7 @@ export default async function ExUkConversationPage({ params }: ConversationPageP
 
   return (
     <>
-      <ExUkTopBar title={product.title} />
+      <ExUkTopBar title={product.title} backHref="/ex-uk/messages" backLabel="Messages" />
       <ExUkConversation product={product} />
     </>
   );

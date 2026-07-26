@@ -7,7 +7,7 @@
 export function GiftCardRegionNotice({ region }: { region: string }) {
   return (
     <div className="mt-4 rounded-card border border-border-subtle p-4">
-      <p className="text-sm font-medium">{region} Store Only</p>
+      <h3 className="text-sm font-medium">{region} Store Only</h3>
       <p className="mt-1 text-xs text-neutral-500">
         {`This code only redeems on an account registered to the ${region} store. Check your account's region before ordering — it won't work on any other region.`}
       </p>

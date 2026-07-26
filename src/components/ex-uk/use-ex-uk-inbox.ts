@@ -23,6 +23,7 @@ export type PersistedThread = {
 };
 
 const STORAGE_KEY = "nuru:ex-uk-inbox";
+const LAST_READ_KEY = "nuru:ex-uk-last-read";
 
 function toPersisted(messages: ConciergeDisplayMessage[]): PersistedMessage[] {
   return messages.map((m) => ({
@@ -43,8 +44,21 @@ function readStoredThreads(): Record<string, PersistedThread> {
   }
 }
 
+function readLastRead(): Record<string, number> {
+  try {
+    const raw = window.localStorage.getItem(LAST_READ_KEY);
+    return raw ? (JSON.parse(raw) as Record<string, number>) : {};
+  } catch {
+    return {};
+  }
+}
+
 type InboxState = {
   threads: Record<string, PersistedThread>;
+  // When each thread was last viewed — a thread is "unread" when its updatedAt is newer than
+  // this, not merely "has any messages" (every matched product gets an initial message, so
+  // that would flag almost every match as unread forever).
+  lastRead: Record<string, number>;
   // Reading localStorage only happens after mount, so callers that seed a one-time initial
   // value from `threads` (e.g. usePersistedConciergeMessages) must wait for this to flip true
   // first — otherwise they'd lock in an empty history before it has loaded.
@@ -53,11 +67,11 @@ type InboxState = {
 
 /** Per-product conversation history — each matched product gets its own persisted "inbox". */
 export function useExUkInbox() {
-  const [state, setState] = useState<InboxState>({ threads: {}, hydrated: false });
+  const [state, setState] = useState<InboxState>({ threads: {}, lastRead: {}, hydrated: false });
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setState({ threads: readStoredThreads(), hydrated: true });
+    setState({ threads: readStoredThreads(), lastRead: readLastRead(), hydrated: true });
   }, []);
 
   const saveThread = useCallback((handle: string, messages: ConciergeDisplayMessage[]) => {
@@ -68,5 +82,15 @@ export function useExUkInbox() {
     });
   }, []);
 
-  return { threads: state.threads, saveThread, hydrated: state.hydrated };
+  // Called when a thread's conversation screen is opened, so messages that arrive after the
+  // shopper leaves still count as unread on their next visit.
+  const markRead = useCallback((handle: string) => {
+    setState((prev) => {
+      const lastRead = { ...prev.lastRead, [handle]: Date.now() };
+      window.localStorage.setItem(LAST_READ_KEY, JSON.stringify(lastRead));
+      return { ...prev, lastRead };
+    });
+  }, []);
+
+  return { threads: state.threads, lastRead: state.lastRead, saveThread, markRead, hydrated: state.hydrated };
 }

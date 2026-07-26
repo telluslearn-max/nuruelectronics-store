@@ -36,7 +36,7 @@ export function ConciergeSheet({
           ref={collapseButtonRef}
           onClick={onCollapse}
           aria-label="Collapse concierge"
-          className="flex h-9 w-9 items-center justify-center rounded-control text-2xl leading-none hover:bg-neutral-100"
+          className="flex h-11 w-11 items-center justify-center rounded-control text-2xl leading-none hover:bg-neutral-100"
         >
           &times;
         </button>

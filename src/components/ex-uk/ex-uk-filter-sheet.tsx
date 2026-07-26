@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { useFocusTrap } from "@/components/use-focus-trap";
 import type { Category } from "@/lib/categories";
 
 const PRICE_PRESETS = [
@@ -14,6 +15,7 @@ export function ExUkFilterSheet({
   categories,
   activeCategory,
   maxPrice,
+  resultCount,
   onChangeCategory,
   onChangeMaxPrice,
   onClose,
@@ -21,11 +23,13 @@ export function ExUkFilterSheet({
   categories: Category[];
   activeCategory: string | null;
   maxPrice: number | null;
+  resultCount: number;
   onChangeCategory: (slug: string | null) => void;
   onChangeMaxPrice: (price: number | null) => void;
   onClose: () => void;
 }) {
   const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const trapRef = useFocusTrap<HTMLDivElement>(true);
 
   useEffect(() => {
     closeButtonRef.current?.focus();
@@ -37,7 +41,7 @@ export function ExUkFilterSheet({
   }, [onClose]);
 
   return (
-    <div role="dialog" aria-modal="true" aria-label="Filter Ex-UK units" className="fixed inset-0 z-50 flex flex-col bg-background">
+    <div ref={trapRef} role="dialog" aria-modal="true" aria-label="Filter Ex-UK units" className="fixed inset-0 z-50 flex flex-col bg-background">
       <div className="flex shrink-0 items-center justify-between border-b border-border-subtle px-4 py-3">
         <span className="text-sm font-semibold">Filters</span>
         <button
@@ -55,6 +59,7 @@ export function ExUkFilterSheet({
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
+            aria-pressed={activeCategory === null}
             onClick={() => onChangeCategory(null)}
             className={`rounded-control border px-3 py-1.5 text-sm ${
               activeCategory === null ? "border-accent bg-accent/10 text-accent" : "border-border-subtle text-neutral-600"
@@ -66,6 +71,7 @@ export function ExUkFilterSheet({
             <button
               key={category.slug}
               type="button"
+              aria-pressed={activeCategory === category.slug}
               onClick={() => onChangeCategory(category.slug)}
               className={`rounded-control border px-3 py-1.5 text-sm ${
                 activeCategory === category.slug
@@ -84,6 +90,7 @@ export function ExUkFilterSheet({
             <button
               key={preset.label}
               type="button"
+              aria-pressed={maxPrice === preset.value}
               onClick={() => onChangeMaxPrice(preset.value)}
               className={`rounded-control border px-3 py-1.5 text-sm ${
                 maxPrice === preset.value ? "border-accent bg-accent/10 text-accent" : "border-border-subtle text-neutral-600"
@@ -101,7 +108,7 @@ export function ExUkFilterSheet({
           onClick={onClose}
           className="w-full rounded-control bg-accent py-3 text-sm font-medium text-accent-foreground"
         >
-          Show results
+          Show {resultCount} {resultCount === 1 ? "result" : "results"}
         </button>
       </div>
     </div>

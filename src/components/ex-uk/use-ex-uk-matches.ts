@@ -40,5 +40,14 @@ export function useExUkMatches() {
     });
   }, []);
 
-  return { matches, addMatch };
+  const removeMatch = useCallback((handle: string) => {
+    setMatches((prev) => {
+      if (!prev.some((m) => m.handle === handle)) return prev;
+      const next = prev.filter((m) => m.handle !== handle);
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      return next;
+    });
+  }, []);
+
+  return { matches, addMatch, removeMatch };
 }

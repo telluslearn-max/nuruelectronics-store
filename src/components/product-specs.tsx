@@ -165,12 +165,8 @@ export function ProductSpecs({ specs }: { specs: ProductSpec[] }) {
     <section className="mt-16">
       <h2 className="text-title">Specifications</h2>
       <div className="mt-6 space-y-8">
-        {groups.map((group) => (
-          <div key={group.id}>
-            <div className="flex items-center gap-2 text-sm font-medium">
-              <CategoryIcon id={group.id} className="h-5 w-5 text-accent" />
-              {group.label}
-            </div>
+        {groups.map((group, index) => {
+          const entries = (
             <dl className="mt-3 divide-y divide-border-subtle border-y border-border-subtle">
               {group.entries.map((spec) => (
                 <div key={spec.key} className="grid grid-cols-2 gap-4 py-3 text-sm">
@@ -179,8 +175,46 @@ export function ProductSpecs({ specs }: { specs: ProductSpec[] }) {
                 </div>
               ))}
             </dl>
-          </div>
-        ))}
+          );
+
+          // Keep the first couple of categories always visible — the ones a
+          // shopper is most likely to scan — and collapse the long tail
+          // behind a native <details> so the page doesn't open with a wall
+          // of spec tables.
+          if (index < 2) {
+            return (
+              <div key={group.id}>
+                <div className="flex items-center gap-2 text-sm font-medium">
+                  <CategoryIcon id={group.id} className="h-5 w-5 text-accent" />
+                  {group.label}
+                </div>
+                {entries}
+              </div>
+            );
+          }
+
+          return (
+            <details key={group.id} className="group">
+              <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-medium [&::-webkit-details-marker]:hidden">
+                <CategoryIcon id={group.id} className="h-5 w-5 text-accent" />
+                {group.label}
+                <svg
+                  viewBox="0 0 12 8"
+                  className="ml-auto h-2.5 w-2.5 transition group-open:-rotate-180"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M1 1.5 6 6.5 11 1.5" />
+                </svg>
+              </summary>
+              {entries}
+            </details>
+          );
+        })}
       </div>
     </section>
   );

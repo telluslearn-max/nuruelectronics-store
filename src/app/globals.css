@@ -10,17 +10,22 @@
   --surface-dark-foreground: #f5f5f7;
   /* WhatsApp's own brand green — fixed regardless of theme, same as --accent. */
   --whatsapp: #25d366;
+  /* Ex-UK swipe deck's "NOPE" stamp — a neutral gray, independent of --accent (used by the "LOVE" stamp). */
+  --nope-stamp: #6b7280;
+  --nope-stamp-glow: rgba(107, 114, 128, 0.5);
   --radius-control: 999px;
   --radius-card: 0.75rem;
   /* Toggled by ProductOptions' IntersectionObserver when its sticky buy bar
      is visible, so the concierge FAB/panel can shift up to clear it. */
   --buy-bar-visible: 0;
   --dock-clear: 4.5rem;
+  --main-pb-base: 10rem;
 }
 
 @media (min-width: 768px) {
   :root {
     --dock-clear: 1.5rem;
+    --main-pb-base: 6rem;
   }
 }
 

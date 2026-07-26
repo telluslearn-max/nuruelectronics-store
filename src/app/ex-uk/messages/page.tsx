@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { HeartIcon } from "@/components/ex-uk/action-icons";
 import { ExUkTopBar } from "@/components/ex-uk/ex-uk-top-bar";
 import { RecentMatchesRow } from "@/components/ex-uk/recent-matches-row";
 import { useExUkInbox } from "@/components/ex-uk/use-ex-uk-inbox";
@@ -22,7 +23,7 @@ export default function ExUkMessagesPage() {
 
   return (
     <>
-      <ExUkTopBar title="Messages" />
+      <ExUkTopBar title="Messages" backHref="/ex-uk" backLabel="Discover" />
       <div className="flex-1 overflow-y-auto">
         <RecentMatchesRow matches={matches} />
 
@@ -47,7 +48,7 @@ export default function ExUkMessagesPage() {
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={match.imageUrl} alt="" className="h-full w-full object-cover" />
                       ) : (
-                        "♥"
+                        <HeartIcon className="h-5 w-5" />
                       )}
                     </span>
                     <span className="min-w-0 flex-1">

@@ -34,7 +34,7 @@ export function WishlistToggleButton({ product }: { product: Product }) {
       }}
       aria-label={active ? "Remove from wishlist" : "Save to wishlist"}
       aria-pressed={active}
-      className={`flex h-9 w-9 items-center justify-center rounded-full border shadow-sm transition ${
+      className={`flex h-11 w-11 items-center justify-center rounded-full border shadow-sm transition ${
         active
           ? "border-accent bg-accent text-accent-foreground"
           : "border-border-subtle bg-background/90 text-neutral-600 hover:border-foreground hover:text-foreground"

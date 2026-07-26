@@ -29,7 +29,7 @@ export function CompareToggleButton({ product }: { product: Product }) {
       aria-label={active ? "Remove from compare" : disabled ? "Compare list is full" : "Add to compare"}
       aria-pressed={active}
       title={disabled ? "Compare list is full (max 3)" : undefined}
-      className={`flex h-9 w-9 items-center justify-center rounded-full border shadow-sm transition disabled:cursor-not-allowed disabled:opacity-40 ${
+      className={`flex h-11 w-11 items-center justify-center rounded-full border shadow-sm transition disabled:cursor-not-allowed disabled:opacity-40 ${
         active
           ? "border-accent bg-accent text-accent-foreground"
           : "border-border-subtle bg-background/90 text-neutral-600 hover:border-foreground hover:text-foreground"

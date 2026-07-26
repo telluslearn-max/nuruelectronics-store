@@ -38,10 +38,20 @@ function MessagesIcon({ className, filled }: { className?: string; filled?: bool
 export function ExUkBottomTabBar() {
   const pathname = usePathname();
   const { matches } = useExUkMatches();
-  const { threads } = useExUkInbox();
+  const { threads, lastRead } = useExUkInbox();
 
-  const unreadCount = matches.filter((m) => !threads[m.handle]?.messages.length).length;
+  // Unread = the thread has messages newer than the shopper's last visit to it — not merely
+  // "has no messages yet", which would flag nearly every fresh match as unread forever.
+  const unreadCount = matches.filter((m) => {
+    const thread = threads[m.handle];
+    return Boolean(thread) && thread.updatedAt > (lastRead[m.handle] ?? 0);
+  }).length;
   const onMessages = pathname.startsWith("/ex-uk/messages");
+  // The individual conversation is its own full-page screen (see ex-uk-conversation.tsx's own
+  // doc comment) — hide the tab bar there so it doesn't compete with the chat's input bar.
+  const isConversation = /^\/ex-uk\/messages\/[^/]+$/.test(pathname ?? "");
+
+  if (isConversation) return null;
 
   return (
     <nav

@@ -53,7 +53,7 @@ export function CartDrawer() {
             ref={closeButtonRef}
             onClick={closeCart}
             aria-label="Close cart"
-            className="flex h-9 w-9 items-center justify-center rounded-control text-2xl leading-none hover:bg-neutral-100"
+            className="flex h-11 w-11 items-center justify-center rounded-control text-2xl leading-none hover:bg-neutral-100"
           >
             &times;
           </button>
@@ -89,7 +89,7 @@ export function CartDrawer() {
                         <p className="text-sm text-neutral-500">{line.merchandise.title}</p>
                       )}
                       <div className="mt-auto flex items-center justify-between">
-                        <div className="flex items-center gap-1 rounded-control border border-border-subtle px-1">
+                        <div className="flex items-center gap-2 rounded-control border border-border-subtle px-1">
                           <button
                             disabled={isPending}
                             onClick={() =>
@@ -99,7 +99,7 @@ export function CartDrawer() {
                               })
                             }
                             aria-label="Decrease quantity"
-                            className="flex h-10 w-10 items-center justify-center text-sm disabled:opacity-50"
+                            className="flex h-11 w-11 items-center justify-center text-sm disabled:opacity-50"
                           >
                             -
                           </button>
@@ -113,7 +113,7 @@ export function CartDrawer() {
                               })
                             }
                             aria-label="Increase quantity"
-                            className="flex h-10 w-10 items-center justify-center text-sm disabled:opacity-50"
+                            className="flex h-11 w-11 items-center justify-center text-sm disabled:opacity-50"
                           >
                             +
                           </button>

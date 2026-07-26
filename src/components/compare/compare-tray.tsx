@@ -30,7 +30,7 @@ export function CompareTray() {
           type="button"
           onClick={clearCompare}
           aria-label="Clear compare list"
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-lg leading-none text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-lg leading-none text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700"
         >
           &times;
         </button>

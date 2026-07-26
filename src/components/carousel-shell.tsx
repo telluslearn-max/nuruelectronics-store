@@ -45,7 +45,7 @@ export function CarouselShell({ children }: { children: React.ReactNode }) {
         type="button"
         aria-label="Scroll left"
         onClick={() => scroll(-1)}
-        className="absolute left-0 top-1/2 hidden -translate-x-3 -translate-y-1/2 rounded-full border border-border-subtle bg-background p-2 shadow-md transition hover:border-foreground sm:flex"
+        className="absolute left-0 top-1/2 hidden -translate-x-3 -translate-y-1/2 rounded-full border border-border-subtle bg-background p-3.5 shadow-md transition hover:border-foreground sm:flex"
       >
         <ChevronLeftIcon />
       </button>
@@ -53,7 +53,7 @@ export function CarouselShell({ children }: { children: React.ReactNode }) {
         type="button"
         aria-label="Scroll right"
         onClick={() => scroll(1)}
-        className="absolute right-0 top-1/2 hidden -translate-y-1/2 translate-x-3 rounded-full border border-border-subtle bg-background p-2 shadow-md transition hover:border-foreground sm:flex"
+        className="absolute right-0 top-1/2 hidden -translate-y-1/2 translate-x-3 rounded-full border border-border-subtle bg-background p-3.5 shadow-md transition hover:border-foreground sm:flex"
       >
         <ChevronRightIcon />
       </button>

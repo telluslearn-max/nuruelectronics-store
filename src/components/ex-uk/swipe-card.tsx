@@ -186,8 +186,8 @@ export const SwipeCard = forwardRef<
         <Stamp
           label="NOPE"
           side="left"
-          color="#6b7280"
-          glow="rgba(107,114,128,0.5)"
+          color="var(--nope-stamp)"
+          glow="var(--nope-stamp-glow)"
           opacity={delta.x < 0 ? stampOpacity : 0}
           scale={stampScale}
         />

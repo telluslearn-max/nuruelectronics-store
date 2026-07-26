@@ -11,6 +11,7 @@ export default async function Image({ params }: { params: Promise<{ handle: stri
   const { handle } = await params;
   const product = await getProductByHandle(handle);
   const price = product?.priceRange.minVariantPrice;
+  const image = product?.images[0];
 
   return new ImageResponse(
     (
@@ -19,35 +20,43 @@ export default async function Image({ params }: { params: Promise<{ handle: stri
           width: "100%",
           height: "100%",
           display: "flex",
-          flexDirection: "column",
-          justifyContent: "space-between",
           backgroundColor: OG_THEME.background,
           color: OG_THEME.foreground,
-          padding: 80,
         }}
       >
-        <div style={{ fontSize: 44, fontWeight: 700, letterSpacing: -1, display: "flex" }}>
-          NURU
-          <div
-            style={{
-              width: 10,
-              height: 10,
-              backgroundColor: OG_THEME.accent,
-              marginTop: 38,
-              marginLeft: 4,
-            }}
-          />
-        </div>
-        <div style={{ display: "flex", flexDirection: "column" }}>
-          <div style={{ fontSize: 68, fontWeight: 700, letterSpacing: -2, lineHeight: 1.1 }}>
-            {product?.title ?? "NURU"}
+        <div
+          style={{
+            flex: 1,
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "space-between",
+            padding: 80,
+          }}
+        >
+          <div style={{ fontSize: 44, fontWeight: 700, letterSpacing: -1, display: "flex" }}>
+            NURU
+            <div
+              style={{
+                width: 10,
+                height: 10,
+                backgroundColor: OG_THEME.accent,
+                marginTop: 38,
+                marginLeft: 4,
+              }}
+            />
           </div>
-          {price && (
-            <div style={{ fontSize: 40, color: OG_THEME.muted, marginTop: 20 }}>
-              {`From ${formatPrice(price.amount, price.currencyCode)}`}
+          <div style={{ display: "flex", flexDirection: "column" }}>
+            <div style={{ fontSize: 56, fontWeight: 700, letterSpacing: -2, lineHeight: 1.1 }}>
+              {product?.title ?? "NURU"}
             </div>
-          )}
+            {price && (
+              <div style={{ fontSize: 36, color: OG_THEME.muted, marginTop: 20 }}>
+                {`From ${formatPrice(price.amount, price.currencyCode)}`}
+              </div>
+            )}
+          </div>
         </div>
+        {image && <img src={image.url} alt="" width={470} height={630} style={{ objectFit: "cover" }} />}
       </div>
     ),
     { ...size },
