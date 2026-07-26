@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { ComingSoonCarousel } from "@/components/coming-soon-carousel";
 import { FeatureCarousel } from "@/components/feature-carousel";
-import { ProductCarousel } from "@/components/product-carousel";
 import { ProductList } from "@/components/product-list";
 import { RelatedCategories, type RelatedCategoryEntry } from "@/components/related-categories";
 import { SectionHeading } from "@/components/section-heading";
@@ -126,10 +126,13 @@ export function CollectionPage({
 
       {comingSoonProducts && comingSoonProducts.length > 0 && (
         <section className="mb-12">
-          <SectionHeading eyebrow="Pre-order" title="Coming Soon" />
-          <div className="mt-4">
-            <ProductCarousel products={comingSoonProducts} />
+          <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-baseline sm:justify-between">
+            <SectionHeading eyebrow="Confirmed. Not yet released." title="Coming Soon" />
+            <Link href="/coming-soon" className="shrink-0 text-sm font-medium text-accent hover:opacity-80">
+              See all &rarr;
+            </Link>
           </div>
+          <ComingSoonCarousel products={comingSoonProducts} />
         </section>
       )}
 
