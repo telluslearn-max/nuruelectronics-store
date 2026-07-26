@@ -6,6 +6,7 @@ import { formatPrice } from "@/lib/format";
 import { syncPnlNow } from "@/lib/pnl-actions";
 import { FeedbackBanner } from "@/components/admin/feedback-banner";
 import { moneyColorClass } from "@/components/admin/money-colors";
+import { PnlChart } from "@/components/admin/pnl-chart";
 
 export const metadata: Metadata = { title: "Profit & Loss" };
 
@@ -92,7 +93,17 @@ export default async function AdminPnlPage({
         </p>
       )}
 
-      <div className="sm:hidden">
+      <div className="mt-8 rounded-card border border-border-subtle p-4">
+        <PnlChart
+          buckets={pnl.buckets}
+          monthLabels={Object.fromEntries(pnl.buckets.map((bucket) => [bucket, monthLabel(bucket)]))}
+          totalRevenue={pnl.totalRevenue}
+          totalExpenses={pnl.totalExpenses}
+          profit={pnl.profit}
+        />
+      </div>
+
+      <div className="mt-8 sm:hidden">
         <form method="GET" className="mt-4 flex items-end gap-3">
           <div>
             <label className="block text-xs text-neutral-500">Month</label>
