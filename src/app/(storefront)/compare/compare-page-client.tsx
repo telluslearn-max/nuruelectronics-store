@@ -58,7 +58,15 @@ export function ComparePageClient() {
           </Link>
         </div>
       ) : products === null ? (
-        <p className="py-16 text-center text-neutral-500">Loading…</p>
+        <div className="mt-10 grid grid-cols-2 gap-4 sm:grid-cols-3">
+          {items.map((item) => (
+            <div key={item.handle}>
+              <div className="aspect-square animate-pulse rounded-card bg-neutral-100" />
+              <div className="mt-3 h-4 w-3/4 animate-pulse rounded bg-neutral-100" />
+              <div className="mt-2 h-8 w-full animate-pulse rounded-control bg-neutral-100" />
+            </div>
+          ))}
+        </div>
       ) : (
         <div className="mt-10">
           <CompareTable

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { isRouteActive, isRouteActiveAny } from "@/lib/route-active";
 import { useCart } from "./cart/cart-context";
 
 function HomeIcon({ active }: { active: boolean }) {
@@ -112,13 +113,9 @@ export function MobileTabBar({
   const itemCount = cart?.totalQuantity ?? 0;
 
   const isHome = pathname === "/";
-  const isShop =
-    pathname === "/shop" ||
-    pathname.startsWith("/category") ||
-    pathname.startsWith("/ecosystem") ||
-    pathname.startsWith("/kit");
-  const isSearch = pathname.startsWith("/search");
-  const isAccount = pathname.startsWith("/account");
+  const isShop = isRouteActiveAny(pathname, ["/shop", "/category", "/ecosystem", "/kit"]);
+  const isSearch = isRouteActive(pathname, "/search");
+  const isAccount = isRouteActive(pathname, "/account");
   const accountHref = authEnabled ? (customerName ? "/account" : "/api/auth/login") : "/account";
 
   const tabClass = (active: boolean) =>

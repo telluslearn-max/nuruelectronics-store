@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { StatusPill } from "@/components/admin/status-pill";
-import { FooterLinks } from "@/components/footer-links";
 import { WishlistSection } from "@/components/wishlist/wishlist-section";
 import { formatPrice } from "@/lib/format";
 import { getCurrentCustomer } from "@/lib/customer";
@@ -44,9 +43,6 @@ export default async function AccountPage({
         <section className="mt-12 border-t border-border-subtle pt-8">
           <WishlistSection />
         </section>
-        <section className="mt-12 border-t border-border-subtle pt-8 md:hidden">
-          <FooterLinks />
-        </section>
       </div>
     );
   }
@@ -74,9 +70,6 @@ export default async function AccountPage({
         </div>
         <section className="mt-12 border-t border-border-subtle pt-8">
           <WishlistSection />
-        </section>
-        <section className="mt-12 border-t border-border-subtle pt-8 md:hidden">
-          <FooterLinks />
         </section>
       </div>
     );
@@ -155,10 +148,6 @@ export default async function AccountPage({
 
       <section className="mt-12 border-t border-border-subtle pt-8">
         <WishlistSection />
-      </section>
-
-      <section className="mt-12 border-t border-border-subtle pt-8 md:hidden">
-        <FooterLinks />
       </section>
     </div>
   );

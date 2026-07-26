@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { getNavEntries } from "@/lib/nav-entries";
+import { isRouteActive } from "@/lib/route-active";
 import { useWishlist } from "./wishlist/wishlist-context";
 import { useCart } from "./cart/cart-context";
 import { SearchBox } from "./search-box";
@@ -143,7 +144,7 @@ export function Nav({
         <div className="mx-auto max-w-6xl overflow-x-auto px-4">
           <ul className="flex gap-6 whitespace-nowrap py-2.5 text-sm">
             {entries.map((entry) => {
-              const isCurrent = pathname === entry.href;
+              const isCurrent = isRouteActive(pathname, entry.href);
               const isOpen = openId === entry.id;
               return (
                 <li

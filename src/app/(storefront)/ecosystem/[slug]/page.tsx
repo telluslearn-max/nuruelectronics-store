@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Breadcrumb } from "@/components/breadcrumb";
 import { CollectionPage, parseSortSlug } from "@/components/collection-page";
-import { HeroProductCard } from "@/components/hero-product-card";
+import { EcosystemFlagshipCard } from "@/components/ecosystem-flagship-card";
 import { IconStrip } from "@/components/icon-strip";
 import { ProductList } from "@/components/product-list";
 import { SectionHeading } from "@/components/section-heading";
@@ -137,7 +137,7 @@ export default async function EcosystemPage({ params, searchParams }: EcosystemP
             <SectionHeading eyebrow="Top picks" title="Popular right now" />
             <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
               {flagshipPage.products.map((product) => (
-                <HeroProductCard key={product.id} product={product} />
+                <EcosystemFlagshipCard key={product.id} product={product} />
               ))}
             </div>
           </section>
