@@ -8,11 +8,30 @@ import { SectionHeading } from "@/components/section-heading";
 import { SITE_URL } from "@/lib/site";
 import type { Product } from "@/lib/shopify/types";
 
-const SORTS = [
+export type CollectionSortKey = "PRICE" | "BEST_SELLING" | "CREATED_AT";
+export type CollectionSort = { sortKey: CollectionSortKey; reverse: boolean };
+
+const SORTS: { slug: string | undefined; label: string; sort?: CollectionSort }[] = [
   { slug: undefined, label: "Featured" },
-  { slug: "price-asc", label: "Price: Low to High" },
-  { slug: "price-desc", label: "Price: High to Low" },
-] as const;
+  { slug: "best-selling", label: "Best Selling", sort: { sortKey: "BEST_SELLING", reverse: false } },
+  { slug: "newest", label: "Newest", sort: { sortKey: "CREATED_AT", reverse: true } },
+  { slug: "price-asc", label: "Price: Low to High", sort: { sortKey: "PRICE", reverse: false } },
+  { slug: "price-desc", label: "Price: High to Low", sort: { sortKey: "PRICE", reverse: true } },
+];
+
+/** Shared by every CollectionPage caller (category/ecosystem/kit) so the `?sort=` slug always
+    maps to the same Shopify sort key, instead of each page re-deriving its own ternary chain. */
+export function parseSortSlug(sortSlug: string | undefined): CollectionSort | undefined {
+  return SORTS.find((s) => s.slug === sortSlug)?.sort;
+}
+
+function FunnelIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 20 20" className={className} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3 4h14l-5.5 6.5v4.5L9 17v-6.5L3 4Z" />
+    </svg>
+  );
+}
 
 export function chipClass(isActive: boolean) {
   return `rounded-control border px-4 py-2 text-sm transition ${
@@ -46,7 +65,7 @@ export function CollectionPage({
   products: Product[];
   hasNextPage: boolean;
   endCursor: string | null;
-  sort?: { sortKey: "PRICE"; reverse: boolean };
+  sort?: CollectionSort;
   sortSlug?: string;
   buildHref: (sort?: string) => string;
   groupChips?: ReactNode;
@@ -117,7 +136,10 @@ export function CollectionPage({
       {groupChips}
 
       <div className="mb-8 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
-        <span className="text-neutral-400">Sort:</span>
+        <span className="flex items-center gap-1.5 text-neutral-400">
+          <FunnelIcon className="h-4 w-4" />
+          Sort:
+        </span>
         {SORTS.map((s) => {
           const isActive = (sortSlug ?? undefined) === s.slug || (!sortSlug && !s.slug);
           return (

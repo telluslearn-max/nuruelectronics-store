@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Breadcrumb } from "@/components/breadcrumb";
-import { CollectionPage } from "@/components/collection-page";
+import { CollectionPage, parseSortSlug } from "@/components/collection-page";
 import { HeroProductCard } from "@/components/hero-product-card";
 import { IconStrip } from "@/components/icon-strip";
 import { ProductList } from "@/components/product-list";
@@ -186,12 +186,7 @@ export default async function EcosystemPage({ params, searchParams }: EcosystemP
     );
   }
 
-  const sort =
-    sortSlug === "price-asc"
-      ? { sortKey: "PRICE" as const, reverse: false }
-      : sortSlug === "price-desc"
-        ? { sortKey: "PRICE" as const, reverse: true }
-        : undefined;
+  const sort = parseSortSlug(sortSlug);
 
   const { products, hasNextPage, endCursor } = await getProducts({
     searchTerm: query,

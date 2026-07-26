@@ -26,17 +26,18 @@ async function findMatchingProducts(query: string) {
   if (await isSemanticSearchReady()) {
     const { products } = await getProducts({ first: 100 });
     const ranked = await searchProductsSemantic(query, products);
-    return { products: ranked, hasNextPage: false, endCursor: null };
+    return { products: ranked, hasNextPage: false, endCursor: null, isSemantic: true };
   }
-  return getProducts({ searchTerm: query });
+  const page = await getProducts({ searchTerm: query });
+  return { ...page, isSemantic: false };
 }
 
 export default async function SearchPage({ searchParams }: SearchPageProps) {
   const { q } = await searchParams;
   const query = q?.trim() ?? "";
-  const { products, hasNextPage, endCursor } = query
+  const { products, hasNextPage, endCursor, isSemantic } = query
     ? await findMatchingProducts(query)
-    : { products: [], hasNextPage: false, endCursor: null };
+    : { products: [], hasNextPage: false, endCursor: null, isSemantic: false };
 
   const showBrowseInstead = !query || products.length === 0;
 
@@ -52,13 +53,20 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
       </div>
 
       {query && (
-        <ProductList
-          key={query}
-          initialProducts={products}
-          initialHasNextPage={hasNextPage}
-          initialEndCursor={endCursor}
-          searchTerm={query}
-        />
+        <>
+          {isSemantic && products.length > 0 && (
+            <p className="mb-4 text-sm text-neutral-500">
+              Showing top {products.length} matches, ranked by relevance.
+            </p>
+          )}
+          <ProductList
+            key={query}
+            initialProducts={products}
+            initialHasNextPage={hasNextPage}
+            initialEndCursor={endCursor}
+            searchTerm={query}
+          />
+        </>
       )}
 
       {showBrowseInstead && (

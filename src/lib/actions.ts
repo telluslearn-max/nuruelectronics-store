@@ -107,7 +107,7 @@ export async function getProductsByHandles(handles: string[]): Promise<Product[]
 export async function loadMoreProducts(
   cursor: string,
   searchTerm?: string,
-  sort?: { sortKey: "PRICE"; reverse: boolean },
+  sort?: { sortKey: "PRICE" | "BEST_SELLING" | "CREATED_AT"; reverse: boolean },
 ): Promise<ProductsPage> {
   return getProducts({ after: cursor, searchTerm, sortKey: sort?.sortKey, reverse: sort?.reverse });
 }

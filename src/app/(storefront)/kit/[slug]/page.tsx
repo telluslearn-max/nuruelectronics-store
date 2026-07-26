@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Breadcrumb } from "@/components/breadcrumb";
-import { CollectionPage } from "@/components/collection-page";
+import { CollectionPage, parseSortSlug } from "@/components/collection-page";
 import { getKit } from "@/lib/collections";
 import { getProducts } from "@/lib/shopify";
 
@@ -35,12 +35,7 @@ export default async function KitPage({ params, searchParams }: KitPageProps) {
     notFound();
   }
 
-  const sort =
-    sortSlug === "price-asc"
-      ? { sortKey: "PRICE" as const, reverse: false }
-      : sortSlug === "price-desc"
-        ? { sortKey: "PRICE" as const, reverse: true }
-        : undefined;
+  const sort = parseSortSlug(sortSlug);
 
   const { products, hasNextPage, endCursor } = await getProducts({
     searchTerm: kit.query,

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { FilterTileIcon } from "./filter-tile-icons";
 import { ArtGlyph } from "./product-media";
 
 /**
@@ -43,8 +44,8 @@ export function FilterTiles({
               isActive ? "border-foreground" : "border-border-subtle hover:border-foreground"
             }`}
           >
-            <ArtGlyph
-              kind="gaming"
+            <FilterTileIcon
+              slug={item.slug}
               className={`h-14 w-14 transition ${
                 isActive ? "text-foreground" : "text-neutral-400 group-hover:text-foreground"
               }`}
