@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { WhatsAppOrderButton } from "@/components/whatsapp-order-button";
 import { formatPrice } from "@/lib/format";
 import type { Savings } from "@/lib/product-match";
@@ -11,6 +11,7 @@ import { ExUkProductCard } from "./ex-uk-product-card";
 import { ExUkProductDetail } from "./ex-uk-product-detail";
 import { SwipeCard, type SwipeCardHandle } from "./swipe-card";
 import { useExUkMatches } from "./use-ex-uk-matches";
+import { useExUkSeen } from "./use-ex-uk-seen";
 
 function UndoIcon({ className }: { className?: string }) {
   return (
@@ -32,25 +33,34 @@ export function SwipeDeck({
   const [detailProduct, setDetailProduct] = useState<Product | null>(null);
   const [lastPassed, setLastPassed] = useState<Product | null>(null);
   const { addMatch } = useExUkMatches();
+  const { seen, markSeen, unmarkSeen } = useExUkSeen();
   const topCardRef = useRef<SwipeCardHandle>(null);
   const router = useRouter();
 
-  const current = products[index];
-  const peekCards = products.slice(index + 1, index + 3);
+  // Cards already swiped in a previous visit (either direction) are filtered out here — not by
+  // the parent — so `index` keeps walking a single stable, order-preserving array rather than
+  // needing to be reconciled against a separately-filtered list.
+  const availableProducts = useMemo(() => products.filter((p) => !seen.has(p.handle)), [products, seen]);
+
+  const current = availableProducts[index];
+  const peekCards = availableProducts.slice(index + 1, index + 3);
 
   function handleSwiped(direction: "left" | "right") {
     setDetailProduct(null);
-    if (direction === "right" && current) {
+    if (!current) return;
+    markSeen(current.handle);
+    if (direction === "right") {
       addMatch({ handle: current.handle, title: current.title, imageUrl: current.images[0]?.url ?? null });
       router.push(`/ex-uk/messages/${current.handle}`);
       return;
     }
-    if (current) setLastPassed(current);
+    setLastPassed(current);
     setIndex((i) => i + 1);
   }
 
   function handleUndo() {
     if (!lastPassed) return;
+    unmarkSeen(lastPassed.handle);
     setLastPassed(null);
     setIndex((i) => Math.max(0, i - 1));
   }

@@ -27,6 +27,11 @@ export default async function AccountPage({
 }: {
   searchParams: Promise<{ error?: string }>;
 }) {
+  // Read before the early returns below — a failed OAuth login never sets a session cookie, so
+  // `customer` is always null on that path, and checking `error` after the `!customer` return
+  // meant this could never actually render.
+  const { error } = await searchParams;
+
   if (!isCustomerAuthConfigured) {
     return (
       <div>
@@ -61,6 +66,11 @@ export default async function AccountPage({
           <p className="mt-2 max-w-sm text-neutral-500">
             Sign in to see your order history and manage your account.
           </p>
+          {error && (
+            <p role="alert" className="mt-4 max-w-sm rounded-card border border-border-subtle bg-neutral-50 px-4 py-3 text-sm text-neutral-600">
+              Something went wrong signing you in. Please try again.
+            </p>
+          )}
           <a
             href="/api/auth/login"
             className="mt-8 rounded-control bg-foreground px-6 py-3 text-sm font-medium text-background transition hover:opacity-90"
@@ -77,8 +87,6 @@ export default async function AccountPage({
       </div>
     );
   }
-
-  const { error } = await searchParams;
 
   return (
     <div>
@@ -107,7 +115,7 @@ export default async function AccountPage({
       </div>
 
       {error && (
-        <p className="mt-6 rounded-card border border-border-subtle bg-neutral-50 px-4 py-3 text-sm text-neutral-600">
+        <p role="alert" className="mt-6 rounded-card border border-border-subtle bg-neutral-50 px-4 py-3 text-sm text-neutral-600">
           Something went wrong signing you in. Please try again.
         </p>
       )}
