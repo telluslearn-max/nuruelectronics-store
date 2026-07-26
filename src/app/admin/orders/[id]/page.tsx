@@ -7,6 +7,7 @@ import { formatPrice } from "@/lib/format";
 import { StatusPill } from "@/components/admin/status-pill";
 import { ConfirmSubmitButton } from "@/components/admin/confirm-submit-button";
 import { FeedbackBanner } from "@/components/admin/feedback-banner";
+import { SubmitButton } from "@/components/admin/submit-button";
 import {
   createInvoiceFromEstimate,
   deleteDeliveryNote,
@@ -26,6 +27,7 @@ import {
 import {
   BillToCard,
   ItemsCard,
+  PlusIcon,
   cardClass,
   cardLabelClass,
   formatDate,
@@ -76,6 +78,10 @@ export default async function AdminOrderHubPage({
     order.invoice != null &&
     Number(order.invoice.amountPaid) === 0 &&
     (order.invoice.status === "draft" || order.invoice.status === "sent");
+  // Shared by the Void button and the Record payment section below — both were repeating the
+  // same "not already settled" check inline.
+  const invoiceOpen = order.invoice != null && order.invoice.status !== "paid" && order.invoice.status !== "void";
+  const invoiceVoidable = invoiceOpen && Number(order.invoice?.amountPaid) === 0;
 
   return (
     <div className="space-y-10">
@@ -121,22 +127,22 @@ export default async function AdminOrderHubPage({
                       Download PDF
                     </a>
                     <form action={sendEstimateEmail.bind(null, estimate.id)}>
-                      <button type="submit" className="underline hover:text-foreground">
+                      <SubmitButton className="underline hover:text-foreground" pendingText="Sending…">
                         Send email
-                      </button>
+                      </SubmitButton>
                     </form>
                     {estimate.status === "accepted" && !order.invoice && (
                       <form action={createInvoiceFromEstimate.bind(null, estimate.id)}>
-                        <button type="submit" className="underline hover:text-foreground">
+                        <SubmitButton className="underline hover:text-foreground" pendingText="Creating…">
                           Create invoice from this
-                        </button>
+                        </SubmitButton>
                       </form>
                     )}
                     {editable && <span className="text-neutral-300">·</span>}
                     {editable && (
                       <form action={deleteEstimate.bind(null, estimate.id)}>
                         <ConfirmSubmitButton
-                          confirmMessage={`Delete estimate ${estimate.number}? This can't be undone.`}
+                          confirmMessage={`Delete estimate ${estimate.number}? This removes the document completely — this can't be undone.`}
                           className="underline hover:text-foreground"
                         >
                           Delete
@@ -219,9 +225,7 @@ export default async function AdminOrderHubPage({
                         />
                       </div>
 
-                      <button type="submit" className={primaryButtonClass}>
-                        Save changes
-                      </button>
+                      <SubmitButton className={primaryButtonClass}>Save changes</SubmitButton>
                     </form>
                   </details>
                 )}
@@ -233,8 +237,9 @@ export default async function AdminOrderHubPage({
 
         <Link
           href={`/admin/orders/${order.id}/estimates/new`}
-          className={`mt-5 inline-block ${secondaryButtonClass}`}
+          className={`mt-5 inline-flex items-center gap-1.5 ${secondaryButtonClass}`}
         >
+          <PlusIcon className="h-4 w-4" />
           New estimate
         </Link>
         {acceptedEstimateWithoutInvoice && (
@@ -267,15 +272,15 @@ export default async function AdminOrderHubPage({
                 Download PDF
               </a>
               <form action={sendInvoiceEmail.bind(null, order.invoice.id)}>
-                <button type="submit" className="underline hover:text-foreground">
+                <SubmitButton className="underline hover:text-foreground" pendingText="Sending…">
                   Send email
-                </button>
+                </SubmitButton>
               </form>
-              {order.invoice.status !== "paid" && order.invoice.status !== "void" && Number(order.invoice.amountPaid) === 0 && (
+              {invoiceVoidable && (
                 <form action={voidInvoice.bind(null, order.invoice.id)}>
-                  <button type="submit" className="underline hover:text-foreground">
+                  <SubmitButton className="underline hover:text-foreground" pendingText="Voiding…">
                     Void
-                  </button>
+                  </SubmitButton>
                 </form>
               )}
               {invoiceDeletable && (
@@ -363,14 +368,12 @@ export default async function AdminOrderHubPage({
                     />
                   </div>
 
-                  <button type="submit" className={primaryButtonClass}>
-                    Save changes
-                  </button>
+                  <SubmitButton className={primaryButtonClass}>Save changes</SubmitButton>
                 </form>
               </details>
             )}
 
-            {order.invoice.status !== "paid" && order.invoice.status !== "void" && (
+            {invoiceOpen && (
               <details>
                 <summary className="cursor-pointer font-medium">Record payment</summary>
                 <form
@@ -397,9 +400,9 @@ export default async function AdminOrderHubPage({
                     <input type="date" name="paidAt" className={inputClass} />
                   </div>
                   <div className="sm:col-span-2">
-                    <button type="submit" className={`${primaryButtonClass} w-full sm:w-auto`}>
+                    <SubmitButton className={`${primaryButtonClass} w-full sm:w-auto`} pendingText="Recording…">
                       Record payment
-                    </button>
+                    </SubmitButton>
                   </div>
                 </form>
               </details>
@@ -420,9 +423,9 @@ export default async function AdminOrderHubPage({
                           Download PDF
                         </a>
                         <form action={sendReceiptEmail.bind(null, receipt.id)}>
-                          <button type="submit" className="underline hover:text-foreground">
+                          <SubmitButton className="underline hover:text-foreground" pendingText="Sending…">
                             Send email
-                          </button>
+                          </SubmitButton>
                         </form>
                       </div>
                     </li>
@@ -434,8 +437,9 @@ export default async function AdminOrderHubPage({
         ) : (
           <Link
             href={`/admin/orders/${order.id}/invoice/new`}
-            className={`mt-3 inline-block ${secondaryButtonClass}`}
+            className={`mt-3 inline-flex items-center gap-1.5 ${secondaryButtonClass}`}
           >
+            <PlusIcon className="h-4 w-4" />
             Create invoice
           </Link>
         )}
@@ -460,14 +464,14 @@ export default async function AdminOrderHubPage({
                 Download PDF
               </a>
               <form action={sendDeliveryNoteEmail.bind(null, order.deliveryNote.id)}>
-                <button type="submit" className="underline hover:text-foreground">
+                <SubmitButton className="underline hover:text-foreground" pendingText="Sending…">
                   Send email
-                </button>
+                </SubmitButton>
               </form>
               {order.deliveryNote.status === "pending" && (
                 <form action={deleteDeliveryNote.bind(null, order.deliveryNote.id)}>
                   <ConfirmSubmitButton
-                    confirmMessage={`Delete delivery note ${order.deliveryNote.number}? This can't be undone.`}
+                    confirmMessage={`Delete delivery note ${order.deliveryNote.number}? This removes the document completely — this can't be undone.`}
                     className="underline hover:text-foreground"
                   >
                     Delete
@@ -523,9 +527,7 @@ export default async function AdminOrderHubPage({
                       </div>
                     </div>
                   </div>
-                  <button type="submit" className={primaryButtonClass}>
-                    Save changes
-                  </button>
+                  <SubmitButton className={primaryButtonClass}>Save changes</SubmitButton>
                 </form>
               </details>
             )}
@@ -549,17 +551,18 @@ export default async function AdminOrderHubPage({
                     ))}
                   </select>
                 </div>
-                <button type="submit" className={`${secondaryButtonClass} w-full sm:w-auto`}>
+                <SubmitButton className={`${secondaryButtonClass} w-full sm:w-auto`} pendingText="Marking…">
                   Mark delivered
-                </button>
+                </SubmitButton>
               </form>
             )}
           </div>
         ) : (
           <Link
             href={`/admin/orders/${order.id}/delivery-note/new`}
-            className={`mt-3 inline-block ${secondaryButtonClass}`}
+            className={`mt-3 inline-flex items-center gap-1.5 ${secondaryButtonClass}`}
           >
+            <PlusIcon className="h-4 w-4" />
             Create delivery note
           </Link>
         )}

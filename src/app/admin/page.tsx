@@ -30,9 +30,11 @@ export default async function AdminDashboardPage() {
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
 
-  const [pnl, outstanding, overdue, accountBalances, pettyCashBalance] = await Promise.all([
+  const [pnl, prevPnl, outstanding, overdue, accountBalances, pettyCashBalance] = await Promise.all([
     computePnl({ from: monthStart, to: monthEnd, granularity: "monthly" }),
+    computePnl({ from: prevMonthStart, to: monthStart, granularity: "monthly" }),
     getOutstandingInvoices(),
     getOverdueInvoices(),
     getAccountBalances(),
@@ -40,6 +42,9 @@ export default async function AdminDashboardPage() {
   ]);
 
   const revenueThisMonth = pnl.buckets.reduce((sum, bucket) => sum + (pnl.totalRevenue[bucket] ?? 0), 0);
+  const revenueLastMonth = prevPnl.buckets.reduce((sum, bucket) => sum + (prevPnl.totalRevenue[bucket] ?? 0), 0);
+  const revenueDeltaPercent =
+    revenueLastMonth > 0 ? ((revenueThisMonth - revenueLastMonth) / revenueLastMonth) * 100 : null;
   const outstandingTotal = outstanding.reduce((sum, invoice) => sum + invoice.balance, 0);
   const overdueTotal = overdue.reduce((sum, invoice) => sum + invoice.balance, 0);
 
@@ -47,8 +52,25 @@ export default async function AdminDashboardPage() {
   const mpesaRow = accountBalances.find((row) => row.account.code === ACCOUNTS.MPESA);
   const cashPosition = (cashRow ? debitBalance(cashRow) : 0) + (mpesaRow ? debitBalance(mpesaRow) : 0);
 
-  const stats: { label: string; value: string; sub?: string; href: string }[] = [
-    { label: "Revenue this month", value: formatPrice(revenueThisMonth.toFixed(2), "KES"), href: "/admin/reports/pnl" },
+  const stats: {
+    label: string;
+    value: string;
+    sub?: string;
+    href: string;
+    delta?: { text: string; positive: boolean };
+  }[] = [
+    {
+      label: "Revenue this month",
+      value: formatPrice(revenueThisMonth.toFixed(2), "KES"),
+      href: "/admin/reports/pnl",
+      delta:
+        revenueDeltaPercent !== null
+          ? {
+              text: `${revenueDeltaPercent >= 0 ? "+" : ""}${revenueDeltaPercent.toFixed(0)}% vs last month`,
+              positive: revenueDeltaPercent >= 0,
+            }
+          : undefined,
+    },
     {
       label: "Outstanding AR",
       value: formatPrice(outstandingTotal.toFixed(2), "KES"),
@@ -92,6 +114,11 @@ export default async function AdminDashboardPage() {
             <p className="text-xs text-neutral-500">{stat.label}</p>
             <p className="mt-1 text-2xl font-semibold">{stat.value}</p>
             {stat.sub && <p className="mt-1 text-xs text-neutral-500">{stat.sub}</p>}
+            {stat.delta && (
+              <p className={`mt-1 text-xs font-medium ${stat.delta.positive ? "text-green-600" : "text-red-600"}`}>
+                {stat.delta.positive ? "▲" : "▼"} {stat.delta.text}
+              </p>
+            )}
           </Link>
         ))}
       </div>
