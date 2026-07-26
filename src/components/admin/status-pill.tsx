@@ -9,6 +9,12 @@ const STATUS_STYLES: Record<string, string> = {
   declined: "bg-red-100 text-red-700",
   void: "bg-red-100 text-red-700",
   expired: "bg-neutral-100 text-neutral-500",
+  // Shopify order fulfillment statuses (customer-facing account/order-history pages).
+  fulfilled: "bg-green-100 text-green-700",
+  unfulfilled: "bg-neutral-100 text-neutral-600",
+  partially_fulfilled: "bg-amber-100 text-amber-700",
+  restocked: "bg-red-100 text-red-700",
+  scheduled: "bg-blue-100 text-blue-700",
 };
 
 function formatStatusLabel(status: string): string {

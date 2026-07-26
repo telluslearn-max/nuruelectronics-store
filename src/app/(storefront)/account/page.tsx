@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { StatusPill } from "@/components/admin/status-pill";
 import { FooterLinks } from "@/components/footer-links";
 import { WishlistSection } from "@/components/wishlist/wishlist-section";
 import { formatPrice } from "@/lib/format";
@@ -13,13 +14,6 @@ export const metadata: Metadata = {
 
 function formatOrderDate(dateString: string) {
   return new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(new Date(dateString));
-}
-
-function formatStatus(status: string) {
-  return status
-    .toLowerCase()
-    .replace(/_/g, " ")
-    .replace(/^\w/, (c) => c.toUpperCase());
 }
 
 export default async function AccountPage({
@@ -123,7 +117,15 @@ export default async function AccountPage({
       <div className="mt-10">
         <h2 className="text-lg font-medium">Order history</h2>
         {customer.orders.length === 0 ? (
-          <p className="mt-3 text-neutral-500">You haven&apos;t placed any orders yet.</p>
+          <div className="mt-3">
+            <p className="text-neutral-500">You haven&apos;t placed any orders yet.</p>
+            <Link
+              href="/shop"
+              className="mt-4 inline-block rounded-control border border-border-subtle px-5 py-2.5 text-sm font-medium transition hover:border-foreground"
+            >
+              Browse products
+            </Link>
+          </div>
         ) : (
           <ul className="mt-4 space-y-4">
             {customer.orders.map((order) => (
@@ -137,9 +139,9 @@ export default async function AccountPage({
                     <p className="font-medium">
                       {formatPrice(order.totalPrice.amount, order.totalPrice.currencyCode)}
                     </p>
-                    <p className="text-sm text-neutral-500">
-                      {formatStatus(order.fulfillmentStatus)}
-                    </p>
+                    <div className="mt-1">
+                      <StatusPill status={order.fulfillmentStatus.toLowerCase()} />
+                    </div>
                   </div>
                 </div>
                 <p className="mt-3 text-sm text-neutral-600">
