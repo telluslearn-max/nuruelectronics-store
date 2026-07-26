@@ -102,11 +102,19 @@ async function CategoryContent({
     : getProducts({ searchTerm: query, sortKey: "BEST_SELLING", first: 8 });
 
   // Pre-release games surfaced as their own rail, gaming category only.
+  // includeComingSoon is required here — getProducts excludes tag:coming-soon
+  // by default, which would otherwise AND against this query's own
+  // tag:coming-soon clause and always return zero results. includeSpecs pulls
+  // the "availability.release_date" metafield so the rail can show a
+  // confirmed ship date, matching the homepage/coming-soon page.
   const comingSoonPromise: Promise<Product[]> =
     category.slug === "gaming"
-      ? getProducts({ searchTerm: `product_type:"Games" AND tag:coming-soon`, first: 8 }).then(
-          (p) => p.products,
-        )
+      ? getProducts({
+          searchTerm: `product_type:"Games" AND tag:coming-soon`,
+          first: 8,
+          includeSpecs: true,
+          includeComingSoon: true,
+        }).then((p) => p.products)
       : Promise.resolve([]);
 
   const [{ products, hasNextPage, endCursor }, flagshipPage, relatedPages, comingSoonProducts] =

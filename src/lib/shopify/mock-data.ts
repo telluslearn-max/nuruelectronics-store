@@ -630,6 +630,42 @@ export const mockProducts: Product[] = [
       { key: "languages", value: "English, French, Swahili" },
     ],
   },
+  // Announced-but-unreleased game — same "coming-soon" tag + availability.release_date
+  // metafield pattern as the Galaxy S27 Ultra entry below, so the Gaming category's
+  // Coming Soon rail has a mock item to render locally.
+  {
+    id: "gid://mock/Product/23",
+    handle: "starfall-chronicles",
+    title: "Starfall Chronicles",
+    description:
+      "An open-world RPG announced ahead of launch, following a squad of scavengers piecing together a fallen empire's last starship.",
+    descriptionHtml:
+      "<p>An open-world RPG announced ahead of launch, following a squad of scavengers piecing together a fallen empire's last starship.</p>",
+    availableForSale: false,
+    productType: "Games",
+    tags: ["mock", "coming-soon", "genre-rpg"],
+    priceRange: { minVariantPrice: money("69.99"), maxVariantPrice: money("69.99") },
+    images: [
+      { url: "https://picsum.photos/seed/starfall-chronicles/800/1000", altText: null, width: 800, height: 1000 },
+    ],
+    variants: [
+      {
+        id: "gid://mock/ProductVariant/34",
+        title: "Default",
+        availableForSale: false,
+        price: money("69.99"),
+        selectedOptions: [{ name: "Title", value: "Default" }],
+      },
+    ],
+    options: [{ id: "1", name: "Title", values: ["Default"] }],
+    specs: [
+      { key: "publisher", value: "Nuru Play" },
+      { key: "developer", value: "Halcyon Interactive" },
+      { key: "multiplayer", value: "Single Player" },
+      { key: "age_rating", value: "PEGI 16" },
+    ],
+    releaseDate: "2026-11-20",
+  },
   // Digital gift card demo — Amount as a plain variant option (same generic
   // mechanism as Platform/Condition above), region-us tag driving the "US
   // Store Only" badge, and a region spec driving the PDP notice.
