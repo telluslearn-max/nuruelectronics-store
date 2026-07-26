@@ -23,20 +23,27 @@ async function rankCandidatesWithGemini(recentTitles: string[], candidates: Prod
 }
 
 /**
- * Gemini-ranked homepage recommendations from the shopper's own recently-viewed handles (the
- * existing client-side localStorage list — src/components/use-recently-viewed.ts — reused as-is
- * rather than standing up a second, server-side tracking mechanism). Returns [] for new visitors
- * with no history yet, or if Vertex AI isn't configured or the ranking call fails — callers should
- * just omit the section in that case rather than showing an empty state.
+ * Homepage "For You" recommendations from the shopper's own recently-viewed handles (the existing
+ * client-side localStorage list — src/components/use-recently-viewed.ts — reused as-is rather than
+ * standing up a second, server-side tracking mechanism), Gemini-ranked when there's history and
+ * Vertex AI is configured. For new visitors with no history yet — or if Vertex isn't configured, or
+ * the ranking call fails — falls back to storewide best sellers so the section always has real
+ * products rather than disappearing for first-time visitors.
  */
 export async function getPersonalizedHomepageProducts(recentHandles: string[]): Promise<Product[]> {
-  if (recentHandles.length === 0 || !isConciergeConfigured) return [];
-
   try {
+    if (recentHandles.length === 0 || !isConciergeConfigured) {
+      const { products } = await getProducts({ sortKey: "BEST_SELLING", first: RECOMMENDATION_COUNT });
+      return products;
+    }
+
     const recentProducts = (await Promise.all(recentHandles.map((h) => getProductByHandle(h)))).filter(
       (p): p is Product => p !== null,
     );
-    if (recentProducts.length === 0) return [];
+    if (recentProducts.length === 0) {
+      const { products } = await getProducts({ sortKey: "BEST_SELLING", first: RECOMMENDATION_COUNT });
+      return products;
+    }
 
     const { products: candidatePool } = await getProducts({ first: CANDIDATE_POOL_SIZE });
     const candidates = candidatePool.filter((p) => !recentHandles.includes(p.handle));

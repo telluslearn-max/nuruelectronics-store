@@ -14,7 +14,10 @@ type TabId = "for-you" | "recently-viewed" | "saved";
 /**
  * Homepage "Recommended for you" section — a pill-tab switcher over the shopper's own signals
  * (Gemini-ranked picks, recently viewed, saved/wishlist), each pulled from the existing localStorage
- * hooks rather than a new tracking mechanism. Renders nothing until at least one tab has signal.
+ * hooks rather than a new tracking mechanism. "For You" always renders — it falls back to storewide
+ * best sellers server-side when there's no browsing history yet — so first-time visitors still see
+ * this section instead of it disappearing; "Recently viewed" and "Saved" only appear once there's
+ * actual signal for them.
  */
 export function HomeRecommendations() {
   const recentHandles = useRecentlyViewedHandles("");
@@ -22,8 +25,7 @@ export function HomeRecommendations() {
   const savedHandles = useMemo(() => wishlistItems.map((item) => item.handle), [wishlistItems]);
 
   const tabs = useMemo(() => {
-    const available: { id: TabId; label: string }[] = [];
-    if (recentHandles.length > 0) available.push({ id: "for-you", label: "For You" });
+    const available: { id: TabId; label: string }[] = [{ id: "for-you", label: "For You" }];
     if (recentHandles.length > 0) available.push({ id: "recently-viewed", label: "Recently viewed" });
     if (savedHandles.length > 0) available.push({ id: "saved", label: "Saved" });
     return available;
