@@ -1,0 +1,133 @@
+{
+  "brand": "NURU Electronics",
+  "primitive": {
+    "color": {
+      "primary": {
+        "50": {
+          "$value": "#F4FFFF",
+          "$type": "color"
+        },
+        "100": {
+          "$value": "#DAFFFF",
+          "$type": "color"
+        },
+        "200": {
+          "$value": "#A7F5E3",
+          "$type": "color"
+        },
+        "300": {
+          "$value": "#74C2B0",
+          "$type": "color"
+        },
+        "400": {
+          "$value": "#418F7D",
+          "$type": "color"
+        },
+        "500": {
+          "$value": "#0E5C4A",
+          "$type": "color"
+        },
+        "600": {
+          "$value": "#003624",
+          "$type": "color"
+        },
+        "700": {
+          "$value": "#001000",
+          "$type": "color"
+        },
+        "800": {
+          "$value": "#000000",
+          "$type": "color"
+        },
+        "900": {
+          "$value": "#000000",
+          "$type": "color"
+        }
+      },
+      "secondary": {
+        "50": {
+          "$value": "#E6FFFF",
+          "$type": "color"
+        },
+        "100": {
+          "$value": "#CCFFFF",
+          "$type": "color"
+        },
+        "200": {
+          "$value": "#99D1FF",
+          "$type": "color"
+        },
+        "300": {
+          "$value": "#669EFF",
+          "$type": "color"
+        },
+        "400": {
+          "$value": "#336BDB",
+          "$type": "color"
+        },
+        "500": {
+          "$value": "#0038A8",
+          "$type": "color"
+        },
+        "600": {
+          "$value": "#001282",
+          "$type": "color"
+        },
+        "700": {
+          "$value": "#00005C",
+          "$type": "color"
+        },
+        "800": {
+          "$value": "#000035",
+          "$type": "color"
+        },
+        "900": {
+          "$value": "#00000F",
+          "$type": "color"
+        }
+      },
+      "accent": {
+        "50": {
+          "$value": "#FFFFFF",
+          "$type": "color"
+        },
+        "100": {
+          "$value": "#FFFFFE",
+          "$type": "color"
+        },
+        "200": {
+          "$value": "#FFE4CB",
+          "$type": "color"
+        },
+        "300": {
+          "$value": "#FFB198",
+          "$type": "color"
+        },
+        "400": {
+          "$value": "#FF7E65",
+          "$type": "color"
+        },
+        "500": {
+          "$value": "#D94B32",
+          "$type": "color"
+        },
+        "600": {
+          "$value": "#B3250C",
+          "$type": "color"
+        },
+        "700": {
+          "$value": "#8D0000",
+          "$type": "color"
+        },
+        "800": {
+          "$value": "#660000",
+          "$type": "color"
+        },
+        "900": {
+          "$value": "#400000",
+          "$type": "color"
+        }
+      }
+    }
+  }
+}
