@@ -465,6 +465,21 @@ model ConciergeRequestLog {
 }
 
 // ---------------------------------------------------------------------------
+// Live device-grading rate limiting — /api/live-grading/token mints a real
+// Gemini Live ephemeral session token per call (far more expensive than one
+// concierge turn), so it gets its own, tighter per-IP cap (see
+// src/lib/live-grading/rate-limit.ts) rather than sharing ConciergeRequestLog.
+// ---------------------------------------------------------------------------
+
+model LiveGradingSessionLog {
+  id        String   @id @default(cuid())
+  ipAddress String
+  createdAt DateTime @default(now())
+
+  @@index([ipAddress, createdAt])
+}
+
+// ---------------------------------------------------------------------------
 // Business settings — singleton row, fixed id "settings"
 // ---------------------------------------------------------------------------
 
