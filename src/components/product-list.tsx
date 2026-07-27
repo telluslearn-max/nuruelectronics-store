@@ -33,7 +33,7 @@ function FacetChip({
       type="button"
       aria-pressed={active}
       onClick={onClick}
-      className={`rounded-control border px-3 py-1.5 text-sm transition ${
+      className={`shrink-0 rounded-control border px-3 py-1.5 text-sm transition ${
         active
           ? "border-foreground bg-foreground text-background"
           : "border-border-subtle text-neutral-600 hover:border-foreground hover:text-foreground"
@@ -41,6 +41,18 @@ function FacetChip({
     >
       {label}
     </button>
+  );
+}
+
+// A single scrollable line per facet, rather than wrapping — a facet with many
+// values (e.g. Color on a product line with a dozen finishes) would otherwise
+// stack into several rows and push the actual product grid far down the page.
+function FacetRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="mb-2 flex items-center gap-2">
+      <span className="shrink-0 text-sm text-neutral-400">{label}:</span>
+      <div className="scrollbar-none flex gap-2 overflow-x-auto">{children}</div>
+    </div>
   );
 }
 
@@ -120,8 +132,7 @@ export function ProductList({
 
   return (
     <div>
-      <div className="mb-2 flex flex-wrap items-center gap-2">
-        <span className="text-sm text-neutral-400">Price:</span>
+      <FacetRow label="Price">
         {PRICE_PRESETS.map((preset) => (
           <FacetChip
             key={preset.label}
@@ -130,11 +141,10 @@ export function ProductList({
             onClick={() => setMaxPrice(preset.value)}
           />
         ))}
-      </div>
+      </FacetRow>
 
       {brands.length > 1 && (
-        <div className="mb-2 flex flex-wrap items-center gap-2">
-          <span className="text-sm text-neutral-400">Brand:</span>
+        <FacetRow label="Brand">
           {brands.map((brand) => (
             <FacetChip
               key={brand}
@@ -143,12 +153,11 @@ export function ProductList({
               onClick={() => setSelectedBrands((prev) => toggleInSet(prev, brand))}
             />
           ))}
-        </div>
+        </FacetRow>
       )}
 
       {colors.length > 0 && (
-        <div className="mb-2 flex flex-wrap items-center gap-2">
-          <span className="text-sm text-neutral-400">Color:</span>
+        <FacetRow label="Color">
           {colors.map((color) => (
             <FacetChip
               key={color}
@@ -157,7 +166,7 @@ export function ProductList({
               onClick={() => setSelectedColors((prev) => toggleInSet(prev, color))}
             />
           ))}
-        </div>
+        </FacetRow>
       )}
 
       <div className="mb-8 flex flex-wrap items-center gap-3">
