@@ -1,4 +1,5 @@
 import { WhatsAppIcon } from "@/components/whatsapp-order-button";
+import { LiveGradingSection } from "@/components/trade-in/live-grading";
 import { isTradeInEligibleProduct } from "@/lib/trade-in";
 import { buildWhatsAppUrl, productUrl } from "@/lib/whatsapp";
 
@@ -33,6 +34,7 @@ export function TradeInSection({
           Start trade-in via WhatsApp
         </a>
       )}
+      <LiveGradingSection productTitle={productTitle} productHandle={productHandle} />
     </div>
   );
 }

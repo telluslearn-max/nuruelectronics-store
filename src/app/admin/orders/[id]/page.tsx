@@ -459,6 +459,32 @@ export default async function AdminOrderHubPage({
                 </span>
               </span>
             </div>
+            {order.deliveryNote.deliveryPhotoUrl && (
+              <div className="flex items-start gap-3 rounded-card border border-border-subtle p-3">
+                <a href={order.deliveryNote.deliveryPhotoUrl} target="_blank" rel="noopener noreferrer" className="shrink-0">
+                  {/* eslint-disable-next-line @next/next/no-img-element -- external Firebase Storage URL, not worth a next.config remotePattern for one admin-only thumbnail */}
+                  <img
+                    src={order.deliveryNote.deliveryPhotoUrl}
+                    alt="Delivery proof"
+                    className="h-16 w-16 rounded-lg object-cover"
+                  />
+                </a>
+                <div>
+                  {order.deliveryNote.photoVerified === true && (
+                    <p className="text-xs font-medium text-emerald-700">✓ AI-verified match</p>
+                  )}
+                  {order.deliveryNote.photoVerified === false && (
+                    <p className="text-xs font-medium text-amber-700">⚠ AI flagged a possible mismatch</p>
+                  )}
+                  {order.deliveryNote.photoVerified === null && (
+                    <p className="text-xs font-medium text-neutral-500">Photo uploaded, not verified</p>
+                  )}
+                  {order.deliveryNote.verificationNote && (
+                    <p className="mt-0.5 text-xs text-neutral-500">{order.deliveryNote.verificationNote}</p>
+                  )}
+                </div>
+              </div>
+            )}
             <div className="flex flex-wrap gap-3">
               <a className="underline hover:text-foreground" href={`/api/delivery-notes/${order.deliveryNote.id}/pdf`}>
                 Download PDF
@@ -550,6 +576,10 @@ export default async function AdminOrderHubPage({
                       </option>
                     ))}
                   </select>
+                </div>
+                <div className="sm:w-56">
+                  <label className="block text-xs text-neutral-500">Delivery photo (optional)</label>
+                  <input type="file" name="photo" accept="image/*" capture="environment" className={inputClass} />
                 </div>
                 <SubmitButton className={`${secondaryButtonClass} w-full sm:w-auto`} pendingText="Marking…">
                   Mark delivered

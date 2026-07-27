@@ -7,19 +7,31 @@ import type { Product } from "@/lib/shopify/types";
 const CANDIDATE_POOL_SIZE = 60;
 const RECOMMENDATION_COUNT = 8;
 
+const RANKING_RESPONSE_SCHEMA = {
+  type: "object",
+  properties: {
+    handles: {
+      type: "array",
+      items: { type: "string" },
+      description: "Product handles, most relevant first.",
+    },
+  },
+  required: ["handles"],
+};
+
 async function rankCandidatesWithGemini(recentTitles: string[], candidates: Product[]): Promise<string[]> {
   const ai = getGenAIClient();
   const candidateList = candidates.map((p) => `${p.handle}: ${p.title} (${p.productType})`).join("\n");
-  const prompt = `A shopper on our electronics store recently viewed: ${recentTitles.join(", ")}.\n\nFrom the candidate list below, pick the ${RECOMMENDATION_COUNT} products most likely to interest them next for a homepage "For You" section — prefer complementary or comparable products over near-duplicates of what they already viewed. Return ONLY a JSON array of handles, most relevant first — no other text.\n\n${candidateList}`;
+  const prompt = `A shopper on our electronics store recently viewed: ${recentTitles.join(", ")}.\n\nFrom the candidate list below, pick the ${RECOMMENDATION_COUNT} products most likely to interest them next for a homepage "For You" section — prefer complementary or comparable products over near-duplicates of what they already viewed.\n\n${candidateList}`;
 
   const response = await ai.models.generateContent({
     model: CONCIERGE_MODEL,
     contents: [{ role: "user", parts: [{ text: prompt }] }],
+    config: { responseMimeType: "application/json", responseSchema: RANKING_RESPONSE_SCHEMA },
   });
-  const text = (response.text ?? "").trim();
-  const match = text.match(/\[[\s\S]*\]/);
-  const parsed: unknown = JSON.parse(match ? match[0] : "[]");
-  return Array.isArray(parsed) ? parsed.filter((h): h is string => typeof h === "string") : [];
+  const parsed: unknown = JSON.parse((response.text ?? "").trim() || "{}");
+  const handles = (parsed as { handles?: unknown }).handles;
+  return Array.isArray(handles) ? handles.filter((h): h is string => typeof h === "string") : [];
 }
 
 /**
