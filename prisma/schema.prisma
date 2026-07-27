@@ -218,6 +218,12 @@ model DeliveryNote {
   riderId String?
   rider   Employee? @relation(fields: [riderId], references: [id])
 
+  // Optional proof-of-delivery photo, Gemini-Vision-verified against the order's line items —
+  // advisory only (see src/lib/logistics/verify-delivery-photo.ts), never blocks marking delivered.
+  deliveryPhotoUrl String?
+  photoVerified    Boolean?
+  verificationNote String?
+
   @@index([riderId])
 }
 

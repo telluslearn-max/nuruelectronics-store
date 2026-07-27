@@ -11,6 +11,7 @@ import { sendDeliveryNoteEmail as sendDeliveryNoteEmailMessage, sendEstimateEmai
 import { renderDeliveryNotePdf, renderEstimatePdf, renderInvoicePdf, renderReceiptPdf } from "./pdf/render";
 import { ActionGuardError, redirectWithError, redirectWithSuccess } from "./admin-feedback";
 import { logAdminAction } from "./audit-log";
+import { verifyDeliveryPhoto } from "./logistics/verify-delivery-photo";
 import { PAYMENT_METHODS, parseEnumField } from "./parse-enum";
 
 function parseLineItems(
@@ -694,10 +695,34 @@ export async function markDelivered(deliveryNoteId: string, formData: FormData):
   await requireAdminSession();
   const receivedBy = String(formData.get("receivedBy") ?? "").trim() || null;
   const riderId = String(formData.get("riderId") ?? "").trim() || null;
+  const photo = formData.get("photo");
+
+  // Photo verification is advisory and best-effort (see verifyDeliveryPhoto) — a failure here
+  // never blocks marking the delivery complete, it just means no photo/verdict gets recorded.
+  let photoResult: Awaited<ReturnType<typeof verifyDeliveryPhoto>> = null;
+  if (photo instanceof File && photo.size > 0) {
+    const order = await prisma.deliveryNote.findUnique({
+      where: { id: deliveryNoteId },
+      select: { order: { select: { items: { select: { title: true, quantity: true } } } } },
+    });
+    if (order) {
+      photoResult = await verifyDeliveryPhoto(deliveryNoteId, photo, order.order.items);
+    }
+  }
 
   const note = await prisma.deliveryNote.update({
     where: { id: deliveryNoteId },
-    data: { status: "delivered", receivedBy, riderId, deliveredAt: new Date() },
+    data: {
+      status: "delivered",
+      receivedBy,
+      riderId,
+      deliveredAt: new Date(),
+      ...(photoResult && {
+        deliveryPhotoUrl: photoResult.photoUrl,
+        photoVerified: photoResult.photoVerified,
+        verificationNote: photoResult.verificationNote,
+      }),
+    },
   });
 
   revalidatePath(`/admin/orders/${note.orderId}`);
