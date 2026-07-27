@@ -7,7 +7,7 @@ export const styles = StyleSheet.create({
     padding: 40,
     fontSize: 10,
     fontFamily: "Helvetica",
-    color: "#1a1a1a",
+    color: "#111111",
   },
   headerRow: {
     flexDirection: "row",
@@ -36,6 +36,7 @@ export const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: "Helvetica-Bold",
     textTransform: "uppercase",
+    color: "#0E5C4A",
   },
   docNumber: {
     fontSize: 10,
@@ -47,7 +48,7 @@ export const styles = StyleSheet.create({
   },
   sectionLabel: {
     fontSize: 8,
-    color: "#888888",
+    color: "#666666",
     textTransform: "uppercase",
     marginBottom: 4,
   },
@@ -57,18 +58,18 @@ export const styles = StyleSheet.create({
   table: {
     marginTop: 8,
     borderTopWidth: 1,
-    borderTopColor: "#dddddd",
+    borderTopColor: "#E4E1DA",
   },
   tableHeaderRow: {
     flexDirection: "row",
     borderBottomWidth: 1,
-    borderBottomColor: "#dddddd",
+    borderBottomColor: "#E4E1DA",
     paddingVertical: 6,
   },
   tableRow: {
     flexDirection: "row",
     borderBottomWidth: 1,
-    borderBottomColor: "#eeeeee",
+    borderBottomColor: "#EFEDE8",
     paddingVertical: 6,
   },
   colTitle: { flex: 4 },
@@ -77,7 +78,7 @@ export const styles = StyleSheet.create({
   colTotal: { flex: 2, textAlign: "right" },
   tableHeaderText: {
     fontSize: 8,
-    color: "#888888",
+    color: "#666666",
     textTransform: "uppercase",
   },
   totalsBlock: {
@@ -96,7 +97,7 @@ export const styles = StyleSheet.create({
     paddingTop: 6,
     marginTop: 3,
     borderTopWidth: 1,
-    borderTopColor: "#1a1a1a",
+    borderTopColor: "#0E5C4A",
   },
   totalsLabel: {
     color: "#666666",
@@ -110,10 +111,10 @@ export const styles = StyleSheet.create({
     left: 40,
     right: 40,
     fontSize: 8,
-    color: "#999999",
+    color: "#666666",
     textAlign: "center",
     borderTopWidth: 1,
-    borderTopColor: "#eeeeee",
+    borderTopColor: "#EFEDE8",
     paddingTop: 8,
   },
 });

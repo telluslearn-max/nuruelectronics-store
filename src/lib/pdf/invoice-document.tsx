@@ -1,5 +1,5 @@
 import { Text, View } from "@react-pdf/renderer";
-import { formatPrice } from "@/lib/format";
+import { formatDocumentMoney } from "./money";
 import { DocumentShell, LineItemsTable, TotalsBlock, styles, type Moneyish } from "./document-layout";
 import type { Letterhead } from "./letterhead";
 import type { Customer, Invoice, Order, OrderItem } from "@prisma/client";
@@ -21,7 +21,7 @@ export function InvoiceDocument({
   items: OrderItem[];
   letterhead?: Letterhead;
 }) {
-  const formatMoney = (amount: Moneyish) => formatPrice(String(amount), order.currencyCode);
+  const formatMoney = (amount: Moneyish) => formatDocumentMoney(String(amount), order.currencyCode);
   const balanceDue = Number(invoice.total) - Number(invoice.amountPaid);
 
   return (

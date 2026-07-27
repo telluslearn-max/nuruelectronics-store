@@ -1,5 +1,5 @@
 import { Text, View } from "@react-pdf/renderer";
-import { formatPrice } from "@/lib/format";
+import { formatDocumentMoney } from "./money";
 import { DocumentShell, TotalsBlock, styles, type Moneyish } from "./document-layout";
 import type { Letterhead } from "./letterhead";
 import type { Customer, Invoice, Receipt } from "@prisma/client";
@@ -24,7 +24,7 @@ export function ReceiptDocument({
   customer: Customer;
   letterhead?: Letterhead;
 }) {
-  const formatMoney = (amount: Moneyish) => formatPrice(String(amount), "KES");
+  const formatMoney = (amount: Moneyish) => formatDocumentMoney(String(amount), "KES");
 
   return (
     <DocumentShell docTitle="Receipt" docNumber={receipt.number} letterhead={letterhead}>

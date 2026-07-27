@@ -1,5 +1,5 @@
 import { Text, View } from "@react-pdf/renderer";
-import { formatPrice } from "@/lib/format";
+import { formatDocumentMoney } from "./money";
 import { DocumentShell, TotalsBlock, styles, type Moneyish } from "./document-layout";
 import type { Letterhead } from "./letterhead";
 import type { Employee, PayRun, Payslip, PayslipDeduction } from "@prisma/client";
@@ -21,7 +21,7 @@ export function PayslipDocument({
   payRun: PayRun;
   letterhead?: Letterhead;
 }) {
-  const formatMoney = (amount: Moneyish) => formatPrice(String(amount), "KES");
+  const formatMoney = (amount: Moneyish) => formatDocumentMoney(String(amount), "KES");
   const totalDeductions = deductions.reduce((sum, d) => sum + Number(d.amount), 0);
 
   return (
