@@ -1,12 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { LegalDocument, LegalSection } from "@/components/legal-document";
-import {
-  LEGAL_DOCS_LAST_UPDATED,
-  LEGAL_ENTITY_NAME,
-  LEGAL_NOTICE_EMAIL,
-  LEGAL_SUPPORT_EMAIL,
-} from "@/lib/legal-entity";
+import { LegalContact, LegalDocument, LegalSection } from "@/components/legal-document";
+import { LEGAL_DOCS_LAST_UPDATED, LEGAL_ENTITY_NAME } from "@/lib/legal-entity";
 
 export const metadata: Metadata = {
   title: "Refund & Warranty Policy",
@@ -67,12 +62,13 @@ export default function RefundPolicyPage() {
 
       <LegalSection heading="5. BNPL orders">
         <p>
-          If you return a product bought on a BNPL plan, your deposit and any installments already
-          paid are refunded according to the terms in our{" "}
+          We handle the return of the product itself under this policy. Your deposit, any
+          installments already paid, and any adjustment to your credit agreement are between you
+          and our third-party BNPL partner, not NURU — see our{" "}
           <Link href="/legal/bnpl-terms" className="underline underline-offset-2">
             BNPL Credit Terms
-          </Link>
-          . Outstanding installments on a returned item are cancelled once the return is approved.
+          </Link>{" "}
+          and contact our partner directly about those.
         </p>
       </LegalSection>
 
@@ -85,21 +81,8 @@ export default function RefundPolicyPage() {
       </LegalSection>
 
       <LegalSection heading="7. Contact">
-        <p>
-          For returns, refunds, or warranty claims, reach us via{" "}
-          <Link href="/support" className="underline underline-offset-2">
-            WhatsApp on the Support page
-          </Link>{" "}
-          or email{" "}
-          {LEGAL_SUPPORT_EMAIL ? (
-            <a href={`mailto:${LEGAL_SUPPORT_EMAIL}`} className="underline underline-offset-2">
-              {LEGAL_SUPPORT_EMAIL}
-            </a>
-          ) : (
-            LEGAL_NOTICE_EMAIL
-          )}
-          .
-        </p>
+        <p>For returns, refunds, or warranty claims:</p>
+        <LegalContact whatsappMessage="Hi! I'd like to start a return/warranty claim for my order." />
       </LegalSection>
     </LegalDocument>
   );

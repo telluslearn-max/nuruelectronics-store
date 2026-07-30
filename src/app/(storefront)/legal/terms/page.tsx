@@ -1,13 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { LegalDocument, LegalSection } from "@/components/legal-document";
+import { LegalContact, LegalDocument, LegalSection } from "@/components/legal-document";
 import {
   LEGAL_DOCS_LAST_UPDATED,
   LEGAL_ENTITY_ADDRESS,
   LEGAL_ENTITY_JURISDICTION,
   LEGAL_ENTITY_NAME,
-  LEGAL_NOTICE_EMAIL,
-  LEGAL_SUPPORT_EMAIL,
 } from "@/lib/legal-entity";
 
 export const metadata: Metadata = {
@@ -50,21 +48,24 @@ export default function TermsPage() {
         <p>
           Checkout, payment capture, and order confirmation for online orders are processed by
           Shopify on Shopify&apos;s own checkout pages, under Shopify&apos;s terms of service. We
-          do not receive or store your full payment card details. Some orders (including cash,
-          M-Pesa, and BNPL applications) are arranged manually with our team over WhatsApp instead
-          of through the website checkout; these Terms apply to those orders as well.
+          do not receive or store your full payment card details. Some orders (cash or M-Pesa) are
+          arranged manually with our team over WhatsApp instead of through the website checkout;
+          these Terms apply to those orders as well.
         </p>
       </LegalSection>
 
       <LegalSection heading="4. Buy Now, Pay Later (BNPL)">
         <p>
-          BNPL is available on selected products and is a separate credit arrangement between you
-          and NURU. Eligibility, deposit amounts, payment schedules, and the cost of the plan are
-          set out in full in our{" "}
+          BNPL is available on selected products, but NURU is not the credit provider — a separate,
+          third-party BNPL partner extends and services that credit. NURU&apos;s role is limited to
+          showing you the plan figures, referring you to our partner, and making the product
+          available for the in-person assessment; NURU does not process BNPL payments or handle
+          collections. Full details, including eligibility, deposit amounts, payment schedules, and
+          the cost of the plan, are set out in our{" "}
           <Link href="/legal/bnpl-terms" className="underline underline-offset-2">
             BNPL Credit Terms
           </Link>
-          , which you must read and accept separately before applying.
+          , which you should read before going in for assessment with our BNPL partner.
         </p>
       </LegalSection>
 
@@ -129,21 +130,8 @@ export default function TermsPage() {
       </LegalSection>
 
       <LegalSection heading="11. Contact">
-        <p>
-          Questions about these Terms can be sent to{" "}
-          {LEGAL_SUPPORT_EMAIL ? (
-            <a href={`mailto:${LEGAL_SUPPORT_EMAIL}`} className="underline underline-offset-2">
-              {LEGAL_SUPPORT_EMAIL}
-            </a>
-          ) : (
-            LEGAL_NOTICE_EMAIL
-          )}
-          , or via our{" "}
-          <Link href="/support" className="underline underline-offset-2">
-            Support page
-          </Link>
-          .
-        </p>
+        <p>Questions about these Terms:</p>
+        <LegalContact whatsappMessage="Hi! I have a question about NURU's Terms of Service." />
       </LegalSection>
     </LegalDocument>
   );

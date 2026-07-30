@@ -1,13 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { LegalDocument, LegalSection } from "@/components/legal-document";
+import { LegalContact, LegalDocument, LegalSection } from "@/components/legal-document";
 import {
   LEGAL_DOCS_LAST_UPDATED,
   LEGAL_ENTITY_ADDRESS,
   LEGAL_ENTITY_JURISDICTION,
   LEGAL_ENTITY_NAME,
-  LEGAL_NOTICE_EMAIL,
-  LEGAL_SUPPORT_EMAIL,
 } from "@/lib/legal-entity";
 
 export const metadata: Metadata = {
@@ -34,13 +32,13 @@ export default function PrivacyPage() {
             Shopify-based customer accounts, or manual/WhatsApp orders.
           </li>
           <li>
-            <strong>BNPL application data:</strong> if you apply for Buy Now, Pay Later, you send
-            us a national ID and M-Pesa statements directly over WhatsApp as part of the
-            application. See our{" "}
+            <strong>BNPL:</strong> we do not collect or store your national ID or M-Pesa
+            statements. That information is given directly to our third-party BNPL partner, in
+            person, as part of their own credit assessment — see our{" "}
             <Link href="/legal/bnpl-terms" className="underline underline-offset-2">
               BNPL Credit Terms
             </Link>{" "}
-            for how that specific data is handled.
+            for how that works and whose privacy practices apply to it.
           </li>
           <li>
             <strong>AI concierge interactions:</strong> text and voice messages you send to our
@@ -59,7 +57,7 @@ export default function PrivacyPage() {
         <ul className="list-disc space-y-1 pl-5">
           <li>To process and deliver your orders, and to send invoices and receipts.</li>
           <li>To provide customer support and respond to enquiries sent via WhatsApp or email.</li>
-          <li>To evaluate and, if approved, administer BNPL applications.</li>
+          <li>To calculate and show you indicative BNPL plan figures, and refer you to our BNPL partner.</li>
           <li>To operate and improve the AI shopping concierge.</li>
           <li>To understand site usage and improve the shopping experience.</li>
         </ul>
@@ -128,16 +126,11 @@ export default function PrivacyPage() {
 
       <LegalSection heading="9. Contact">
         <p>
-          For privacy requests or questions, contact us at{" "}
-          {LEGAL_SUPPORT_EMAIL ? (
-            <a href={`mailto:${LEGAL_SUPPORT_EMAIL}`} className="underline underline-offset-2">
-              {LEGAL_SUPPORT_EMAIL}
-            </a>
-          ) : (
-            LEGAL_NOTICE_EMAIL
-          )}
-          , or our registered address at {LEGAL_ENTITY_ADDRESS},{" "}
-          {LEGAL_ENTITY_JURISDICTION}.
+          For privacy requests or questions:
+        </p>
+        <LegalContact whatsappMessage="Hi! I have a question about how NURU handles my personal data." />
+        <p>
+          Or write to our registered address at {LEGAL_ENTITY_ADDRESS}, {LEGAL_ENTITY_JURISDICTION}.
         </p>
       </LegalSection>
     </LegalDocument>
