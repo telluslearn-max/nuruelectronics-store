@@ -27,6 +27,7 @@ export function BnplSection({
   bnplOverride?: ProductVariant["bnplOverride"];
 }) {
   const [planId, setPlanId] = useState<BnplPlanId>("weekly");
+  const [expanded, setExpanded] = useState(false);
 
   if (!isBnplEligibleProduct(product.tags)) {
     if (isBnplComingSoonProduct(product.tags)) {
@@ -70,6 +71,21 @@ export function BnplSection({
 
   const message = buildBnplApplicationMessage(product, price.currencyCode, plan);
   const whatsappHref = buildWhatsAppUrl(message);
+
+  if (!expanded) {
+    return (
+      <div className="mt-4 rounded-card border border-border-subtle p-4">
+        <h3 className="text-sm font-medium">Buy Now, Pay Later</h3>
+        <button
+          type="button"
+          onClick={() => setExpanded(true)}
+          className="mt-3 flex w-full items-center justify-center gap-2 rounded-control border border-foreground px-6 py-3 text-sm font-medium transition hover:bg-foreground hover:text-background"
+        >
+          Buy with BNPL
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="mt-4 rounded-card border border-border-subtle p-4">
