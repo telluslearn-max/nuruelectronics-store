@@ -5,7 +5,7 @@ import { CompareToggleButton } from "@/components/compare/compare-toggle-button"
 import { gradeForProduct } from "@/components/ex-uk/condition-grade";
 import { ProductBadges } from "@/components/product-badges";
 import { WishlistToggleButton } from "@/components/wishlist/wishlist-toggle-button";
-import { calculateBnplPlan, isBnplEligibleProduct } from "@/lib/bnpl";
+import { buildPartnerBnplPlan, calculateBnplPlan, isBnplEligibleProduct } from "@/lib/bnpl";
 import { getProductBadges } from "@/lib/badges";
 import { formatPrice } from "@/lib/format";
 import { getSavings } from "@/lib/pricing";
@@ -19,12 +19,16 @@ export function ProductCard({ product, quickAdd = false }: { product: Product; q
   const savings = getSavings(price, compareAtPrice);
   const grade = gradeForProduct(product.tags);
   const cheapestVariant = product.variants.find((v) => v.price.amount === price.amount);
+  const bnplOverride = cheapestVariant?.bnplOverride;
   const bnplPlan = isBnplEligibleProduct(product.tags)
-    ? calculateBnplPlan(
-        Number(price.amount),
-        "weekly",
-        cheapestVariant?.bnplPrice ? Number(cheapestVariant.bnplPrice.amount) : undefined,
-      )
+    ? bnplOverride
+      ? buildPartnerBnplPlan(Number(price.amount), {
+          deposit: Number(bnplOverride.deposit.amount),
+          installment: Number(bnplOverride.installment.amount),
+          termCount: bnplOverride.termCount,
+          termUnit: bnplOverride.termUnit,
+        })
+      : calculateBnplPlan(Number(price.amount), "weekly")
     : null;
   const colorOption = product.options.find((o) => o.name === "Color");
 
@@ -71,7 +75,8 @@ export function ProductCard({ product, quickAdd = false }: { product: Product; q
         </div>
         {bnplPlan && (
           <p className="text-[11px] text-neutral-400">
-            from {formatPrice(String(bnplPlan.installment), price.currencyCode)}/wk
+            from {formatPrice(String(bnplPlan.installment), price.currencyCode)}/
+            {bnplPlan.termUnit === "week" ? "wk" : "mo"}
           </p>
         )}
         {quickAdd && <QuickAddToCartButton product={product} className="mt-2" />}

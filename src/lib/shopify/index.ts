@@ -104,26 +104,48 @@ function reshapeImages(images: Connection<ProductImage>): ProductImage[] {
   return images.edges.map((edge) => edge.node);
 }
 
-type RawVariant = Omit<ProductVariant, "bnplPrice"> & {
-  metafield?: { value: string } | null;
+type RawVariant = Omit<ProductVariant, "bnplOverride"> & {
+  metafields?: ({ key: string; value: string } | null)[];
 };
 
-// The "bnpl.sale_price" metafield is type "money", whose value Shopify serializes as a
-// JSON string (e.g. `{"amount":"725.00","currency_code":"KES"}`) rather than a typed object.
-function parseMoneyMetafield(metafield?: { value: string } | null): Money | null {
-  if (!metafield) return null;
+// Money-type metafields serialize their value as a JSON string (e.g.
+// `{"amount":"77500.00","currency_code":"KES"}`) rather than a typed object.
+function parseMoneyMetafieldValue(value: string): Money | null {
   try {
-    const parsed = JSON.parse(metafield.value) as { amount: string; currency_code: string };
+    const parsed = JSON.parse(value) as { amount: string; currency_code: string };
     return { amount: parsed.amount, currencyCode: parsed.currency_code };
   } catch {
     return null;
   }
 }
 
+// Requires all four bnpl.* metafields (partner deposit/installment/term figures) to be present
+// and valid — a partial set isn't enough to build a usable partner-supplied BNPL plan.
+function parseBnplOverride(metafields?: ({ key: string; value: string } | null)[]): ProductVariant["bnplOverride"] {
+  const byKey = new Map(
+    (metafields ?? [])
+      .filter((m): m is { key: string; value: string } => m !== null)
+      .map((m) => [m.key, m.value]),
+  );
+  const depositRaw = byKey.get("deposit");
+  const installmentRaw = byKey.get("installment");
+  const termCountRaw = byKey.get("term_count");
+  const termUnitRaw = byKey.get("term_unit");
+  if (!depositRaw || !installmentRaw || !termCountRaw || !termUnitRaw) return null;
+
+  const deposit = parseMoneyMetafieldValue(depositRaw);
+  const installment = parseMoneyMetafieldValue(installmentRaw);
+  const termCount = Number(termCountRaw);
+  if (!deposit || !installment || !Number.isFinite(termCount) || termCount <= 0) return null;
+  if (termUnitRaw !== "week" && termUnitRaw !== "month") return null;
+
+  return { deposit, installment, termCount, termUnit: termUnitRaw };
+}
+
 function reshapeVariants(variants: Connection<RawVariant>): ProductVariant[] {
   return variants.edges.map(({ node }) => {
-    const { metafield, ...rest } = node;
-    return { ...rest, bnplPrice: parseMoneyMetafield(metafield) };
+    const { metafields, ...rest } = node;
+    return { ...rest, bnplOverride: parseBnplOverride(metafields) };
   });
 }
 

@@ -19,30 +19,25 @@ export const BNPL_PLANS: Record<BnplPlanId, BnplPlanConfig> = {
 };
 
 export type BnplPlan = {
-  planId: BnplPlanId;
+  planId: BnplPlanId | "partner";
   label: string;
   itemPrice: number;
   deposit: number;
-  balance: number;
   totalPayable: number;
   installment: number;
   termCount: number;
   termUnit: "week" | "month";
-  /** Percentage the balance is marked up by, e.g. 50 for a 1.5x multiplier. */
-  effectiveRatePercent: number;
+  /** Percentage the balance is marked up by, e.g. 50 for a 1.5x multiplier. Omitted for
+   * partner-supplied plans (see `buildPartnerBnplPlan`), which carry no implied interest rate
+   * since we're not the one computing the markup. */
+  effectiveRatePercent?: number;
 };
 
-/**
- * `bnplSalePrice`, when given, is the total price payable for the item under BNPL (deposit +
- * all installments) as manually set on the product — used in place of the formulaic 1.5x
- * markup. Deposit still comes off the outright `itemPrice`, so `deposit + totalPayable` equals
- * `bnplSalePrice`.
- */
-export function calculateBnplPlan(itemPrice: number, planId: BnplPlanId, bnplSalePrice?: number): BnplPlan {
+export function calculateBnplPlan(itemPrice: number, planId: BnplPlanId): BnplPlan {
   const config = BNPL_PLANS[planId];
   const deposit = itemPrice * config.depositRate;
   const balance = itemPrice - deposit;
-  const totalPayable = bnplSalePrice !== undefined ? bnplSalePrice - deposit : balance * BNPL_BALANCE_MARKUP_MULTIPLIER;
+  const totalPayable = balance * BNPL_BALANCE_MARKUP_MULTIPLIER;
   const installment = totalPayable / config.termCount;
   const effectiveRatePercent = ((totalPayable - balance) / balance) * 100;
   return {
@@ -50,12 +45,37 @@ export function calculateBnplPlan(itemPrice: number, planId: BnplPlanId, bnplSal
     label: config.label,
     itemPrice,
     deposit,
-    balance,
     totalPayable,
     installment,
     termCount: config.termCount,
     termUnit: config.termUnit,
     effectiveRatePercent,
+  };
+}
+
+export type BnplPartnerFigures = {
+  deposit: number;
+  installment: number;
+  termCount: number;
+  termUnit: "week" | "month";
+};
+
+/**
+ * Samsung's BNPL is run by our partner Wuezesha off their own reference price, which runs
+ * significantly higher than our cash price — so their deposit/installment figures can't be
+ * derived from our formula (it would compute a deposit against the wrong base price). Their
+ * numbers are used verbatim instead of being recomputed here.
+ */
+export function buildPartnerBnplPlan(itemPrice: number, figures: BnplPartnerFigures): BnplPlan {
+  return {
+    planId: "partner",
+    label: figures.termUnit === "week" ? "Weekly" : "Monthly",
+    itemPrice,
+    deposit: figures.deposit,
+    totalPayable: figures.installment * figures.termCount,
+    installment: figures.installment,
+    termCount: figures.termCount,
+    termUnit: figures.termUnit,
   };
 }
 

@@ -6,6 +6,7 @@ import {
   BNPL_PLANS,
   buildBnplApplicationMessage,
   buildBnplWaitlistMessage,
+  buildPartnerBnplPlan,
   calculateBnplPlan,
   getBnplComingSoonBrand,
   isBnplComingSoonProduct,
@@ -13,17 +14,17 @@ import {
   type BnplPlanId,
 } from "@/lib/bnpl";
 import { formatPrice } from "@/lib/format";
-import type { Money, Product } from "@/lib/shopify/types";
+import type { Money, Product, ProductVariant } from "@/lib/shopify/types";
 import { buildWhatsAppUrl } from "@/lib/whatsapp";
 
 export function BnplSection({
   product,
   price,
-  bnplPrice,
+  bnplOverride,
 }: {
   product: Product;
   price: Money;
-  bnplPrice?: Money | null;
+  bnplOverride?: ProductVariant["bnplOverride"];
 }) {
   const [planId, setPlanId] = useState<BnplPlanId>("weekly");
 
@@ -52,11 +53,14 @@ export function BnplSection({
     return null;
   }
 
-  const plan = calculateBnplPlan(
-    Number(price.amount),
-    planId,
-    bnplPrice ? Number(bnplPrice.amount) : undefined,
-  );
+  const plan = bnplOverride
+    ? buildPartnerBnplPlan(Number(price.amount), {
+        deposit: Number(bnplOverride.deposit.amount),
+        installment: Number(bnplOverride.installment.amount),
+        termCount: bnplOverride.termCount,
+        termUnit: bnplOverride.termUnit,
+      })
+    : calculateBnplPlan(Number(price.amount), planId);
   const fmt = (amount: number) => formatPrice(String(amount), price.currencyCode);
 
   const message = buildBnplApplicationMessage(product, price.currencyCode, plan);
@@ -65,22 +69,25 @@ export function BnplSection({
   return (
     <div className="mt-4 rounded-card border border-border-subtle p-4">
       <h3 className="text-sm font-medium">Buy Now, Pay Later</h3>
-      <div className="mt-2 flex gap-2">
-        {Object.values(BNPL_PLANS).map((config) => (
-          <button
-            key={config.id}
-            type="button"
-            onClick={() => setPlanId(config.id)}
-            className={`rounded-card border px-4 py-2 text-sm transition ${
-              planId === config.id
-                ? "border-foreground bg-foreground text-background"
-                : "border-border-subtle hover:border-foreground"
-            }`}
-          >
-            {config.label}
-          </button>
-        ))}
-      </div>
+      {/* Wuezesha's partner-supplied figures are a single fixed plan — no weekly/monthly choice. */}
+      {!bnplOverride && (
+        <div className="mt-2 flex gap-2">
+          {Object.values(BNPL_PLANS).map((config) => (
+            <button
+              key={config.id}
+              type="button"
+              onClick={() => setPlanId(config.id)}
+              className={`rounded-card border px-4 py-2 text-sm transition ${
+                planId === config.id
+                  ? "border-foreground bg-foreground text-background"
+                  : "border-border-subtle hover:border-foreground"
+              }`}
+            >
+              {config.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       <p className="mt-3 text-sm text-neutral-600">
         <span className="font-medium text-neutral-800">{fmt(plan.deposit)} deposit</span>, then{" "}
@@ -90,8 +97,14 @@ export function BnplSection({
         </span>
       </p>
       <p className="mt-1 text-xs text-neutral-500">
-        Total payable: {fmt(plan.totalPayable)} (includes {plan.effectiveRatePercent.toFixed(0)}% interest
-        on the balance after deposit)
+        {plan.effectiveRatePercent !== undefined ? (
+          <>
+            Total payable: {fmt(plan.totalPayable)} (includes {plan.effectiveRatePercent.toFixed(0)}% interest
+            on the balance after deposit)
+          </>
+        ) : (
+          <>Total payable: {fmt(plan.totalPayable)}</>
+        )}
       </p>
 
       <ul className="mt-3 space-y-1 text-xs text-neutral-500">

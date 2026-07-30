@@ -4,6 +4,7 @@ import {
   BNPL_PLANS,
   buildBnplApplicationMessage,
   buildBnplWaitlistMessage,
+  buildPartnerBnplPlan,
   calculateBnplPlan,
   getBnplComingSoonBrand,
   isBnplComingSoonProduct,
@@ -15,7 +16,7 @@ import { getProductByHandle } from "@/lib/shopify";
 export type BnplExplainerResult =
   | {
       eligible: true;
-      planId: BnplPlanId;
+      planId: BnplPlanId | "partner";
       label: string;
       itemPrice: string;
       deposit: string;
@@ -47,11 +48,16 @@ export async function explainBnplPlan(handle: string, planId: BnplPlanId = "week
 
   const price = product.priceRange.minVariantPrice;
   const cheapestVariant = product.variants.find((v) => v.price.amount === price.amount);
-  const plan = calculateBnplPlan(
-    Number(price.amount),
-    planId,
-    cheapestVariant?.bnplPrice ? Number(cheapestVariant.bnplPrice.amount) : undefined,
-  );
+  const bnplOverride = cheapestVariant?.bnplOverride;
+  // A partner-supplied plan (Wuezesha) is a single fixed plan — the requested planId doesn't apply.
+  const plan = bnplOverride
+    ? buildPartnerBnplPlan(Number(price.amount), {
+        deposit: Number(bnplOverride.deposit.amount),
+        installment: Number(bnplOverride.installment.amount),
+        termCount: bnplOverride.termCount,
+        termUnit: bnplOverride.termUnit,
+      })
+    : calculateBnplPlan(Number(price.amount), planId);
 
   return {
     eligible: true,

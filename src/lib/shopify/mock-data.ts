@@ -340,9 +340,14 @@ export const mockProducts: Product[] = [
         title: "Default",
         availableForSale: true,
         price: money("549.00"),
-        // Exercises the "bnpl.sale_price" metafield override locally — a manually-set BNPL
-        // total distinct from the formulaic 1.5x markup on the outright price above.
-        bnplPrice: money("725.00"),
+        // Exercises the bnpl.* metafield override locally — Wuezesha's own fixed deposit/
+        // installment figures, used verbatim rather than derived from the outright price above.
+        bnplOverride: {
+          deposit: money("219.60"),
+          installment: money("168.47"),
+          termCount: 3,
+          termUnit: "month",
+        },
         selectedOptions: [{ name: "Title", value: "Default" }],
       },
     ],

@@ -16,8 +16,18 @@ export type ProductVariant = {
   availableForSale: boolean;
   price: Money;
   compareAtPrice?: Money | null;
-  /** From the "bnpl.sale_price" metafield — the manually-set total price payable under a BNPL plan, distinct from `price` (the outright cash price). Falls back to the formulaic markup in `calculateBnplPlan` when unset. */
-  bnplPrice?: Money | null;
+  /**
+   * From the "bnpl.deposit" / "bnpl.installment" / "bnpl.term_count" / "bnpl.term_unit"
+   * metafields — our BNPL partner's (Wuezesha's) own fixed figures for this variant, used
+   * verbatim via `buildPartnerBnplPlan` instead of the in-house formula in `calculateBnplPlan`.
+   * Only set when all four metafields are present and valid.
+   */
+  bnplOverride?: {
+    deposit: Money;
+    installment: Money;
+    termCount: number;
+    termUnit: "week" | "month";
+  } | null;
   selectedOptions: { name: string; value: string }[];
   sku?: string | null;
 };

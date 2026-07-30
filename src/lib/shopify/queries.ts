@@ -54,7 +54,13 @@ const productFragment = /* GraphQL */ `
             amount
             currencyCode
           }
-          metafield(namespace: "bnpl", key: "sale_price") {
+          metafields(identifiers: [
+            { namespace: "bnpl", key: "deposit" }
+            { namespace: "bnpl", key: "installment" }
+            { namespace: "bnpl", key: "term_count" }
+            { namespace: "bnpl", key: "term_unit" }
+          ]) {
+            key
             value
           }
           selectedOptions {
