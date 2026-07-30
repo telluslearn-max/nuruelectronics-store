@@ -143,8 +143,10 @@ function parseBnplOverride(metafields?: ({ key: string; value: string } | null)[
   // so display code can tell "no breakdown given" apart from "breakdown is zero".
   const processingFeeRaw = byKey.get("processing_fee");
   const insurancePerPeriodRaw = byKey.get("insurance_per_period");
+  const referencePriceRaw = byKey.get("reference_price");
   const processingFee = processingFeeRaw ? parseMoneyMetafieldValue(processingFeeRaw) : null;
   const insurancePerPeriod = insurancePerPeriodRaw ? parseMoneyMetafieldValue(insurancePerPeriodRaw) : null;
+  const referencePrice = referencePriceRaw ? parseMoneyMetafieldValue(referencePriceRaw) : null;
 
   return {
     deposit,
@@ -153,6 +155,7 @@ function parseBnplOverride(metafields?: ({ key: string; value: string } | null)[
     termUnit: termUnitRaw,
     ...(processingFee ? { processingFee } : {}),
     ...(insurancePerPeriod ? { insurancePerPeriod } : {}),
+    ...(referencePrice ? { referencePrice } : {}),
   };
 }
 

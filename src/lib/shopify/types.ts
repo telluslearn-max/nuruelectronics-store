@@ -23,7 +23,9 @@ export type ProductVariant = {
    * Only set when all four metafields are present and valid. `processingFee` and
    * `insurancePerPeriod` are optional breakdown detail (from "bnpl.processing_fee" /
    * "bnpl.insurance_per_period") — already included in `deposit`/`installment`, itemized here
-   * only for display, matching how Wuezesha's own UI discloses them.
+   * only for display, matching how Wuezesha's own UI discloses them. `referencePrice` (from
+   * "bnpl.reference_price") is Wuezesha's own price basis for this variant — often different
+   * from our `price` above — shown for context only, never used in any calculation.
    */
   bnplOverride?: {
     deposit: Money;
@@ -32,6 +34,7 @@ export type ProductVariant = {
     termUnit: "week" | "month";
     processingFee?: Money;
     insurancePerPeriod?: Money;
+    referencePrice?: Money;
   } | null;
   selectedOptions: { name: string; value: string }[];
   sku?: string | null;

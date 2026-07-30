@@ -63,6 +63,7 @@ export function BnplSection({
         insurancePerPeriod: bnplOverride.insurancePerPeriod
           ? Number(bnplOverride.insurancePerPeriod.amount)
           : undefined,
+        referencePrice: bnplOverride.referencePrice ? Number(bnplOverride.referencePrice.amount) : undefined,
       })
     : calculateBnplPlan(Number(price.amount), planId);
   const fmt = (amount: number) => formatPrice(String(amount), price.currencyCode);
@@ -93,7 +94,12 @@ export function BnplSection({
         </div>
       )}
 
-      <p className="mt-3 text-sm text-neutral-600">
+      {plan.referencePrice !== undefined && (
+        <p className="mt-3 text-sm text-neutral-600">
+          Wuezesha price: <span className="font-medium text-neutral-800">{fmt(plan.referencePrice)}</span>
+        </p>
+      )}
+      <p className={plan.referencePrice !== undefined ? "mt-1 text-sm text-neutral-600" : "mt-3 text-sm text-neutral-600"}>
         <span className="font-medium text-neutral-800">{fmt(plan.deposit)} deposit</span>, then{" "}
         {plan.termCount} x{" "}
         <span className="font-medium text-neutral-800">

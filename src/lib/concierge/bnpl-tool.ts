@@ -28,6 +28,8 @@ export type BnplExplainerResult =
       /** Only present for partner-supplied (Wuezesha) plans that break these out separately. */
       processingFee?: string;
       insurancePerPeriod?: string;
+      /** Wuezesha's own price basis for this item, when they supply one — may differ from `itemPrice` (our cash price). */
+      referencePrice?: string;
       requirements: string[];
       /** Text for the concierge to surface as a "Continue on WhatsApp" CTA once the shopper wants to apply. */
       applicationMessage: string;
@@ -63,6 +65,7 @@ export async function explainBnplPlan(handle: string, planId: BnplPlanId = "week
         insurancePerPeriod: bnplOverride.insurancePerPeriod
           ? Number(bnplOverride.insurancePerPeriod.amount)
           : undefined,
+        referencePrice: bnplOverride.referencePrice ? Number(bnplOverride.referencePrice.amount) : undefined,
       })
     : calculateBnplPlan(Number(price.amount), planId);
 
@@ -79,6 +82,7 @@ export async function explainBnplPlan(handle: string, planId: BnplPlanId = "week
     currencyCode: price.currencyCode,
     processingFee: plan.processingFee?.toFixed(2),
     insurancePerPeriod: plan.insurancePerPeriod?.toFixed(2),
+    referencePrice: plan.referencePrice?.toFixed(2),
     requirements: BNPL_ELIGIBILITY_REQUIREMENTS,
     applicationMessage: buildBnplApplicationMessage(product, price.currencyCode, plan),
   };

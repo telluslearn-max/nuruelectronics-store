@@ -35,6 +35,9 @@ export type BnplPlan = {
    * present here only so the UI can itemize them the way Wuezesha's own widget does. */
   processingFee?: number;
   insurancePerPeriod?: number;
+  /** Wuezesha's own price basis for this item — often different from `itemPrice` (our cash
+   * price). Shown for context only; never used in any calculation here. */
+  referencePrice?: number;
 };
 
 export function calculateBnplPlan(itemPrice: number, planId: BnplPlanId): BnplPlan {
@@ -64,6 +67,7 @@ export type BnplPartnerFigures = {
   termUnit: "week" | "month";
   processingFee?: number;
   insurancePerPeriod?: number;
+  referencePrice?: number;
 };
 
 /**
@@ -84,6 +88,7 @@ export function buildPartnerBnplPlan(itemPrice: number, figures: BnplPartnerFigu
     termUnit: figures.termUnit,
     processingFee: figures.processingFee,
     insurancePerPeriod: figures.insurancePerPeriod,
+    referencePrice: figures.referencePrice,
   };
 }
 

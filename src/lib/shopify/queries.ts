@@ -61,6 +61,7 @@ const productFragment = /* GraphQL */ `
             { namespace: "bnpl", key: "term_unit" }
             { namespace: "bnpl", key: "processing_fee" }
             { namespace: "bnpl", key: "insurance_per_period" }
+            { namespace: "bnpl", key: "reference_price" }
           ]) {
             key
             value

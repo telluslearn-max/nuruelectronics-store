@@ -355,6 +355,7 @@ export async function dispatchTool(
               currencyCode: result.currencyCode,
               ...(result.processingFee ? { processingFee: result.processingFee } : {}),
               ...(result.insurancePerPeriod ? { insurancePerPeriod: result.insurancePerPeriod } : {}),
+              ...(result.referencePrice ? { referencePrice: result.referencePrice } : {}),
             },
             requirements: result.requirements,
           },
