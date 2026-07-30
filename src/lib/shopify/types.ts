@@ -16,6 +16,8 @@ export type ProductVariant = {
   availableForSale: boolean;
   price: Money;
   compareAtPrice?: Money | null;
+  /** From the "bnpl.sale_price" metafield — the manually-set total price payable under a BNPL plan, distinct from `price` (the outright cash price). Falls back to the formulaic markup in `calculateBnplPlan` when unset. */
+  bnplPrice?: Money | null;
   selectedOptions: { name: string; value: string }[];
   sku?: string | null;
 };

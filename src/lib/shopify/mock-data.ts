@@ -340,6 +340,9 @@ export const mockProducts: Product[] = [
         title: "Default",
         availableForSale: true,
         price: money("549.00"),
+        // Exercises the "bnpl.sale_price" metafield override locally — a manually-set BNPL
+        // total distinct from the formulaic 1.5x markup on the outright price above.
+        bnplPrice: money("725.00"),
         selectedOptions: [{ name: "Title", value: "Default" }],
       },
     ],

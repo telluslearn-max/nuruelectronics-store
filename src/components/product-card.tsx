@@ -18,8 +18,13 @@ export function ProductCard({ product, quickAdd = false }: { product: Product; q
   const compareAtPrice = product.compareAtPriceRange?.minVariantPrice;
   const savings = getSavings(price, compareAtPrice);
   const grade = gradeForProduct(product.tags);
+  const cheapestVariant = product.variants.find((v) => v.price.amount === price.amount);
   const bnplPlan = isBnplEligibleProduct(product.tags)
-    ? calculateBnplPlan(Number(price.amount), "weekly")
+    ? calculateBnplPlan(
+        Number(price.amount),
+        "weekly",
+        cheapestVariant?.bnplPrice ? Number(cheapestVariant.bnplPrice.amount) : undefined,
+      )
     : null;
   const colorOption = product.options.find((o) => o.name === "Color");
 

@@ -46,7 +46,12 @@ export async function explainBnplPlan(handle: string, planId: BnplPlanId = "week
   }
 
   const price = product.priceRange.minVariantPrice;
-  const plan = calculateBnplPlan(Number(price.amount), planId);
+  const cheapestVariant = product.variants.find((v) => v.price.amount === price.amount);
+  const plan = calculateBnplPlan(
+    Number(price.amount),
+    planId,
+    cheapestVariant?.bnplPrice ? Number(cheapestVariant.bnplPrice.amount) : undefined,
+  );
 
   return {
     eligible: true,

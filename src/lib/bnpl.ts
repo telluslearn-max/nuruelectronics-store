@@ -32,11 +32,17 @@ export type BnplPlan = {
   effectiveRatePercent: number;
 };
 
-export function calculateBnplPlan(itemPrice: number, planId: BnplPlanId): BnplPlan {
+/**
+ * `bnplSalePrice`, when given, is the total price payable for the item under BNPL (deposit +
+ * all installments) as manually set on the product — used in place of the formulaic 1.5x
+ * markup. Deposit still comes off the outright `itemPrice`, so `deposit + totalPayable` equals
+ * `bnplSalePrice`.
+ */
+export function calculateBnplPlan(itemPrice: number, planId: BnplPlanId, bnplSalePrice?: number): BnplPlan {
   const config = BNPL_PLANS[planId];
   const deposit = itemPrice * config.depositRate;
   const balance = itemPrice - deposit;
-  const totalPayable = balance * BNPL_BALANCE_MARKUP_MULTIPLIER;
+  const totalPayable = bnplSalePrice !== undefined ? bnplSalePrice - deposit : balance * BNPL_BALANCE_MARKUP_MULTIPLIER;
   const installment = totalPayable / config.termCount;
   const effectiveRatePercent = ((totalPayable - balance) / balance) * 100;
   return {

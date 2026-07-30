@@ -1,5 +1,5 @@
 import "server-only";
-import type { Article, Cart, CartLine, Product, ProductImage, ProductVariant } from "./types";
+import type { Article, Cart, CartLine, Money, Product, ProductImage, ProductVariant } from "./types";
 import {
   addToCartMutation,
   cartAttributesUpdateMutation,
@@ -104,13 +104,32 @@ function reshapeImages(images: Connection<ProductImage>): ProductImage[] {
   return images.edges.map((edge) => edge.node);
 }
 
-function reshapeVariants(variants: Connection<ProductVariant>): ProductVariant[] {
-  return variants.edges.map((edge) => edge.node);
+type RawVariant = Omit<ProductVariant, "bnplPrice"> & {
+  metafield?: { value: string } | null;
+};
+
+// The "bnpl.sale_price" metafield is type "money", whose value Shopify serializes as a
+// JSON string (e.g. `{"amount":"725.00","currency_code":"KES"}`) rather than a typed object.
+function parseMoneyMetafield(metafield?: { value: string } | null): Money | null {
+  if (!metafield) return null;
+  try {
+    const parsed = JSON.parse(metafield.value) as { amount: string; currency_code: string };
+    return { amount: parsed.amount, currencyCode: parsed.currency_code };
+  } catch {
+    return null;
+  }
+}
+
+function reshapeVariants(variants: Connection<RawVariant>): ProductVariant[] {
+  return variants.edges.map(({ node }) => {
+    const { metafield, ...rest } = node;
+    return { ...rest, bnplPrice: parseMoneyMetafield(metafield) };
+  });
 }
 
 function reshapeProduct(node: Omit<Product, "images" | "variants" | "specs" | "releaseDate"> & {
   images: Connection<ProductImage>;
-  variants: Connection<ProductVariant>;
+  variants: Connection<RawVariant>;
   metafields?: ({ namespace: string; key: string; value: string } | null)[];
 }): Product {
   const { metafields, ...rest } = node;

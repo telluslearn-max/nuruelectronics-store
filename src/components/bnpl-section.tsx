@@ -16,7 +16,15 @@ import { formatPrice } from "@/lib/format";
 import type { Money, Product } from "@/lib/shopify/types";
 import { buildWhatsAppUrl } from "@/lib/whatsapp";
 
-export function BnplSection({ product, price }: { product: Product; price: Money }) {
+export function BnplSection({
+  product,
+  price,
+  bnplPrice,
+}: {
+  product: Product;
+  price: Money;
+  bnplPrice?: Money | null;
+}) {
   const [planId, setPlanId] = useState<BnplPlanId>("weekly");
 
   if (!isBnplEligibleProduct(product.tags)) {
@@ -44,7 +52,11 @@ export function BnplSection({ product, price }: { product: Product; price: Money
     return null;
   }
 
-  const plan = calculateBnplPlan(Number(price.amount), planId);
+  const plan = calculateBnplPlan(
+    Number(price.amount),
+    planId,
+    bnplPrice ? Number(bnplPrice.amount) : undefined,
+  );
   const fmt = (amount: number) => formatPrice(String(amount), price.currencyCode);
 
   const message = buildBnplApplicationMessage(product, price.currencyCode, plan);

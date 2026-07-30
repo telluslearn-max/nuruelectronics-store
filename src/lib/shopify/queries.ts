@@ -54,6 +54,9 @@ const productFragment = /* GraphQL */ `
             amount
             currencyCode
           }
+          metafield(namespace: "bnpl", key: "sale_price") {
+            value
+          }
           selectedOptions {
             name
             value
