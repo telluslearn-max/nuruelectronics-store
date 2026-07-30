@@ -353,6 +353,8 @@ export async function dispatchTool(
               termUnit: result.termUnit,
               totalPayable: result.totalPayable,
               currencyCode: result.currencyCode,
+              ...(result.processingFee ? { processingFee: result.processingFee } : {}),
+              ...(result.insurancePerPeriod ? { insurancePerPeriod: result.insurancePerPeriod } : {}),
             },
             requirements: result.requirements,
           },

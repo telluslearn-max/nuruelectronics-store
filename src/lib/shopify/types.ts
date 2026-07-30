@@ -20,13 +20,18 @@ export type ProductVariant = {
    * From the "bnpl.deposit" / "bnpl.installment" / "bnpl.term_count" / "bnpl.term_unit"
    * metafields — our BNPL partner's (Wuezesha's) own fixed figures for this variant, used
    * verbatim via `buildPartnerBnplPlan` instead of the in-house formula in `calculateBnplPlan`.
-   * Only set when all four metafields are present and valid.
+   * Only set when all four metafields are present and valid. `processingFee` and
+   * `insurancePerPeriod` are optional breakdown detail (from "bnpl.processing_fee" /
+   * "bnpl.insurance_per_period") — already included in `deposit`/`installment`, itemized here
+   * only for display, matching how Wuezesha's own UI discloses them.
    */
   bnplOverride?: {
     deposit: Money;
     installment: Money;
     termCount: number;
     termUnit: "week" | "month";
+    processingFee?: Money;
+    insurancePerPeriod?: Money;
   } | null;
   selectedOptions: { name: string; value: string }[];
   sku?: string | null;

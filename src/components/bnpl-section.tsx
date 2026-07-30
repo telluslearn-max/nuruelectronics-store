@@ -59,6 +59,10 @@ export function BnplSection({
         installment: Number(bnplOverride.installment.amount),
         termCount: bnplOverride.termCount,
         termUnit: bnplOverride.termUnit,
+        processingFee: bnplOverride.processingFee ? Number(bnplOverride.processingFee.amount) : undefined,
+        insurancePerPeriod: bnplOverride.insurancePerPeriod
+          ? Number(bnplOverride.insurancePerPeriod.amount)
+          : undefined,
       })
     : calculateBnplPlan(Number(price.amount), planId);
   const fmt = (amount: number) => formatPrice(String(amount), price.currencyCode);
@@ -96,6 +100,19 @@ export function BnplSection({
           {fmt(plan.installment)}/{plan.termUnit}
         </span>
       </p>
+      {plan.processingFee !== undefined && (
+        // No percentage shown here deliberately — the deposit rate is set by Wuezesha against
+        // their own reference price, not our itemPrice, so a derived "(X%)" here would show a
+        // different number than what Wuezesha's own disclosure states.
+        <p className="mt-1 text-xs text-neutral-500">
+          Deposit {fmt(plan.deposit - plan.processingFee)} + processing fee {fmt(plan.processingFee)}
+        </p>
+      )}
+      {plan.insurancePerPeriod !== undefined && (
+        <p className="mt-1 text-xs text-neutral-500">
+          Includes {fmt(plan.insurancePerPeriod)} insurance per {plan.termUnit}
+        </p>
+      )}
       <p className="mt-1 text-xs text-neutral-500">
         {plan.effectiveRatePercent !== undefined ? (
           <>

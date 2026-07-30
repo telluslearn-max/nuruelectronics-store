@@ -25,6 +25,9 @@ export type BnplExplainerResult =
       termUnit: "week" | "month";
       totalPayable: string;
       currencyCode: string;
+      /** Only present for partner-supplied (Wuezesha) plans that break these out separately. */
+      processingFee?: string;
+      insurancePerPeriod?: string;
       requirements: string[];
       /** Text for the concierge to surface as a "Continue on WhatsApp" CTA once the shopper wants to apply. */
       applicationMessage: string;
@@ -56,6 +59,10 @@ export async function explainBnplPlan(handle: string, planId: BnplPlanId = "week
         installment: Number(bnplOverride.installment.amount),
         termCount: bnplOverride.termCount,
         termUnit: bnplOverride.termUnit,
+        processingFee: bnplOverride.processingFee ? Number(bnplOverride.processingFee.amount) : undefined,
+        insurancePerPeriod: bnplOverride.insurancePerPeriod
+          ? Number(bnplOverride.insurancePerPeriod.amount)
+          : undefined,
       })
     : calculateBnplPlan(Number(price.amount), planId);
 
@@ -70,6 +77,8 @@ export async function explainBnplPlan(handle: string, planId: BnplPlanId = "week
     termUnit: plan.termUnit,
     totalPayable: plan.totalPayable.toFixed(2),
     currencyCode: price.currencyCode,
+    processingFee: plan.processingFee?.toFixed(2),
+    insurancePerPeriod: plan.insurancePerPeriod?.toFixed(2),
     requirements: BNPL_ELIGIBILITY_REQUIREMENTS,
     applicationMessage: buildBnplApplicationMessage(product, price.currencyCode, plan),
   };

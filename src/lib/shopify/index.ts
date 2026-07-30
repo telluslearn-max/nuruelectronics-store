@@ -139,7 +139,21 @@ function parseBnplOverride(metafields?: ({ key: string; value: string } | null)[
   if (!deposit || !installment || !Number.isFinite(termCount) || termCount <= 0) return null;
   if (termUnitRaw !== "week" && termUnitRaw !== "month") return null;
 
-  return { deposit, installment, termCount, termUnit: termUnitRaw };
+  // Breakdown detail is optional — omitted entirely (not defaulted) when the metafield is unset,
+  // so display code can tell "no breakdown given" apart from "breakdown is zero".
+  const processingFeeRaw = byKey.get("processing_fee");
+  const insurancePerPeriodRaw = byKey.get("insurance_per_period");
+  const processingFee = processingFeeRaw ? parseMoneyMetafieldValue(processingFeeRaw) : null;
+  const insurancePerPeriod = insurancePerPeriodRaw ? parseMoneyMetafieldValue(insurancePerPeriodRaw) : null;
+
+  return {
+    deposit,
+    installment,
+    termCount,
+    termUnit: termUnitRaw,
+    ...(processingFee ? { processingFee } : {}),
+    ...(insurancePerPeriod ? { insurancePerPeriod } : {}),
+  };
 }
 
 function reshapeVariants(variants: Connection<RawVariant>): ProductVariant[] {

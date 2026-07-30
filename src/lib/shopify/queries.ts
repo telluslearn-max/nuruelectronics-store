@@ -59,6 +59,8 @@ const productFragment = /* GraphQL */ `
             { namespace: "bnpl", key: "installment" }
             { namespace: "bnpl", key: "term_count" }
             { namespace: "bnpl", key: "term_unit" }
+            { namespace: "bnpl", key: "processing_fee" }
+            { namespace: "bnpl", key: "insurance_per_period" }
           ]) {
             key
             value

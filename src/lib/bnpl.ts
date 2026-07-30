@@ -31,6 +31,10 @@ export type BnplPlan = {
    * partner-supplied plans (see `buildPartnerBnplPlan`), which carry no implied interest rate
    * since we're not the one computing the markup. */
   effectiveRatePercent?: number;
+  /** Breakdown detail for partner-supplied plans — already included in `deposit`/`installment`,
+   * present here only so the UI can itemize them the way Wuezesha's own widget does. */
+  processingFee?: number;
+  insurancePerPeriod?: number;
 };
 
 export function calculateBnplPlan(itemPrice: number, planId: BnplPlanId): BnplPlan {
@@ -58,6 +62,8 @@ export type BnplPartnerFigures = {
   installment: number;
   termCount: number;
   termUnit: "week" | "month";
+  processingFee?: number;
+  insurancePerPeriod?: number;
 };
 
 /**
@@ -76,6 +82,8 @@ export function buildPartnerBnplPlan(itemPrice: number, figures: BnplPartnerFigu
     installment: figures.installment,
     termCount: figures.termCount,
     termUnit: figures.termUnit,
+    processingFee: figures.processingFee,
+    insurancePerPeriod: figures.insurancePerPeriod,
   };
 }
 
