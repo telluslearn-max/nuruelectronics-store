@@ -112,7 +112,8 @@ export function BnplSection({
 
       {plan.referencePrice !== undefined && (
         <p className="mt-3 text-sm text-neutral-600">
-          Wuezesha price: <span className="font-medium text-neutral-800">{fmt(plan.referencePrice)}</span>
+          Buy Now, Pay Later price:{" "}
+          <span className="font-medium text-neutral-800">{fmt(plan.referencePrice)}</span>
         </p>
       )}
       <p className={plan.referencePrice !== undefined ? "mt-1 text-sm text-neutral-600" : "mt-3 text-sm text-neutral-600"}>
