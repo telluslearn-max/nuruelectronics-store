@@ -50,6 +50,31 @@ export function FooterLinks() {
           </li>
         </ul>
       </div>
+      <div>
+        <p className="text-sm font-medium">Legal</p>
+        <ul className="mt-3 space-y-2 text-sm text-neutral-500">
+          <li>
+            <Link href="/legal/terms" className="hover:text-foreground">
+              Terms of Service
+            </Link>
+          </li>
+          <li>
+            <Link href="/legal/privacy" className="hover:text-foreground">
+              Privacy Policy
+            </Link>
+          </li>
+          <li>
+            <Link href="/legal/refund-policy" className="hover:text-foreground">
+              Refund & Warranty Policy
+            </Link>
+          </li>
+          <li>
+            <Link href="/legal/bnpl-terms" className="hover:text-foreground">
+              BNPL Credit Terms
+            </Link>
+          </li>
+        </ul>
+      </div>
     </div>
   );
 }
