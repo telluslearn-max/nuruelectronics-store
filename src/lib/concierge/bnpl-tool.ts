@@ -4,6 +4,7 @@ import {
   BNPL_PLANS,
   buildBnplApplicationMessage,
   buildBnplWaitlistMessage,
+  buildPartnerBnplPlan,
   calculateBnplPlan,
   getBnplComingSoonBrand,
   isBnplComingSoonProduct,
@@ -15,7 +16,7 @@ import { getProductByHandle } from "@/lib/shopify";
 export type BnplExplainerResult =
   | {
       eligible: true;
-      planId: BnplPlanId;
+      planId: BnplPlanId | "partner";
       label: string;
       itemPrice: string;
       deposit: string;
@@ -24,6 +25,11 @@ export type BnplExplainerResult =
       termUnit: "week" | "month";
       totalPayable: string;
       currencyCode: string;
+      /** Only present for partner-supplied (Wuezesha) plans that break these out separately. */
+      processingFee?: string;
+      insurancePerPeriod?: string;
+      /** Wuezesha's own price basis for this item, when they supply one — may differ from `itemPrice` (our cash price). */
+      referencePrice?: string;
       requirements: string[];
       /** Text for the concierge to surface as a "Continue on WhatsApp" CTA once the shopper wants to apply. */
       applicationMessage: string;
@@ -46,7 +52,22 @@ export async function explainBnplPlan(handle: string, planId: BnplPlanId = "week
   }
 
   const price = product.priceRange.minVariantPrice;
-  const plan = calculateBnplPlan(Number(price.amount), planId);
+  const cheapestVariant = product.variants.find((v) => v.price.amount === price.amount);
+  const bnplOverride = cheapestVariant?.bnplOverride;
+  // A partner-supplied plan (Wuezesha) is a single fixed plan — the requested planId doesn't apply.
+  const plan = bnplOverride
+    ? buildPartnerBnplPlan(Number(price.amount), {
+        deposit: Number(bnplOverride.deposit.amount),
+        installment: Number(bnplOverride.installment.amount),
+        termCount: bnplOverride.termCount,
+        termUnit: bnplOverride.termUnit,
+        processingFee: bnplOverride.processingFee ? Number(bnplOverride.processingFee.amount) : undefined,
+        insurancePerPeriod: bnplOverride.insurancePerPeriod
+          ? Number(bnplOverride.insurancePerPeriod.amount)
+          : undefined,
+        referencePrice: bnplOverride.referencePrice ? Number(bnplOverride.referencePrice.amount) : undefined,
+      })
+    : calculateBnplPlan(Number(price.amount), planId);
 
   return {
     eligible: true,
@@ -59,6 +80,9 @@ export async function explainBnplPlan(handle: string, planId: BnplPlanId = "week
     termUnit: plan.termUnit,
     totalPayable: plan.totalPayable.toFixed(2),
     currencyCode: price.currencyCode,
+    processingFee: plan.processingFee?.toFixed(2),
+    insurancePerPeriod: plan.insurancePerPeriod?.toFixed(2),
+    referencePrice: plan.referencePrice?.toFixed(2),
     requirements: BNPL_ELIGIBILITY_REQUIREMENTS,
     applicationMessage: buildBnplApplicationMessage(product, price.currencyCode, plan),
   };
