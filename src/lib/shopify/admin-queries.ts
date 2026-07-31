@@ -4,6 +4,7 @@ const orderFields = `
   processedAt
   displayFinancialStatus
   displayFulfillmentStatus
+  paymentGatewayNames
   currentTotalPriceSet {
     shopMoney { amount currencyCode }
   }

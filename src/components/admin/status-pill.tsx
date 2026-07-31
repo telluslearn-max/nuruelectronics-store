@@ -17,12 +17,17 @@ const STATUS_META: Record<string, { className: string; category: StatusCategory 
   partially_fulfilled: { className: "bg-amber-100 text-amber-700", category: "warning" },
   restocked: { className: "bg-red-100 text-red-700", category: "danger" },
   scheduled: { className: "bg-blue-100 text-blue-700", category: "info" },
+  // Shopify order financial statuses (Admin order list/detail — displayFinancialStatus).
+  authorized: { className: "bg-amber-100 text-amber-700", category: "warning" },
+  voided: { className: "bg-red-100 text-red-700", category: "danger" },
+  refunded: { className: "bg-red-100 text-red-700", category: "danger" },
+  partially_refunded: { className: "bg-amber-100 text-amber-700", category: "warning" },
 };
 
 const DEFAULT_META = { className: "bg-neutral-100 text-neutral-600", category: "neutral" as const };
 
 function formatStatusLabel(status: string): string {
-  return status.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());
+  return status.toLowerCase().replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());
 }
 
 // A same-shaped icon per category, alongside color — so status isn't conveyed by color alone
@@ -62,7 +67,9 @@ function CategoryIcon({ category }: { category: StatusCategory }) {
 }
 
 export function StatusPill({ status }: { status: string }) {
-  const meta = STATUS_META[status] ?? DEFAULT_META;
+  // Callers pass lowercase internal statuses (invoice/estimate/delivery) and Shopify's
+  // own UPPERCASE enum values (e.g. "PENDING", "PARTIALLY_REFUNDED") interchangeably.
+  const meta = STATUS_META[status.toLowerCase()] ?? DEFAULT_META;
   return (
     <span
       className={`inline-flex items-center gap-1 rounded-control px-2.5 py-0.5 text-xs font-medium ${meta.className}`}

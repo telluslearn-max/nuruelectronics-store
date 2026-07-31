@@ -8,6 +8,7 @@ import { importShopifyOrder } from "@/lib/admin-actions";
 import { parsePage, type PageSearchParams } from "@/lib/pagination";
 import { PaginationControls } from "@/components/admin/pagination-controls";
 import { FeedbackBanner } from "@/components/admin/feedback-banner";
+import { StatusPill } from "@/components/admin/status-pill";
 
 export const metadata: Metadata = {
   title: "Orders",
@@ -107,14 +108,20 @@ export default async function AdminOrdersPage({
           <ul className="mt-3 space-y-3">
             {shopifyPage.orders.map((shopifyOrder) => {
               const importedId = [...importedShopifyOrderIds].find(([sid]) => sid === shopifyOrder.id)?.[1];
+              const isPaid = shopifyOrder.displayFinancialStatus === "PAID";
               return (
                 <li key={shopifyOrder.id} className="rounded-card border border-border-subtle p-4 text-sm">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <span>
                       <span className="block font-medium">{shopifyOrder.name}</span>
-                      <span className="mt-1 block text-neutral-500">
-                        {shopifyOrder.customer?.displayName ?? "No customer"} · {formatDate(shopifyOrder.processedAt)} ·{" "}
-                        {shopifyOrder.displayFinancialStatus}
+                      <span className="mt-1 flex flex-wrap items-center gap-2 text-neutral-500">
+                        {shopifyOrder.customer?.displayName ?? "No customer"} · {formatDate(shopifyOrder.processedAt)}
+                        <StatusPill status={shopifyOrder.displayFinancialStatus} />
+                        {/* Not paid yet — surface the payment method so it's obvious *why* (e.g. Cash
+                            on Delivery still awaiting collection) rather than reading as a stuck/broken order. */}
+                        {!isPaid && shopifyOrder.paymentGatewayNames.length > 0 && (
+                          <span>via {shopifyOrder.paymentGatewayNames.join(", ")}</span>
+                        )}
                       </span>
                     </span>
                     <span className="text-right">

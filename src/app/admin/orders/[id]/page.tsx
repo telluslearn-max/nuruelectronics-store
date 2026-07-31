@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAdminSession } from "@/lib/admin-auth";
 import { formatPrice } from "@/lib/format";
 import { StatusPill } from "@/components/admin/status-pill";
+import { getShopifyOrderById } from "@/lib/shopify/admin-api";
 import { ConfirmSubmitButton } from "@/components/admin/confirm-submit-button";
 import { FeedbackBanner } from "@/components/admin/feedback-banner";
 import { SubmitButton } from "@/components/admin/submit-button";
@@ -70,6 +71,15 @@ export default async function AdminOrderHubPage({
       ? await prisma.employee.findMany({ where: { active: true }, orderBy: { name: "asc" } })
       : [];
 
+  // For Shopify-sourced orders, the internal Invoice's "paid" status is bookkeeping staff enter
+  // by hand and can drift from reality — the live Shopify order is the actual source of truth for
+  // whether real money has been received (e.g. a Cash on Delivery order stays financially Pending
+  // in Shopify until cash is collected on delivery, regardless of what's recorded here).
+  const liveShopifyOrder =
+    order.source === "shopify" && order.shopifyOrderId ? await getShopifyOrderById(order.shopifyOrderId) : null;
+  const paymentConfirmed =
+    order.source === "shopify" ? liveShopifyOrder?.displayFinancialStatus === "PAID" : order.invoice?.status === "paid";
+
   const formatMoney = (amount: string | number) => formatPrice(String(amount), order.currencyCode);
   const acceptedEstimateWithoutInvoice = order.estimates.find((e) => e.status === "accepted") && !order.invoice;
   const itemsSubtotal = order.items.reduce((sum, item) => sum + Number(item.lineTotal), 0);
@@ -94,6 +104,29 @@ export default async function AdminOrderHubPage({
           {order.customer.name ?? order.customer.email} · {order.customer.email} · {formatDate(order.createdAt)} ·{" "}
           {order.source}
         </p>
+        {liveShopifyOrder && (
+          <div
+            className={`mt-3 rounded-control border px-3 py-2 text-sm ${
+              paymentConfirmed
+                ? "border-green-200 bg-green-50 text-green-700"
+                : "border-amber-200 bg-amber-50 text-amber-800"
+            }`}
+          >
+            <span className="flex flex-wrap items-center gap-2">
+              <span className="font-medium">Shopify payment:</span>
+              <StatusPill status={liveShopifyOrder.displayFinancialStatus} />
+              {liveShopifyOrder.paymentGatewayNames.length > 0 && (
+                <span>via {liveShopifyOrder.paymentGatewayNames.join(", ")}</span>
+              )}
+            </span>
+            {!paymentConfirmed && (
+              <p className="mt-1">
+                Shopify hasn&apos;t recorded real payment for this order yet — don&apos;t treat it as sold or
+                hand over/ship the product until this is confirmed paid (or cash is collected, for COD).
+              </p>
+            )}
+          </div>
+        )}
         <ul className="mt-4 space-y-1 text-sm">
           {order.items.map((item) => (
             <li key={item.id} className="flex justify-between">
@@ -551,6 +584,12 @@ export default async function AdminOrderHubPage({
                     ))}
                   </select>
                 </div>
+                {!paymentConfirmed && (
+                  <label className="flex items-center gap-2 text-sm text-amber-800 sm:basis-full">
+                    <input type="checkbox" name="confirmPayment" required className="h-4 w-4" />
+                    I confirm payment has actually been received for this order
+                  </label>
+                )}
                 <SubmitButton className={`${secondaryButtonClass} w-full sm:w-auto`} pendingText="Marking…">
                   Mark delivered
                 </SubmitButton>
