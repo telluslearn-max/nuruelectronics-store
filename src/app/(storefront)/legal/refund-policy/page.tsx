@@ -25,7 +25,11 @@ export default function RefundPolicyPage() {
         <p>
           You may return a product within 7 days of delivery if it is unused, in its original
           packaging, and with all accessories included. Contact us before sending anything back so
-          we can confirm eligibility and arrange collection or drop-off.
+          we can confirm eligibility and arrange collection or drop-off. See our{" "}
+          <Link href="/returns" className="underline underline-offset-2">
+            Returns page
+          </Link>{" "}
+          for the step-by-step process.
         </p>
       </LegalSection>
 
