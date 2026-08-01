@@ -36,7 +36,12 @@ function BrandMark() {
   return (
     <svg width="30" height="30" viewBox="0 0 64 64" aria-hidden="true" className="shrink-0">
       <rect width="64" height="64" rx="14" fill={OG_THEME.background} />
-      <path d="M20 46V18h6l14 19V18h6v28h-6L26 27v19h-6z" fill={OG_THEME.foreground} />
+      <g transform="translate(7 12.1) scale(0.5102) translate(-1 -18)">
+        <path
+          d="M50 20 L57 28 L60 30 L99 58 Q80 62 62 56 L56 64 L58 96 L50 80 L42 96 L44 64 L38 56 Q20 62 1 58 L40 30 L43 28 Z"
+          fill={OG_THEME.foreground}
+        />
+      </g>
       <rect x="42" y="40" width="6" height="6" fill={OG_THEME.accent} />
     </svg>
   );

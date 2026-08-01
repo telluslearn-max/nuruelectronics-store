@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
+import { FalconIcon } from "@/components/falcon-icon";
 import { getNavEntries } from "@/lib/nav-entries";
 import { isRouteActive } from "@/lib/route-active";
 import { useWishlist } from "./wishlist/wishlist-context";
@@ -93,7 +94,8 @@ export function Nav({
     >
       <div className="mx-auto max-w-6xl px-4 py-4">
         <div className="flex items-center gap-2 sm:gap-4">
-          <Link href="/" className="shrink-0 text-lg font-semibold tracking-tight">
+          <Link href="/" className="flex shrink-0 items-center gap-1.5 text-lg font-semibold tracking-tight">
+            <FalconIcon className="h-6 w-6 shrink-0" />
             NURU
           </Link>
           <div className="hidden min-w-0 flex-1 md:block">

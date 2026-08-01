@@ -1,3 +1,4 @@
+import { FalconIcon } from "./falcon-icon";
 import { FooterLinks } from "./footer-links";
 
 /**
@@ -14,7 +15,10 @@ export function Footer() {
       <div className="mx-auto hidden w-full max-w-6xl px-4 py-12 md:block">
         <div className="grid grid-cols-1 gap-8 sm:grid-cols-3">
           <div>
-            <p className="text-lg font-semibold tracking-tight">NURU</p>
+            <p className="flex items-center gap-1.5 text-lg font-semibold tracking-tight">
+              <FalconIcon className="h-5 w-5 shrink-0" />
+              NURU
+            </p>
             <p className="mt-2 max-w-xs text-sm text-neutral-500">
               NURU is a Kenya-based electronics store offering genuine phones, laptops, audio,
               gaming, cameras, appliances, and more from the world&apos;s top brands. Every order

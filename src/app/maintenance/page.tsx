@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { FalconIcon } from "@/components/falcon-icon";
 import { WhatsAppIcon } from "@/components/whatsapp-order-button";
 import { buildWhatsAppUrl } from "@/lib/whatsapp";
 
@@ -13,7 +14,10 @@ export default function MaintenancePage() {
 
   return (
     <div className="flex min-h-full flex-1 flex-col items-center justify-center px-4 py-24 text-center">
-      <p className="text-lg font-semibold tracking-tight">NURU</p>
+      <p className="flex items-center gap-1.5 text-lg font-semibold tracking-tight">
+        <FalconIcon className="h-6 w-6 shrink-0" />
+        NURU
+      </p>
       <h1 className="mt-6 text-title sm:text-display">We&apos;ll be right back</h1>
       <p className="mt-4 max-w-md text-neutral-500">
         We&apos;re making some improvements and will be back online shortly. Thanks for your
