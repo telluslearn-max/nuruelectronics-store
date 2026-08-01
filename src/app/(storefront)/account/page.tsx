@@ -42,6 +42,9 @@ export default async function AccountPage({
         </div>
         <section className="mt-12 border-t border-border-subtle pt-8">
           <WishlistSection />
+          <Link href="/wishlist" className="mt-4 inline-block text-sm font-medium text-accent hover:opacity-80">
+            View full wishlist →
+          </Link>
         </section>
       </div>
     );
@@ -70,6 +73,9 @@ export default async function AccountPage({
         </div>
         <section className="mt-12 border-t border-border-subtle pt-8">
           <WishlistSection />
+          <Link href="/wishlist" className="mt-4 inline-block text-sm font-medium text-accent hover:opacity-80">
+            View full wishlist →
+          </Link>
         </section>
       </div>
     );
@@ -122,24 +128,29 @@ export default async function AccountPage({
         ) : (
           <ul className="mt-4 space-y-4">
             {customer.orders.map((order) => (
-              <li key={order.id} className="rounded-card border border-border-subtle p-5">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div>
-                    <p className="font-medium">{order.name}</p>
-                    <p className="text-sm text-neutral-500">{formatOrderDate(order.processedAt)}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-medium">
-                      {formatPrice(order.totalPrice.amount, order.totalPrice.currencyCode)}
-                    </p>
-                    <div className="mt-1">
-                      <StatusPill status={order.fulfillmentStatus.toLowerCase()} />
+              <li key={order.id}>
+                <Link
+                  href={`/account/orders/${encodeURIComponent(order.id)}`}
+                  className="block rounded-card border border-border-subtle p-5 transition hover:border-foreground"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <p className="font-medium">{order.name}</p>
+                      <p className="text-sm text-neutral-500">{formatOrderDate(order.processedAt)}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-medium">
+                        {formatPrice(order.totalPrice.amount, order.totalPrice.currencyCode)}
+                      </p>
+                      <div className="mt-1">
+                        <StatusPill status={order.fulfillmentStatus.toLowerCase()} />
+                      </div>
                     </div>
                   </div>
-                </div>
-                <p className="mt-3 text-sm text-neutral-600">
-                  {order.lineItems.map((li) => `${li.title} × ${li.quantity}`).join(", ")}
-                </p>
+                  <p className="mt-3 text-sm text-neutral-600">
+                    {order.lineItems.map((li) => `${li.title} × ${li.quantity}`).join(", ")}
+                  </p>
+                </Link>
               </li>
             ))}
           </ul>

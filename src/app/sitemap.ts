@@ -51,6 +51,36 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: "daily",
       priority: 0.6,
     },
+    {
+      url: `${SITE_URL}/trade-in`,
+      lastModified: CONTENT_REVISION_DATE,
+      changeFrequency: "monthly",
+      priority: 0.5,
+    },
+    {
+      url: `${SITE_URL}/gift-cards`,
+      lastModified: CONTENT_REVISION_DATE,
+      changeFrequency: "monthly",
+      priority: 0.5,
+    },
+    {
+      url: `${SITE_URL}/careers`,
+      lastModified: CONTENT_REVISION_DATE,
+      changeFrequency: "monthly",
+      priority: 0.5,
+    },
+    {
+      url: `${SITE_URL}/returns`,
+      lastModified: CONTENT_REVISION_DATE,
+      changeFrequency: "monthly",
+      priority: 0.5,
+    },
+    {
+      url: `${SITE_URL}/legal/cookie-policy`,
+      lastModified: CONTENT_REVISION_DATE,
+      changeFrequency: "monthly",
+      priority: 0.5,
+    },
     ...articles.map((article) => ({
       url: `${SITE_URL}/blog/${article.handle}`,
       lastModified: article.publishedAt,

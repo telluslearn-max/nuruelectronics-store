@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useTransition } from "react";
 import { removeItem, updateItemQuantity } from "@/lib/actions";
 import { trackEvent } from "@/lib/analytics/track-event";
@@ -170,6 +171,13 @@ export function CartDrawer() {
             >
               Checkout
             </a>
+            <Link
+              href="/cart"
+              onClick={closeCart}
+              className="mt-3 block text-center text-sm text-neutral-500 underline hover:text-foreground"
+            >
+              View full cart
+            </Link>
           </div>
         )}
       </div>
