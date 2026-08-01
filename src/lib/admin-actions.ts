@@ -555,13 +555,18 @@ export async function sendReceiptEmail(receiptId: string): Promise<void> {
   await requireAdminSession();
   const receipt = await prisma.receipt.findUniqueOrThrow({
     where: { id: receiptId },
-    include: { invoice: { include: { order: { include: { customer: true } } } } },
+    include: { invoice: { include: { order: { include: { customer: true, items: true } } } } },
   });
   if (!receipt.invoice.order.customer.email) {
     redirectWithError(`/admin/orders/${receipt.invoice.orderId}`, "Customer has no email on file.");
   }
 
-  const pdfBuffer = await renderReceiptPdf(receipt, receipt.invoice, receipt.invoice.order.customer);
+  const pdfBuffer = await renderReceiptPdf(
+    receipt,
+    receipt.invoice,
+    receipt.invoice.order.customer,
+    receipt.invoice.order.items,
+  );
   await sendReceiptEmailMessage(receipt, receipt.invoice.order.customer, pdfBuffer);
 
   revalidatePath(`/admin/orders/${receipt.invoice.orderId}`);

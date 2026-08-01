@@ -40,9 +40,14 @@ export async function renderInvoicePdf(
   return renderToBuffer(InvoiceDocument({ invoice, order, customer, items, letterhead }));
 }
 
-export async function renderReceiptPdf(receipt: Receipt, invoice: Invoice, customer: Customer): Promise<Buffer> {
+export async function renderReceiptPdf(
+  receipt: Receipt,
+  invoice: Invoice,
+  customer: Customer,
+  items: OrderItem[],
+): Promise<Buffer> {
   const letterhead = await getLetterhead();
-  return renderToBuffer(ReceiptDocument({ receipt, invoice, customer, letterhead }));
+  return renderToBuffer(ReceiptDocument({ receipt, invoice, customer, items, letterhead }));
 }
 
 export async function renderDeliveryNotePdf(note: DeliveryNote, order: Order, items: OrderItem[]): Promise<Buffer> {

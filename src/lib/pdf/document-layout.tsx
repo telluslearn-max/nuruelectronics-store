@@ -155,6 +155,24 @@ export function DocumentShell({
   );
 }
 
+/** Splits "NURU Electronics" into a bold tracked-caps "NURU" and a smaller tracked-caps
+ * "ELECTRONICS" line beneath it — used by documents (e.g. ReceiptDocument) that render their own
+ * bespoke header instead of DocumentShell's compact logo/wordmark row. */
+export function BrandWordmark({ companyName }: { companyName: string }) {
+  const [primary, ...rest] = companyName.split(" ");
+  const secondary = rest.join(" ");
+  return (
+    <View>
+      <Text style={{ fontSize: 20, fontFamily: "Helvetica-Bold", letterSpacing: 4 }}>{primary}</Text>
+      {secondary && (
+        <Text style={{ fontSize: 8, letterSpacing: 2, color: "#666666", marginTop: 3 }}>
+          {secondary.toUpperCase()}
+        </Text>
+      )}
+    </View>
+  );
+}
+
 export type Moneyish = string | number | { toString(): string };
 
 export function LineItemsTable({
