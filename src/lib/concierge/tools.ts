@@ -159,12 +159,20 @@ const getExUkSavingsDeclaration: FunctionDeclaration = {
 const explainBnplPlanDeclaration: FunctionDeclaration = {
   name: "explain_bnpl_plan",
   description:
-    "Look up the real Buy Now, Pay Later terms for a product by its handle — deposit, installment amount, and eligibility requirements. Never state BNPL numbers or eligibility without calling this first; BNPL is only live for some brands today.",
+    "Look up the real Buy Now, Pay Later terms for a product by its handle — deposit, installment amount, and eligibility requirements. Never state BNPL numbers or eligibility without calling this first. BNPL is live for Apple (weekly/monthly plans) and for Samsung/Google/OnePlus/Nothing (3-month/6-month plans, exact model+storage/RAM specific) — other brands are coming soon. If the result says needsVariantSelection, ask the shopper which storage/RAM they want and call again with variantId.",
   parametersJsonSchema: {
     type: "object",
     properties: {
       handle: { type: "string", description: "The product handle to check BNPL terms for." },
-      planId: { type: "string", enum: ["weekly", "monthly"], description: "Defaults to \"weekly\" if not specified." },
+      planId: {
+        type: "string",
+        enum: ["weekly", "monthly", "3-month", "6-month"],
+        description: "Defaults to the brand's standard plan if not specified (\"weekly\" for Apple, \"3-month\" for Android brands).",
+      },
+      variantId: {
+        type: "string",
+        description: "An exact variant id from a prior search/details tool result — required to price Android-brand products with more than one storage/RAM option.",
+      },
     },
     required: ["handle"],
   },
@@ -335,11 +343,12 @@ export async function dispatchTool(
 
     case "explain_bnpl_plan": {
       const handle = typeof args.handle === "string" ? args.handle : "";
-      const planId: BnplPlanId = args.planId === "monthly" ? "monthly" : "weekly";
+      const planId = typeof args.planId === "string" ? (args.planId as BnplPlanId) : undefined;
+      const variantId = typeof args.variantId === "string" ? args.variantId : undefined;
       if (!handle) {
         return { resultForModel: { error: "Missing handle." }, events: [] };
       }
-      const result = await explainBnplPlan(handle, planId);
+      const result = await explainBnplPlan(handle, planId, variantId);
       if ("applicationMessage" in result) {
         return {
           resultForModel: {
@@ -363,6 +372,16 @@ export async function dispatchTool(
         return {
           resultForModel: { eligible: false, comingSoonBrand: result.comingSoonBrand },
           events: [{ type: "whatsapp", message: result.waitlistMessage }],
+        };
+      }
+      if ("needsVariantSelection" in result) {
+        return {
+          resultForModel: {
+            eligible: false,
+            needsVariantSelection: true,
+            availableVariants: result.availableVariants,
+          },
+          events: [],
         };
       }
       return { resultForModel: result, events: [] };

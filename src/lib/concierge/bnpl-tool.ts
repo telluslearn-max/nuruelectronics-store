@@ -1,13 +1,13 @@
 import "server-only";
 import {
+  ANDROID_BNPL_PLANS,
+  APPLE_BNPL_PLANS,
   BNPL_ELIGIBILITY_REQUIREMENTS,
-  BNPL_PLANS,
   buildBnplApplicationMessage,
   buildBnplWaitlistMessage,
-  calculateBnplPlan,
   getBnplComingSoonBrand,
-  isBnplComingSoonProduct,
-  isBnplEligibleProduct,
+  getBnplTier,
+  resolveBnplPlan,
   type BnplPlanId,
 } from "@/lib/bnpl";
 import { getProductByHandle } from "@/lib/shopify";
@@ -30,23 +30,47 @@ export type BnplExplainerResult =
     }
   | { eligible: false; comingSoonBrand: string; waitlistMessage: string }
   | { eligible: false; comingSoonBrand: null }
+  | { eligible: false; needsVariantSelection: true; availableVariants: { id: string; title: string }[] }
   | { error: string };
 
 /** Backs the concierge's `explain_bnpl_plan` tool — reuses the same real math/message-building as the storefront BnplSection, never forks it. */
-export async function explainBnplPlan(handle: string, planId: BnplPlanId = "weekly"): Promise<BnplExplainerResult> {
+export async function explainBnplPlan(
+  handle: string,
+  planId?: BnplPlanId,
+  variantId?: string,
+): Promise<BnplExplainerResult> {
   const product = await getProductByHandle(handle);
   if (!product) return { error: "Product not found." };
 
-  if (!isBnplEligibleProduct(product.tags)) {
-    if (isBnplComingSoonProduct(product.tags)) {
-      const brand = getBnplComingSoonBrand(product.tags) ?? product.title;
-      return { eligible: false, comingSoonBrand: brand, waitlistMessage: buildBnplWaitlistMessage(product, brand) };
-    }
-    return { eligible: false, comingSoonBrand: null };
+  const tier = getBnplTier(product.tags);
+  if (tier === "coming-soon") {
+    const brand = getBnplComingSoonBrand(product.tags) ?? product.title;
+    return { eligible: false, comingSoonBrand: brand, waitlistMessage: buildBnplWaitlistMessage(product, brand) };
+  }
+  if (tier === "none") return { eligible: false, comingSoonBrand: null };
+
+  let variant = variantId ? product.variants.find((v) => v.id === variantId) : undefined;
+  if (!variant && product.variants.length === 1) variant = product.variants[0];
+
+  if (tier === "lookup" && !variant && product.variants.length > 1) {
+    return {
+      eligible: false,
+      needsVariantSelection: true,
+      availableVariants: product.variants.map((v) => ({ id: v.id, title: v.title })),
+    };
   }
 
-  const price = product.priceRange.minVariantPrice;
-  const plan = calculateBnplPlan(Number(price.amount), planId);
+  const resolvedPlanId: BnplPlanId = planId ?? (tier === "formula" ? "weekly" : "3-month");
+  const plan = resolveBnplPlan(product, variant, resolvedPlanId);
+  if (!plan) {
+    return {
+      eligible: false,
+      comingSoonBrand: product.title,
+      waitlistMessage: buildBnplWaitlistMessage(product, product.title),
+    };
+  }
+
+  const price = variant?.price ?? product.priceRange.minVariantPrice;
 
   return {
     eligible: true,
@@ -59,9 +83,12 @@ export async function explainBnplPlan(handle: string, planId: BnplPlanId = "week
     termUnit: plan.termUnit,
     totalPayable: plan.totalPayable.toFixed(2),
     currencyCode: price.currencyCode,
-    requirements: BNPL_ELIGIBILITY_REQUIREMENTS,
+    requirements: BNPL_ELIGIBILITY_REQUIREMENTS[plan.tier],
     applicationMessage: buildBnplApplicationMessage(product, price.currencyCode, plan),
   };
 }
 
-export const BNPL_PLAN_IDS = Object.keys(BNPL_PLANS) as BnplPlanId[];
+export const BNPL_PLAN_IDS = [
+  ...Object.keys(APPLE_BNPL_PLANS),
+  ...Object.keys(ANDROID_BNPL_PLANS),
+] as BnplPlanId[];
