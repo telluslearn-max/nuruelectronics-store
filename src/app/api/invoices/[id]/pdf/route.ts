@@ -7,7 +7,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 
   const invoice = await prisma.invoice.findUnique({
     where: { id },
-    include: { order: { include: { customer: true, items: true } } },
+    include: { order: { include: { customer: true, items: true } }, receipts: true },
   });
   if (!invoice) return new Response("Not found", { status: 404 });
 
@@ -15,7 +15,13 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     return new Response("Not found", { status: 404 });
   }
 
-  const pdfBuffer = await renderInvoicePdf(invoice, invoice.order, invoice.order.customer, invoice.order.items);
+  const pdfBuffer = await renderInvoicePdf(
+    invoice,
+    invoice.order,
+    invoice.order.customer,
+    invoice.order.items,
+    invoice.receipts,
+  );
   return new Response(new Uint8Array(pdfBuffer), {
     headers: {
       "Content-Type": "application/pdf",

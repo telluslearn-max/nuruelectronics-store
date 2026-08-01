@@ -24,9 +24,15 @@ async function runReminders() {
     try {
       const invoice = await prisma.invoice.findUniqueOrThrow({
         where: { id: candidate.id },
-        include: { order: { include: { customer: true, items: true } } },
+        include: { order: { include: { customer: true, items: true } }, receipts: true },
       });
-      const pdfBuffer = await renderInvoicePdf(invoice, invoice.order, invoice.order.customer, invoice.order.items);
+      const pdfBuffer = await renderInvoicePdf(
+        invoice,
+        invoice.order,
+        invoice.order.customer,
+        invoice.order.items,
+        invoice.receipts,
+      );
       await sendInvoiceReminderEmail(invoice, invoice.order.customer, pdfBuffer);
       await prisma.invoice.update({ where: { id: invoice.id }, data: { lastReminderSentAt: new Date() } });
       sent++;

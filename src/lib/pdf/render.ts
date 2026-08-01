@@ -35,9 +35,10 @@ export async function renderInvoicePdf(
   order: Order,
   customer: Customer,
   items: OrderItem[],
+  receipts: Receipt[],
 ): Promise<Buffer> {
   const letterhead = await getLetterhead();
-  return renderToBuffer(InvoiceDocument({ invoice, order, customer, items, letterhead }));
+  return renderToBuffer(InvoiceDocument({ invoice, order, customer, items, receipts, letterhead }));
 }
 
 export async function renderReceiptPdf(

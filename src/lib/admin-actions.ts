@@ -442,13 +442,19 @@ export async function deleteInvoice(invoiceId: string): Promise<void> {
 async function sendInvoiceEmailSilent(invoiceId: string): Promise<{ orderId: string }> {
   const invoice = await prisma.invoice.findUniqueOrThrow({
     where: { id: invoiceId },
-    include: { order: { include: { customer: true, items: true } } },
+    include: { order: { include: { customer: true, items: true } }, receipts: true },
   });
   if (!invoice.order.customer.email) {
     throw new ActionGuardError("Customer has no email on file.", `/admin/orders/${invoice.orderId}`);
   }
 
-  const pdfBuffer = await renderInvoicePdf(invoice, invoice.order, invoice.order.customer, invoice.order.items);
+  const pdfBuffer = await renderInvoicePdf(
+    invoice,
+    invoice.order,
+    invoice.order.customer,
+    invoice.order.items,
+    invoice.receipts,
+  );
   await sendInvoiceEmailMessage(invoice, invoice.order.customer, pdfBuffer);
 
   await prisma.invoice.update({

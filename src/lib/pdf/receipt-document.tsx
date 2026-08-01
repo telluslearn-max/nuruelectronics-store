@@ -1,6 +1,6 @@
-import { Document, Page, StyleSheet, Svg, Circle, Path, Text, View } from "@react-pdf/renderer";
+import { Document, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
 import { formatPrice } from "@/lib/format";
-import { BrandWordmark, type Moneyish } from "./document-layout";
+import { BrandWordmark, DocumentFooter, PhoneIcon, WarrantyTerms, type Moneyish } from "./document-layout";
 import type { Letterhead } from "./letterhead";
 import type { Customer, Invoice, OrderItem, Receipt } from "@prisma/client";
 
@@ -57,49 +57,7 @@ const s = StyleSheet.create({
   paymentMethodText: { fontSize: 11, fontFamily: "Helvetica-Bold", marginLeft: 8 },
   paymentStatus: { fontSize: 9, color: "#666666", marginTop: 4 },
   thankYou: { fontSize: 10, fontFamily: "Helvetica-Bold", marginTop: 20 },
-  footerRow: {
-    position: "absolute",
-    bottom: 30,
-    left: 40,
-    right: 40,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    borderTopWidth: 1,
-    borderTopColor: "#eeeeee",
-    paddingTop: 8,
-  },
-  footerText: { fontSize: 8, color: "#999999" },
 });
-
-/** A plain phone glyph — stands in for whichever method was actually used (cash/M-Pesa are both
- * collected/confirmed on a phone in this store's workflow), so one icon covers both without
- * needing per-method artwork. */
-function PhoneIcon() {
-  return (
-    <Svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#1a1a1a" strokeWidth={2}>
-      <Path d="M7 2h10a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1Z" />
-      <Path d="M11 18h2" />
-    </Svg>
-  );
-}
-
-/** Decorative monochrome social glyphs — generic circle-with-initial marks rather than exact
- * brand icons, so this doesn't depend on the store's real social handles/links. */
-function SocialGlyphs() {
-  const marks = ["IG", "FB", "X"];
-  return (
-    <View style={{ flexDirection: "row" }}>
-      {marks.map((mark) => (
-        <View key={mark} style={{ marginLeft: 8 }}>
-          <Svg width={14} height={14} viewBox="0 0 24 24">
-            <Circle cx={12} cy={12} r={11} fill="none" stroke="#1a1a1a" strokeWidth={1.5} />
-          </Svg>
-        </View>
-      ))}
-    </View>
-  );
-}
 
 export function ReceiptDocument({
   receipt,
@@ -186,10 +144,9 @@ export function ReceiptDocument({
 
         <Text style={s.thankYou}>Thank you for choosing {companyName}.</Text>
 
-        <View style={s.footerRow}>
-          <Text style={s.footerText}>nuruelectronics.com</Text>
-          <SocialGlyphs />
-        </View>
+        <WarrantyTerms />
+
+        <DocumentFooter />
       </Page>
     </Document>
   );

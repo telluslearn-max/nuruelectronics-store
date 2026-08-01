@@ -1,7 +1,13 @@
 import "server-only";
 import { getSettings } from "../settings";
 
-export type Letterhead = { companyName: string; logoDataUri?: string };
+export type Letterhead = {
+  companyName: string;
+  logoDataUri?: string;
+  companyEmail?: string | null;
+  companyPhone?: string | null;
+  companyAddress?: string | null;
+};
 
 const PRIVATE_HOSTNAME_PATTERNS = [
   /^localhost$/i,
@@ -60,5 +66,11 @@ async function fetchLogoAsDataUri(url: string): Promise<string | undefined> {
 export async function getLetterhead(): Promise<Letterhead> {
   const settings = await getSettings();
   const logoDataUri = settings.logoUrl ? await fetchLogoAsDataUri(settings.logoUrl) : undefined;
-  return { companyName: settings.companyName, logoDataUri };
+  return {
+    companyName: settings.companyName,
+    logoDataUri,
+    companyEmail: settings.companyEmail,
+    companyPhone: settings.companyPhone,
+    companyAddress: settings.companyAddress,
+  };
 }
