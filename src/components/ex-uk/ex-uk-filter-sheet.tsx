@@ -4,11 +4,13 @@ import { useEffect, useRef } from "react";
 import { useFocusTrap } from "@/components/use-focus-trap";
 import type { Category } from "@/lib/categories";
 
+// Compared directly against the product's KES price elsewhere — see the matching note in
+// components/product-list.tsx, which had the same USD-labeled tiers.
 const PRICE_PRESETS = [
   { label: "Any price", value: null },
-  { label: "Under $300", value: 300 },
-  { label: "Under $600", value: 600 },
-  { label: "Under $1000", value: 1000 },
+  { label: "Under KES 10,000", value: 10000 },
+  { label: "Under KES 50,000", value: 50000 },
+  { label: "Under KES 100,000", value: 100000 },
 ];
 
 export function ExUkFilterSheet({

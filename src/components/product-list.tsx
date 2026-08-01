@@ -5,11 +5,14 @@ import { loadMoreProducts } from "@/lib/actions";
 import type { Product } from "@/lib/shopify/types";
 import { ProductGrid } from "./product-grid";
 
+// Amounts are compared directly against priceRange.minVariantPrice, which is in the store's own
+// currency (KES) — these must be real KES tiers, not USD-labeled numbers that would filter out
+// almost every product in a KES-priced catalog (a phone priced at KES 20,000+ would fail "Under 300").
 const PRICE_PRESETS: { label: string; value: number | null }[] = [
   { label: "Any price", value: null },
-  { label: "Under $300", value: 300 },
-  { label: "Under $600", value: 600 },
-  { label: "Under $1000", value: 1000 },
+  { label: "Under KES 10,000", value: 10000 },
+  { label: "Under KES 50,000", value: 50000 },
+  { label: "Under KES 100,000", value: 100000 },
 ];
 
 function toggleInSet<T>(set: Set<T>, value: T): Set<T> {
