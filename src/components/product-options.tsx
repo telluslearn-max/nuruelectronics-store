@@ -308,6 +308,10 @@ export function ProductOptions({ product }: { product: Product }) {
             {buyNowError}
           </p>
         )}
+        <p className="text-xs text-neutral-400">
+          Card &amp; M-Pesa payments are confirmed instantly. Cash on Delivery orders are confirmed once payment is
+          collected on delivery.
+        </p>
         <WhatsAppOrderButton
           productTitle={product.title}
           variantLabel={variantLabel(selectedVariant)}
