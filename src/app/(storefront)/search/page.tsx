@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { CategoryTiles } from "@/components/category-tiles";
 import { ProductList } from "@/components/product-list";
 import { isSemanticSearchReady, searchProductsSemantic } from "@/lib/search/semantic-search";
-import { getProducts } from "@/lib/shopify";
+import { getProducts, sanitizeFreeTextSearchTerm } from "@/lib/shopify";
 
 type SearchPageProps = {
   searchParams: Promise<{ q?: string }>;
@@ -28,12 +28,15 @@ async function findMatchingProducts(query: string) {
     const ranked = await searchProductsSemantic(query, products);
     return { products: ranked, hasNextPage: false, endCursor: null, isSemantic: true };
   }
-  const page = await getProducts({ searchTerm: query });
+  const page = await getProducts({ searchTerm: sanitizeFreeTextSearchTerm(query) });
   return { ...page, isSemantic: false };
 }
 
 export default async function SearchPage({ searchParams }: SearchPageProps) {
   const { q } = await searchParams;
+  // Kept raw for display (React escapes it — no injection risk there); findMatchingProducts and
+  // the searchTerm handed to ProductList (which feeds "load more" pagination) both sanitize it
+  // before it ever becomes part of a Shopify search query.
   const query = q?.trim() ?? "";
   const { products, hasNextPage, endCursor, isSemantic } = query
     ? await findMatchingProducts(query)
@@ -64,7 +67,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
             initialProducts={products}
             initialHasNextPage={hasNextPage}
             initialEndCursor={endCursor}
-            searchTerm={query}
+            searchTerm={sanitizeFreeTextSearchTerm(query)}
           />
         </>
       )}

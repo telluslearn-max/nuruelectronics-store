@@ -52,6 +52,26 @@ export function matchesSearchTerm(product: Product, searchTerm: string): boolean
   });
 }
 
+/**
+ * `getProducts` ANDs its own structured clauses (e.g. `-tag:ex-uk`, `-tag:coming-soon`) onto
+ * whatever `searchTerm` it's given, by wrapping it in parens and joining with " AND " — a pattern
+ * this codebase's own facet builders rely on intentionally (category/ecosystem/kit pages pass
+ * `product_type:"X" AND tag:y` on purpose). But `searchTerm` also carries genuine shopper-typed
+ * free text (the /search box, search suggestions, the AI concierge), and Shopify's search syntax
+ * treats parens, colons, and the AND/OR keywords as query-structuring — so unsanitized free text
+ * can restructure the query and slip past the exclusions this app ANDs on (e.g. `") OR (tag:ex-uk"`
+ * breaks out of the wrapping parens). Run any *shopper-typed* string through this before it
+ * becomes a `searchTerm` — never call it on this app's own structured facet queries, which need
+ * that syntax to work.
+ */
+export function sanitizeFreeTextSearchTerm(raw: string): string {
+  return raw
+    .replace(/[():"*]/g, " ")
+    .replace(/\bAND\b|\bOR\b|\bNOT\b/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 const domain = process.env.SHOPIFY_STORE_DOMAIN;
 const token = process.env.SHOPIFY_STOREFRONT_ACCESS_TOKEN;
 const apiVersion = "2024-10";

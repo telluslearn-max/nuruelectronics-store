@@ -8,6 +8,7 @@ import {
   getProductByHandle,
   getProducts,
   removeFromCart as removeFromCartInShopify,
+  sanitizeFreeTextSearchTerm,
   updateCartAttributes as updateCartAttributesInShopify,
   updateCartLine as updateCartLineInShopify,
 } from "./shopify";
@@ -113,7 +114,7 @@ export type SearchSuggestion = {
 export async function searchSuggestions(term: string): Promise<SearchSuggestion[]> {
   const trimmed = term.trim();
   if (trimmed.length < 2) return [];
-  const { products } = await getProducts({ searchTerm: trimmed, first: 5 });
+  const { products } = await getProducts({ searchTerm: sanitizeFreeTextSearchTerm(trimmed), first: 5 });
   return products.map((p) => ({
     handle: p.handle,
     title: p.title,

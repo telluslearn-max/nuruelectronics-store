@@ -16,7 +16,10 @@ function buildFreeTextQuery(text: string): string {
   const words = text
     .trim()
     .split(/\s+/)
-    .map((w) => w.replace(/["*]/g, ""))
+    // Strip characters Shopify's search syntax treats as structural (grouping/field-scoping),
+    // so a crafted word can't break out of the `(title:*w* OR ...)` wrapper below and
+    // restructure the query — e.g. to bypass the ex-uk/coming-soon exclusions getProducts ANDs on.
+    .map((w) => w.replace(/["*():]/g, ""))
     .filter(Boolean);
   if (words.length === 0) return "";
   return words.map((w) => `(title:*${w}* OR vendor:*${w}* OR tag:*${w}*)`).join(" AND ");
