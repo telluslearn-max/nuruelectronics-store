@@ -191,10 +191,6 @@ export function CartDrawer() {
             >
               Checkout
             </a>
-            <p className="mt-2 text-center text-xs text-neutral-400">
-              Card &amp; M-Pesa payments are confirmed instantly. Cash on Delivery orders are confirmed once payment
-              is collected on delivery.
-            </p>
           </div>
         )}
       </div>

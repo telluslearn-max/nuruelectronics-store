@@ -11,6 +11,10 @@ export const metadata: Metadata = {
     template: "%s · Admin",
   },
   robots: { index: false, follow: false },
+  // Scoped here (not app/manifest.ts, which — despite being admin-branded — is a Next.js
+  // root-level special file and would link into every page's <head>, including the storefront,
+  // offering ordinary customers an "Install Nuru Admin" prompt).
+  manifest: "/admin-manifest.webmanifest",
 };
 
 const NAV_LINKS = [
