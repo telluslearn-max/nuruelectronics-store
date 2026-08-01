@@ -28,7 +28,6 @@ export function ExUkDiscoverScreen({
   const searchParams = useSearchParams();
   const highlightHandle = searchParams.get("highlight");
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
-  const [maxPrice, setMaxPrice] = useState<number | null>(null);
   const [filterOpen, setFilterOpen] = useState(false);
 
   const availableCategories = useMemo(() => {
@@ -43,7 +42,6 @@ export function ExUkDiscoverScreen({
   const filteredProducts = useMemo(() => {
     let list = products.filter((product) => {
       if (activeCategory && categoryForProductType(product.productType)?.slug !== activeCategory) return false;
-      if (maxPrice && Number(product.priceRange.minVariantPrice.amount) > maxPrice) return false;
       return true;
     });
 
@@ -56,13 +54,12 @@ export function ExUkDiscoverScreen({
     }
 
     return list;
-  }, [products, activeCategory, maxPrice, highlightHandle]);
+  }, [products, activeCategory, highlightHandle]);
 
-  const isFiltered = activeCategory !== null || maxPrice !== null;
+  const isFiltered = activeCategory !== null;
 
   function clearFilters() {
     setActiveCategory(null);
-    setMaxPrice(null);
   }
 
   return (
@@ -98,10 +95,8 @@ export function ExUkDiscoverScreen({
         <ExUkFilterSheet
           categories={availableCategories}
           activeCategory={activeCategory}
-          maxPrice={maxPrice}
           resultCount={filteredProducts.length}
           onChangeCategory={setActiveCategory}
-          onChangeMaxPrice={setMaxPrice}
           onClose={() => setFilterOpen(false)}
         />
       )}
