@@ -33,9 +33,9 @@ export default function BnplTermsPage() {
           relevant partner, and make the product available for your assessment. It is currently
           available on Apple-brand products and on Samsung, Google, OnePlus, and Nothing Phone
           products; other brands (Infinix, Oppo, Tecno, Vivo, Xiaomi) are &quot;coming soon&quot;
-          and not yet live. Even on a live brand, BNPL may not be offered on every model or every
-          storage/RAM configuration — the site will tell you if a specific option isn&apos;t
-          currently available.
+          and not yet live. Even on a live brand, BNPL is only offered on the specific models and
+          storage/RAM configurations our partner has priced — not every model or configuration is
+          included, and the option simply won&apos;t appear on the site for one that isn&apos;t.
         </p>
       </LegalSection>
 

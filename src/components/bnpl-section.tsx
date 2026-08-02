@@ -57,9 +57,9 @@ export function BnplSection({
 
   const plan = resolveBnplPlan(product, variant, planId);
   if (!plan) {
-    return (
-      <WaitlistPanel product={product} brand={product.title} note="Not currently available for this model." />
-    );
+    // Lookup-tier brand, but this exact model/storage/RAM has no rate-card row — show nothing,
+    // rather than a waitlist panel implying BNPL is coming for it.
+    return null;
   }
 
   const fmt = (amount: number) => formatPrice(String(amount), price.currencyCode);

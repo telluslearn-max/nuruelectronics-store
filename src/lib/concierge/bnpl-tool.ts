@@ -63,11 +63,9 @@ export async function explainBnplPlan(
   const resolvedPlanId: BnplPlanId = planId ?? (tier === "formula" ? "weekly" : "3-month");
   const plan = resolveBnplPlan(product, variant, resolvedPlanId);
   if (!plan) {
-    return {
-      eligible: false,
-      comingSoonBrand: product.title,
-      waitlistMessage: buildBnplWaitlistMessage(product, product.title),
-    };
+    // Lookup-tier brand, but this exact model/storage/RAM has no rate-card row — flatly not
+    // eligible, not a waitlist (BNPL isn't "coming" for it, it's simply not covered).
+    return { eligible: false, comingSoonBrand: null };
   }
 
   const price = variant?.price ?? product.priceRange.minVariantPrice;
