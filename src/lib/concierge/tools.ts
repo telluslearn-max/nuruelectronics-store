@@ -5,7 +5,7 @@ import { getCart, markCartConciergeAssisted } from "@/lib/actions";
 import { logAdminAction } from "@/lib/audit-log";
 import type { BnplPlanId } from "@/lib/bnpl";
 import type { Cart, Product } from "@/lib/shopify/types";
-import { explainBnplPlan } from "./bnpl-tool";
+import { BNPL_PLAN_IDS, explainBnplPlan } from "./bnpl-tool";
 import { addToCartTool, removeCartItem, updateCartItemQuantity } from "./cart-tools";
 import { compareProducts, getProductDetails, listKitsOrEcosystems, searchProducts } from "./catalog-tools";
 import { getExUkSavings } from "./ex-uk-tool";
@@ -168,7 +168,7 @@ const explainBnplPlanDeclaration: FunctionDeclaration = {
       handle: { type: "string", description: "The product handle to check BNPL terms for." },
       planId: {
         type: "string",
-        enum: ["weekly", "monthly", "3-month", "6-month"],
+        enum: BNPL_PLAN_IDS,
         description: "Defaults to the brand's standard plan if not specified (\"weekly\" for Apple, \"3-month\" for Android brands).",
       },
       variantId: {
