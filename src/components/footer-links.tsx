@@ -16,6 +16,16 @@ export function FooterLinks() {
               </Link>
             </li>
           ))}
+          <li>
+            <Link href="/trade-in" className="hover:text-foreground">
+              Trade-In
+            </Link>
+          </li>
+          <li>
+            <Link href="/gift-cards" className="hover:text-foreground">
+              Gift Cards
+            </Link>
+          </li>
         </ul>
       </div>
       <div>
@@ -48,6 +58,26 @@ export function FooterLinks() {
               Blog
             </Link>
           </li>
+          <li>
+            <Link href="/wishlist" className="hover:text-foreground">
+              Wishlist
+            </Link>
+          </li>
+          <li>
+            <Link href="/cart" className="hover:text-foreground">
+              Cart
+            </Link>
+          </li>
+          <li>
+            <Link href="/returns" className="hover:text-foreground">
+              Returns
+            </Link>
+          </li>
+          <li>
+            <Link href="/careers" className="hover:text-foreground">
+              Careers
+            </Link>
+          </li>
         </ul>
       </div>
       <div>
@@ -71,6 +101,11 @@ export function FooterLinks() {
           <li>
             <Link href="/legal/bnpl-terms" className="hover:text-foreground">
               BNPL Credit Terms
+            </Link>
+          </li>
+          <li>
+            <Link href="/legal/cookie-policy" className="hover:text-foreground">
+              Cookie Policy
             </Link>
           </li>
         </ul>

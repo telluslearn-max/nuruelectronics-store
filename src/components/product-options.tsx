@@ -184,7 +184,7 @@ export function ProductOptions({ product }: { product: Product }) {
         {isDigitalProduct(product.productType) ? <DigitalDeliveryCard /> : <ProductDeliveryCard />}
       </div>
       {region && <GiftCardRegionNotice region={region} />}
-      <BnplSection product={product} price={price} />
+      <BnplSection product={product} variant={selectedVariant} price={price} />
       <TradeInSection
         productType={product.productType}
         productTitle={product.title}

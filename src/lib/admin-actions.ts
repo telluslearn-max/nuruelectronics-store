@@ -7,7 +7,7 @@ import { requireAdminSession } from "./admin-auth";
 import { generateAccessToken, mintDocumentNumber } from "./documents";
 import { ACCOUNTS, cashAccountForMethod, postJournalEntry } from "./ledger";
 import { decrementVariantInventory, getShopifyOrderById } from "./shopify/admin-api";
-import { sendDeliveryNoteEmail as sendDeliveryNoteEmailMessage, sendEstimateEmail as sendEstimateEmailMessage, sendInvoiceEmail as sendInvoiceEmailMessage, sendReceiptEmail as sendReceiptEmailMessage } from "./email";
+import { isEmailConfigured, sendDeliveryNoteEmail as sendDeliveryNoteEmailMessage, sendEstimateEmail as sendEstimateEmailMessage, sendInvoiceEmail as sendInvoiceEmailMessage, sendReceiptEmail as sendReceiptEmailMessage } from "./email";
 import { renderDeliveryNotePdf, renderEstimatePdf, renderInvoicePdf, renderReceiptPdf } from "./pdf/render";
 import { ActionGuardError, redirectWithError, redirectWithSuccess } from "./admin-feedback";
 import { logAdminAction } from "./audit-log";
@@ -238,6 +238,12 @@ async function sendEstimateEmailSilent(estimateId: string): Promise<{ orderId: s
     where: { id: estimateId },
     include: { order: { include: { customer: true, items: true } } },
   });
+  if (!isEmailConfigured) {
+    throw new ActionGuardError(
+      "Email isn't configured — set RESEND_API_KEY and DOCUMENT_EMAIL_FROM.",
+      `/admin/orders/${estimate.orderId}`,
+    );
+  }
   if (!estimate.order.customer.email) {
     throw new ActionGuardError("Customer has no email on file.", `/admin/orders/${estimate.orderId}`);
   }
@@ -444,6 +450,12 @@ async function sendInvoiceEmailSilent(invoiceId: string): Promise<{ orderId: str
     where: { id: invoiceId },
     include: { order: { include: { customer: true, items: true } }, receipts: true },
   });
+  if (!isEmailConfigured) {
+    throw new ActionGuardError(
+      "Email isn't configured — set RESEND_API_KEY and DOCUMENT_EMAIL_FROM.",
+      `/admin/orders/${invoice.orderId}`,
+    );
+  }
   if (!invoice.order.customer.email) {
     throw new ActionGuardError("Customer has no email on file.", `/admin/orders/${invoice.orderId}`);
   }
@@ -563,6 +575,12 @@ export async function sendReceiptEmail(receiptId: string): Promise<void> {
     where: { id: receiptId },
     include: { invoice: { include: { order: { include: { customer: true, items: true } } } } },
   });
+  if (!isEmailConfigured) {
+    redirectWithError(
+      `/admin/orders/${receipt.invoice.orderId}`,
+      "Email isn't configured — set RESEND_API_KEY and DOCUMENT_EMAIL_FROM.",
+    );
+  }
   if (!receipt.invoice.order.customer.email) {
     redirectWithError(`/admin/orders/${receipt.invoice.orderId}`, "Customer has no email on file.");
   }
@@ -755,6 +773,12 @@ async function sendDeliveryNoteEmailSilent(deliveryNoteId: string): Promise<{ or
     where: { id: deliveryNoteId },
     include: { order: { include: { customer: true, items: true } } },
   });
+  if (!isEmailConfigured) {
+    throw new ActionGuardError(
+      "Email isn't configured — set RESEND_API_KEY and DOCUMENT_EMAIL_FROM.",
+      `/admin/orders/${note.orderId}`,
+    );
+  }
   if (!note.order.customer.email) {
     throw new ActionGuardError("Customer has no email on file.", `/admin/orders/${note.orderId}`);
   }

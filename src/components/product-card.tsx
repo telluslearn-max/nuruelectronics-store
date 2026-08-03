@@ -5,7 +5,7 @@ import { CompareToggleButton } from "@/components/compare/compare-toggle-button"
 import { gradeForProduct } from "@/components/ex-uk/condition-grade";
 import { ProductBadges } from "@/components/product-badges";
 import { WishlistToggleButton } from "@/components/wishlist/wishlist-toggle-button";
-import { calculateBnplPlan, isBnplEligibleProduct } from "@/lib/bnpl";
+import { calculateFormulaBnplPlan, getBnplTier } from "@/lib/bnpl";
 import { getProductBadges } from "@/lib/badges";
 import { formatPrice } from "@/lib/format";
 import { getSavings } from "@/lib/pricing";
@@ -18,9 +18,10 @@ export function ProductCard({ product, quickAdd = false }: { product: Product; q
   const compareAtPrice = product.compareAtPriceRange?.minVariantPrice;
   const savings = getSavings(price, compareAtPrice);
   const grade = gradeForProduct(product.tags);
-  const bnplPlan = isBnplEligibleProduct(product.tags)
-    ? calculateBnplPlan(Number(price.amount), "weekly")
-    : null;
+  // Only the formula tier (Apple) gets a numeric teaser here — no variant is selected on a card,
+  // so the lookup tier (Android) has no single correct figure to show without one.
+  const bnplPlan =
+    getBnplTier(product.tags) === "formula" ? calculateFormulaBnplPlan(Number(price.amount), "weekly") : null;
   const colorOption = product.options.find((o) => o.name === "Color");
 
   return (
@@ -66,7 +67,8 @@ export function ProductCard({ product, quickAdd = false }: { product: Product; q
         </div>
         {bnplPlan && (
           <p className="text-[11px] text-neutral-400">
-            from {formatPrice(String(bnplPlan.installment), price.currencyCode)}/wk
+            from {formatPrice(String(bnplPlan.installment), price.currencyCode)}/
+            {bnplPlan.termUnit === "week" ? "wk" : "mo"}
           </p>
         )}
         {quickAdd && <QuickAddToCartButton product={product} className="mt-2" />}

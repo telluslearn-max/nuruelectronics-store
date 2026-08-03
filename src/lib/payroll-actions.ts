@@ -6,7 +6,7 @@ import { requireAdminSession } from "./admin-auth";
 import { mintDocumentNumber } from "./documents";
 import { ACCOUNTS, cashAccountForMethod, postJournalEntry } from "./ledger";
 import { renderPayslipPdf } from "./pdf/render";
-import { sendPayslipEmail as sendPayslipEmailMessage } from "./email";
+import { isEmailConfigured, sendPayslipEmail as sendPayslipEmailMessage } from "./email";
 import { redirectWithError, redirectWithSuccess } from "./admin-feedback";
 import { logAdminAction } from "./audit-log";
 import { PAYMENT_METHODS, parseEnumField } from "./parse-enum";
@@ -136,6 +136,12 @@ export async function sendPayslipEmail(payslipId: string): Promise<void> {
     where: { id: payslipId },
     include: { employee: true, deductions: true, payRun: true },
   });
+  if (!isEmailConfigured) {
+    redirectWithError(
+      `/admin/payroll/runs/${payslip.payRunId}`,
+      "Email isn't configured — set RESEND_API_KEY and DOCUMENT_EMAIL_FROM.",
+    );
+  }
   if (!payslip.employee.email) {
     redirectWithError(`/admin/payroll/runs/${payslip.payRunId}`, "Employee has no email on file.");
   }
