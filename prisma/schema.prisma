@@ -507,3 +507,45 @@ model AdminAuditLog {
   @@index([createdAt])
   @@index([entityType, entityId])
 }
+
+// ---------------------------------------------------------------------------
+// Return/refund cases — decided by the AI concierge under a fixed policy
+// (see src/lib/support/return-policy.ts, mirrors /legal/refund-policy), or
+// escalated to staff. `decidedBy` is "agent" unless a human later overrides
+// an escalated case from /admin/support.
+// ---------------------------------------------------------------------------
+
+enum ReturnCaseReason {
+  change_of_mind
+  damaged
+  wrong_item
+  missing_item
+  warranty
+}
+
+enum ReturnCaseStatus {
+  approved
+  denied
+  escalated
+  refunded
+}
+
+model ReturnCase {
+  id               String           @id @default(cuid())
+  shopifyOrderId   String
+  shopifyOrderName String
+  customerEmail    String
+  reason           ReturnCaseReason
+  description      String
+  status           ReturnCaseStatus
+  decisionBasis    String
+  decidedBy        String           @default("agent")
+  refundAmount     Decimal?         @db.Decimal(10, 2)
+  refundChannel    String?
+  journalEntryId   String?
+  createdAt        DateTime         @default(now())
+  resolvedAt       DateTime?
+
+  @@index([shopifyOrderId])
+  @@index([status, createdAt])
+}

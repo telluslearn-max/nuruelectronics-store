@@ -32,13 +32,14 @@ export default async function AdminDashboardPage() {
   const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
   const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
 
-  const [pnl, prevPnl, outstanding, overdue, accountBalances, pettyCashBalance] = await Promise.all([
+  const [pnl, prevPnl, outstanding, overdue, accountBalances, pettyCashBalance, aiDecisionsThisMonth] = await Promise.all([
     computePnl({ from: monthStart, to: monthEnd, granularity: "monthly" }),
     computePnl({ from: prevMonthStart, to: monthStart, granularity: "monthly" }),
     getOutstandingInvoices(),
     getOverdueInvoices(),
     getAccountBalances(),
     getPettyCashBalance(),
+    prisma.returnCase.count({ where: { decidedBy: "agent", createdAt: { gte: monthStart, lt: monthEnd } } }),
   ]);
 
   const revenueThisMonth = pnl.buckets.reduce((sum, bucket) => sum + (pnl.totalRevenue[bucket] ?? 0), 0);
@@ -90,6 +91,12 @@ export default async function AdminDashboardPage() {
       href: "/admin/reports/trial-balance",
     },
     { label: "Petty cash balance", value: formatPrice(pettyCashBalance.toFixed(2), "KES"), href: "/admin/petty-cash" },
+    {
+      label: "AI-decided support cases",
+      value: String(aiDecisionsThisMonth),
+      sub: "This month, no staff involved",
+      href: "/admin/support",
+    },
   ];
 
   return (

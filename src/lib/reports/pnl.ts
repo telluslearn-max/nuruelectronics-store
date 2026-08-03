@@ -11,6 +11,7 @@ export type PnlResult = {
   granularity: PnlGranularity;
   buckets: string[];
   revenue: BucketRecord;
+  refunds: BucketRecord;
   cogsPersonnel: BucketRecord;
   cogsSoftware: BucketRecord;
   cogsOther: BucketRecord;
@@ -73,6 +74,7 @@ export async function computePnl({
 }): Promise<PnlResult> {
   const buckets = enumerateBuckets(from, to, granularity);
   const revenue: BucketRecord = {};
+  const refunds: BucketRecord = {};
   const cogsPersonnel: BucketRecord = {};
   const cogsSoftware: BucketRecord = {};
   const cogsOther: BucketRecord = {};
@@ -98,6 +100,16 @@ export async function computePnl({
     }
   }
 
+  // Refunds reduce revenue in the bucket they were actually paid out, cash-basis-consistent with
+  // Receipts above — the AI concierge's authorization moment (ReturnCase.createdAt) is a commitment,
+  // not a cash event, so it doesn't touch this report; only the payout (resolvedAt) does.
+  const refundedCases = await prisma.returnCase.findMany({
+    where: { status: "refunded", resolvedAt: { gte: from, lt: to } },
+  });
+  for (const returnCase of refundedCases) {
+    addTo(refunds, bucketKey(returnCase.resolvedAt!, granularity), Number(returnCase.refundAmount ?? 0));
+  }
+
   const expenses = await prisma.expense.findMany({ where: { date: { gte: from, lt: to } } });
   for (const expense of expenses) {
     const key = bucketKey(expense.date, granularity);
@@ -121,7 +133,7 @@ export async function computePnl({
   const totalExpenses: BucketRecord = {};
   const profit: BucketRecord = {};
   for (const bucket of buckets) {
-    totalRevenue[bucket] = revenue[bucket] ?? 0;
+    totalRevenue[bucket] = (revenue[bucket] ?? 0) - (refunds[bucket] ?? 0);
     totalExpenses[bucket] =
       (cogsPersonnel[bucket] ?? 0) +
       (cogsSoftware[bucket] ?? 0) +
@@ -137,6 +149,7 @@ export async function computePnl({
     granularity,
     buckets,
     revenue,
+    refunds,
     cogsPersonnel,
     cogsSoftware,
     cogsOther,
@@ -154,6 +167,7 @@ export async function computePnl({
 export function pnlToCsv(pnl: PnlResult): string {
   const metricRows: [string, BucketRecord][] = [
     ["Independent Sales", pnl.revenue],
+    ["Refunds (AI-authorized)", pnl.refunds],
     ["TOTAL REVENUE", pnl.totalRevenue],
     ["COGS: Personnel", pnl.cogsPersonnel],
     ["COGS: Software Subscriptions", pnl.cogsSoftware],

@@ -1,5 +1,6 @@
 import "server-only";
 import type { FunctionDeclaration } from "@google/genai";
+import type { ReturnCaseReason } from "@prisma/client";
 import { getCart, markCartConciergeAssisted } from "@/lib/actions";
 import { logAdminAction } from "@/lib/audit-log";
 import type { BnplPlanId } from "@/lib/bnpl";
@@ -8,6 +9,7 @@ import { explainBnplPlan } from "./bnpl-tool";
 import { addToCartTool, removeCartItem, updateCartItemQuantity } from "./cart-tools";
 import { compareProducts, getProductDetails, listKitsOrEcosystems, searchProducts } from "./catalog-tools";
 import { getExUkSavings } from "./ex-uk-tool";
+import { checkOrderStatus, fileReturnOrRefund } from "./support-tool";
 import type { ConciergeEvent } from "./types";
 import { buildWhatsAppHandoffMessage, isWhatsAppHandoffConfigured } from "./whatsapp-tool";
 
@@ -178,6 +180,45 @@ const explainBnplPlanDeclaration: FunctionDeclaration = {
   },
 };
 
+const checkOrderStatusDeclaration: FunctionDeclaration = {
+  name: "check_order_status",
+  description:
+    "Look up a real order's status (payment, fulfillment, items, total) by its order number and the email it was placed with. Never state an order's status without calling this first.",
+  parametersJsonSchema: {
+    type: "object",
+    properties: {
+      orderNumber: { type: "string", description: "The order number the shopper gives you, e.g. \"#1023\" or \"1023\"." },
+      email: { type: "string", description: "The email address the order was placed with, to verify identity." },
+    },
+    required: ["orderNumber", "email"],
+  },
+};
+
+const requestReturnOrRefundDeclaration: FunctionDeclaration = {
+  name: "request_return_or_refund",
+  description:
+    "Decide a return, refund, or warranty claim yourself, right now, against store policy — don't just hand this off. Verifies the order/email, applies the published return window (7 days change-of-mind, 48 hours for damaged/wrong/missing items, 1 year for warranty), and either approves it (refund gets accrued immediately), denies it, or escalates it to staff when policy doesn't clearly cover it. Always tell the shopper the concrete outcome and the reasoning, not just that you'll \"look into it.\"",
+  parametersJsonSchema: {
+    type: "object",
+    properties: {
+      orderNumber: { type: "string", description: "The order number, e.g. \"#1023\" or \"1023\"." },
+      email: { type: "string", description: "The email address the order was placed with, to verify identity." },
+      reason: {
+        type: "string",
+        enum: ["change_of_mind", "damaged", "wrong_item", "missing_item", "warranty"],
+        description: "Pick the category that best matches what the shopper is describing.",
+      },
+      description: { type: "string", description: "A concise summary of what the shopper told you, for the case file." },
+      isBnpl: { type: "boolean", description: "True if the shopper mentions this order was financed via Buy Now, Pay Later." },
+      orderItemTitle: {
+        type: "string",
+        description: "If the claim is about one specific item in a multi-item order, its title (or a distinctive substring) so the refund amount matches that item, not the whole order.",
+      },
+    },
+    required: ["orderNumber", "email", "reason", "description"],
+  },
+};
+
 const openCheckoutDeclaration: FunctionDeclaration = {
   name: "open_checkout",
   description: "Surface the real checkout link once the shopper is ready to pay. Only call this once they've indicated they're done deciding.",
@@ -207,6 +248,8 @@ export const functionDeclarations: FunctionDeclaration[] = [
   updateCartQuantityDeclaration,
   explainBnplPlanDeclaration,
   getExUkSavingsDeclaration,
+  checkOrderStatusDeclaration,
+  requestReturnOrRefundDeclaration,
   openCheckoutDeclaration,
   ...(isWhatsAppHandoffConfigured ? [openWhatsAppHandoffDeclaration] : []),
 ];
@@ -393,6 +436,35 @@ export async function dispatchTool(
         return { resultForModel: { error: "Missing handle." }, events: [] };
       }
       const result = await getExUkSavings(handle);
+      return { resultForModel: result, events: [] };
+    }
+
+    case "check_order_status": {
+      const orderNumber = typeof args.orderNumber === "string" ? args.orderNumber : "";
+      const email = typeof args.email === "string" ? args.email : "";
+      if (!orderNumber || !email) {
+        return { resultForModel: { error: "Missing orderNumber or email." }, events: [] };
+      }
+      const result = await checkOrderStatus(orderNumber, email);
+      return { resultForModel: result, events: [] };
+    }
+
+    case "request_return_or_refund": {
+      const orderNumber = typeof args.orderNumber === "string" ? args.orderNumber : "";
+      const email = typeof args.email === "string" ? args.email : "";
+      const reason = typeof args.reason === "string" ? (args.reason as ReturnCaseReason) : undefined;
+      const description = typeof args.description === "string" ? args.description : "";
+      if (!orderNumber || !email || !reason || !description) {
+        return { resultForModel: { error: "Missing orderNumber, email, reason, or description." }, events: [] };
+      }
+      const result = await fileReturnOrRefund({
+        orderNumber,
+        email,
+        reason,
+        description,
+        isBnpl: typeof args.isBnpl === "boolean" ? args.isBnpl : undefined,
+        orderItemTitle: typeof args.orderItemTitle === "string" ? args.orderItemTitle : undefined,
+      });
       return { resultForModel: result, events: [] };
     }
 

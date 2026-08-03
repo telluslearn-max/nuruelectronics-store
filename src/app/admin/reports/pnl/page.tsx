@@ -21,6 +21,7 @@ function monthLabel(bucket: string): string {
 
 const ROW_DEFS: [string, keyof Awaited<ReturnType<typeof computePnl>>][] = [
   ["Independent Sales", "revenue"],
+  ["Refunds (AI-authorized)", "refunds"],
   ["TOTAL REVENUE", "totalRevenue"],
   ["COGS: Personnel", "cogsPersonnel"],
   ["COGS: Software Subscriptions", "cogsSoftware"],
