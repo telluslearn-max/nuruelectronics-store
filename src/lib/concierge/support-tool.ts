@@ -19,7 +19,13 @@ async function findOrderByNumber(orderNumber: string, email: string): Promise<Or
     return { error: "Order lookup isn't available right now — use open_whatsapp_handoff so a staff member can check it." };
   }
   const name = normalizeOrderNumber(orderNumber);
-  const { orders } = await getShopifyOrders({ query: `name:${name}`, first: 1 });
+  let orders: ShopifyAdminOrder[];
+  try {
+    ({ orders } = await getShopifyOrders({ query: `name:${name}`, first: 1 }));
+  } catch (error) {
+    console.error("Shopify order lookup failed", error);
+    return { error: "Order lookup isn't working right now — use open_whatsapp_handoff so a staff member can check it." };
+  }
   const order = orders[0];
   if (!order) return { error: `No order found matching ${name}.` };
 

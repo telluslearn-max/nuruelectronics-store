@@ -445,8 +445,13 @@ export async function dispatchTool(
       if (!orderNumber || !email) {
         return { resultForModel: { error: "Missing orderNumber or email." }, events: [] };
       }
-      const result = await checkOrderStatus(orderNumber, email);
-      return { resultForModel: result, events: [] };
+      try {
+        const result = await checkOrderStatus(orderNumber, email);
+        return { resultForModel: result, events: [] };
+      } catch (error) {
+        console.error("check_order_status failed", error);
+        return { resultForModel: { error: "Order lookup isn't working right now — use open_whatsapp_handoff so a staff member can check it." }, events: [] };
+      }
     }
 
     case "request_return_or_refund": {
@@ -457,15 +462,20 @@ export async function dispatchTool(
       if (!orderNumber || !email || !reason || !description) {
         return { resultForModel: { error: "Missing orderNumber, email, reason, or description." }, events: [] };
       }
-      const result = await fileReturnOrRefund({
-        orderNumber,
-        email,
-        reason,
-        description,
-        isBnpl: typeof args.isBnpl === "boolean" ? args.isBnpl : undefined,
-        orderItemTitle: typeof args.orderItemTitle === "string" ? args.orderItemTitle : undefined,
-      });
-      return { resultForModel: result, events: [] };
+      try {
+        const result = await fileReturnOrRefund({
+          orderNumber,
+          email,
+          reason,
+          description,
+          isBnpl: typeof args.isBnpl === "boolean" ? args.isBnpl : undefined,
+          orderItemTitle: typeof args.orderItemTitle === "string" ? args.orderItemTitle : undefined,
+        });
+        return { resultForModel: result, events: [] };
+      } catch (error) {
+        console.error("request_return_or_refund failed", error);
+        return { resultForModel: { error: "I couldn't process that just now — use open_whatsapp_handoff so a staff member can help." }, events: [] };
+      }
     }
 
     case "open_checkout": {
