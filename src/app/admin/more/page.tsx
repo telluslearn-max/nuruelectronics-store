@@ -6,6 +6,7 @@ export const metadata: Metadata = { title: "More" };
 
 const LINKS = [
   { href: "/admin/orders", label: "Orders" },
+  { href: "/admin/support", label: "Support" },
   { href: "/admin/customers", label: "Customers" },
   { href: "/admin/receipts", label: "Receipts" },
   { href: "/admin/expenses", label: "Expenses" },

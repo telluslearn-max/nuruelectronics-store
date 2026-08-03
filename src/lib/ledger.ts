@@ -14,11 +14,13 @@ export const ACCOUNTS = {
   FIXED_ASSETS: "1500",
   ACCUMULATED_DEPRECIATION: "1510",
   ACCOUNTS_PAYABLE: "2000",
+  REFUNDS_PAYABLE: "2050",
   VAT_PAYABLE: "2100",
   PAYROLL_LIABILITIES: "2200",
   OWNERS_EQUITY: "3000",
   RETAINED_EARNINGS: "3900",
   SALES_REVENUE: "4000",
+  SALES_RETURNS: "4100",
   COGS: "5000",
   PERSONNEL_EXPENSE: "5100",
   SOFTWARE_SUBSCRIPTIONS: "5110",
@@ -46,7 +48,10 @@ type PostJournalEntryInput = {
  * triggered it (a Receipt, Expense, Bill payment, etc.), so the ledger
  * always reflects exactly what's committed.
  */
-export async function postJournalEntry(tx: Prisma.TransactionClient, input: PostJournalEntryInput): Promise<void> {
+export async function postJournalEntry(
+  tx: Prisma.TransactionClient,
+  input: PostJournalEntryInput,
+): Promise<{ id: string }> {
   const totalDebit = input.lines.reduce((sum, line) => sum + (line.debit ?? 0), 0);
   const totalCredit = input.lines.reduce((sum, line) => sum + (line.credit ?? 0), 0);
   if (Math.abs(totalDebit - totalCredit) > 0.005) {
@@ -57,7 +62,7 @@ export async function postJournalEntry(tx: Prisma.TransactionClient, input: Post
   const accounts = await tx.account.findMany({ where: { code: { in: codes } } });
   const accountByCode = new Map(accounts.map((account) => [account.code, account]));
 
-  await tx.journalEntry.create({
+  return tx.journalEntry.create({
     data: {
       date: input.date,
       description: input.description,
@@ -75,5 +80,6 @@ export async function postJournalEntry(tx: Prisma.TransactionClient, input: Post
         }),
       },
     },
+    select: { id: true },
   });
 }
