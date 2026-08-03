@@ -448,7 +448,7 @@ export async function deleteInvoice(invoiceId: string): Promise<void> {
 async function sendInvoiceEmailSilent(invoiceId: string): Promise<{ orderId: string }> {
   const invoice = await prisma.invoice.findUniqueOrThrow({
     where: { id: invoiceId },
-    include: { order: { include: { customer: true, items: true } } },
+    include: { order: { include: { customer: true, items: true } }, receipts: true },
   });
   if (!isEmailConfigured) {
     throw new ActionGuardError(
@@ -460,7 +460,13 @@ async function sendInvoiceEmailSilent(invoiceId: string): Promise<{ orderId: str
     throw new ActionGuardError("Customer has no email on file.", `/admin/orders/${invoice.orderId}`);
   }
 
-  const pdfBuffer = await renderInvoicePdf(invoice, invoice.order, invoice.order.customer, invoice.order.items);
+  const pdfBuffer = await renderInvoicePdf(
+    invoice,
+    invoice.order,
+    invoice.order.customer,
+    invoice.order.items,
+    invoice.receipts,
+  );
   await sendInvoiceEmailMessage(invoice, invoice.order.customer, pdfBuffer);
 
   await prisma.invoice.update({
@@ -567,7 +573,7 @@ export async function sendReceiptEmail(receiptId: string): Promise<void> {
   await requireAdminSession();
   const receipt = await prisma.receipt.findUniqueOrThrow({
     where: { id: receiptId },
-    include: { invoice: { include: { order: { include: { customer: true } } } } },
+    include: { invoice: { include: { order: { include: { customer: true, items: true } } } } },
   });
   if (!isEmailConfigured) {
     redirectWithError(
@@ -579,7 +585,12 @@ export async function sendReceiptEmail(receiptId: string): Promise<void> {
     redirectWithError(`/admin/orders/${receipt.invoice.orderId}`, "Customer has no email on file.");
   }
 
-  const pdfBuffer = await renderReceiptPdf(receipt, receipt.invoice, receipt.invoice.order.customer);
+  const pdfBuffer = await renderReceiptPdf(
+    receipt,
+    receipt.invoice,
+    receipt.invoice.order.customer,
+    receipt.invoice.order.items,
+  );
   await sendReceiptEmailMessage(receipt, receipt.invoice.order.customer, pdfBuffer);
 
   revalidatePath(`/admin/orders/${receipt.invoice.orderId}`);
@@ -712,11 +723,46 @@ export async function markDelivered(deliveryNoteId: string, formData: FormData):
   await requireAdminSession();
   const receivedBy = String(formData.get("receivedBy") ?? "").trim() || null;
   const riderId = String(formData.get("riderId") ?? "").trim() || null;
+  const confirmPayment = formData.get("confirmPayment") === "on";
+
+  const existing = await prisma.deliveryNote.findUniqueOrThrow({
+    where: { id: deliveryNoteId },
+    include: { order: { include: { invoice: true } } },
+  });
+
+  // Re-derive payment status server-side rather than trusting a client-submitted flag — the
+  // internal Invoice is staff-entered bookkeeping that can drift from reality, so for Shopify
+  // orders (e.g. Cash on Delivery, which stays financially Pending until cash is collected) the
+  // live Shopify order is the real source of truth.
+  const liveShopifyOrder =
+    existing.order.source === "shopify" && existing.order.shopifyOrderId
+      ? await getShopifyOrderById(existing.order.shopifyOrderId)
+      : null;
+  const paymentConfirmed =
+    existing.order.source === "shopify"
+      ? liveShopifyOrder?.displayFinancialStatus === "PAID"
+      : existing.order.invoice?.status === "paid";
+
+  if (!paymentConfirmed && !confirmPayment) {
+    redirectWithError(
+      `/admin/orders/${existing.orderId}`,
+      "This order isn't confirmed as paid yet — check \"I confirm payment has actually been received\" before marking it delivered.",
+    );
+  }
 
   const note = await prisma.deliveryNote.update({
     where: { id: deliveryNoteId },
     data: { status: "delivered", receivedBy, riderId, deliveredAt: new Date() },
   });
+
+  if (!paymentConfirmed) {
+    await logAdminAction({
+      action: "deliveryNote.markDelivered.unconfirmedPayment",
+      entityType: "deliveryNote",
+      entityId: note.id,
+      summary: `Marked delivered for order ${existing.orderId} without confirmed payment (Shopify status: ${liveShopifyOrder?.displayFinancialStatus ?? "n/a"})`,
+    });
+  }
 
   revalidatePath(`/admin/orders/${note.orderId}`);
   redirectWithSuccess(`/admin/orders/${note.orderId}`, "Marked as delivered.");

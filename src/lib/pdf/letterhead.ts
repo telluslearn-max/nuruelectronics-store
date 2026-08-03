@@ -1,7 +1,13 @@
 import "server-only";
 import { getSettings } from "../settings";
 
-export type Letterhead = { companyName: string; logoDataUri?: string };
+export type Letterhead = {
+  companyName: string;
+  logoDataUri?: string;
+  companyEmail?: string | null;
+  companyPhone?: string | null;
+  companyAddress?: string | null;
+};
 
 const PRIVATE_HOSTNAME_PATTERNS = [
   /^localhost$/i,
@@ -40,9 +46,14 @@ async function fetchLogoAsDataUri(url: string): Promise<string | undefined> {
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 5000);
-    const response = await fetch(url, { signal: controller.signal });
+    // redirect: "manual" so a URL that passes isSafeLogoUrl can't redirect the server to an
+    // internal/private target the check never validated (e.g. a 302 to a cloud metadata IP) —
+    // any redirect is treated the same as an unreachable URL below, never followed.
+    const response = await fetch(url, { signal: controller.signal, redirect: "manual" });
     clearTimeout(timeout);
-    if (!response.ok) return undefined;
+    if (!response.ok || response.type === "opaqueredirect" || (response.status >= 300 && response.status < 400)) {
+      return undefined;
+    }
     const contentType = response.headers.get("content-type") ?? "";
     if (!contentType.startsWith("image/") || contentType.includes("svg")) return undefined;
     const buffer = Buffer.from(await response.arrayBuffer());
@@ -60,5 +71,11 @@ async function fetchLogoAsDataUri(url: string): Promise<string | undefined> {
 export async function getLetterhead(): Promise<Letterhead> {
   const settings = await getSettings();
   const logoDataUri = settings.logoUrl ? await fetchLogoAsDataUri(settings.logoUrl) : undefined;
-  return { companyName: settings.companyName, logoDataUri };
+  return {
+    companyName: settings.companyName,
+    logoDataUri,
+    companyEmail: settings.companyEmail,
+    companyPhone: settings.companyPhone,
+    companyAddress: settings.companyAddress,
+  };
 }

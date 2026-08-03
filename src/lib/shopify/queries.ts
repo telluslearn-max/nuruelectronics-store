@@ -306,6 +306,10 @@ export const createCartMutation = /* GraphQL */ `
       cart {
         ...cartFields
       }
+      userErrors {
+        field
+        message
+      }
     }
   }
 `;
@@ -326,6 +330,10 @@ export const addToCartMutation = /* GraphQL */ `
       cart {
         ...cartFields
       }
+      userErrors {
+        field
+        message
+      }
     }
   }
 `;
@@ -336,6 +344,10 @@ export const updateCartMutation = /* GraphQL */ `
     cartLinesUpdate(cartId: $cartId, lines: $lines) {
       cart {
         ...cartFields
+      }
+      userErrors {
+        field
+        message
       }
     }
   }
@@ -348,6 +360,10 @@ export const removeFromCartMutation = /* GraphQL */ `
       cart {
         ...cartFields
       }
+      userErrors {
+        field
+        message
+      }
     }
   }
 `;
@@ -358,6 +374,10 @@ export const cartAttributesUpdateMutation = /* GraphQL */ `
     cartAttributesUpdate(cartId: $cartId, attributes: $attributes) {
       cart {
         ...cartFields
+      }
+      userErrors {
+        field
+        message
       }
     }
   }

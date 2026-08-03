@@ -30,6 +30,10 @@ export type ShopifyAdminOrder = {
   processedAt: string;
   displayFinancialStatus: string;
   displayFulfillmentStatus: string;
+  /** e.g. ["Cash on Delivery (COD)"] — surfaced alongside displayFinancialStatus so a
+   * Pending order's payment method (an unpaid manual/offline method vs. a real-time
+   * gateway) is visible wherever financial status is shown. */
+  paymentGatewayNames: string[];
   currentTotalPriceSet: { shopMoney: { amount: string; currencyCode: string } };
   customAttributes: { key: string; value: string }[];
   customer: { id: string; email: string | null; displayName: string } | null;

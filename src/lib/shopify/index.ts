@@ -52,6 +52,26 @@ export function matchesSearchTerm(product: Product, searchTerm: string): boolean
   });
 }
 
+/**
+ * `getProducts` ANDs its own structured clauses (e.g. `-tag:ex-uk`, `-tag:coming-soon`) onto
+ * whatever `searchTerm` it's given, by wrapping it in parens and joining with " AND " — a pattern
+ * this codebase's own facet builders rely on intentionally (category/ecosystem/kit pages pass
+ * `product_type:"X" AND tag:y` on purpose). But `searchTerm` also carries genuine shopper-typed
+ * free text (the /search box, search suggestions, the AI concierge), and Shopify's search syntax
+ * treats parens, colons, and the AND/OR keywords as query-structuring — so unsanitized free text
+ * can restructure the query and slip past the exclusions this app ANDs on (e.g. `") OR (tag:ex-uk"`
+ * breaks out of the wrapping parens). Run any *shopper-typed* string through this before it
+ * becomes a `searchTerm` — never call it on this app's own structured facet queries, which need
+ * that syntax to work.
+ */
+export function sanitizeFreeTextSearchTerm(raw: string): string {
+  return raw
+    .replace(/[():"*]/g, " ")
+    .replace(/\bAND\b|\bOR\b|\bNOT\b/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 const domain = process.env.SHOPIFY_STORE_DOMAIN;
 const token = process.env.SHOPIFY_STOREFRONT_ACCESS_TOKEN;
 const apiVersion = "2024-10";
@@ -137,6 +157,18 @@ type RawCartLine = Omit<CartLine, "merchandise"> & {
     };
   };
 };
+
+type UserError = { field?: string[] | string | null; message: string };
+
+/** Shopify accepts a cart mutation at the GraphQL protocol level but can still reject it at the
+ * business level (sold out, deleted variant, cart already converted to an order, etc.) via this
+ * field, returning `cart: null` alongside it — that combination must be checked explicitly, since
+ * it doesn't populate the top-level `errors` array `shopifyFetch` already handles. */
+function assertNoUserErrors(userErrors: UserError[]): void {
+  if (userErrors.length > 0) {
+    throw new Error(userErrors.map((e) => e.message).join("; "));
+  }
+}
 
 function reshapeCart(node: Omit<Cart, "lines"> & { lines: Connection<RawCartLine> }): Cart {
   return {
@@ -302,10 +334,11 @@ export async function createCart(lines: { merchandiseId: string; quantity: numbe
     mockCarts.set(id, cart);
     return cart;
   }
-  const data = await shopifyFetch<{ cartCreate: { cart: Parameters<typeof reshapeCart>[0] } }>(
-    createCartMutation,
-    { lines },
-  );
+  const data = await shopifyFetch<{
+    cartCreate: { cart: Parameters<typeof reshapeCart>[0] | null; userErrors: UserError[] };
+  }>(createCartMutation, { lines });
+  assertNoUserErrors(data.cartCreate.userErrors);
+  if (!data.cartCreate.cart) throw new Error("Shopify did not return a cart for cartCreate.");
   return reshapeCart(data.cartCreate.cart);
 }
 
@@ -357,10 +390,11 @@ export async function addToCart(
     mockCarts.set(cartId, updated);
     return updated;
   }
-  const data = await shopifyFetch<{ cartLinesAdd: { cart: Parameters<typeof reshapeCart>[0] } }>(
-    addToCartMutation,
-    { cartId, lines },
-  );
+  const data = await shopifyFetch<{
+    cartLinesAdd: { cart: Parameters<typeof reshapeCart>[0] | null; userErrors: UserError[] };
+  }>(addToCartMutation, { cartId, lines });
+  assertNoUserErrors(data.cartLinesAdd.userErrors);
+  if (!data.cartLinesAdd.cart) throw new Error("Shopify did not return a cart for cartLinesAdd.");
   return reshapeCart(data.cartLinesAdd.cart);
 }
 
@@ -380,10 +414,11 @@ export async function updateCartLine(cartId: string, lineId: string, quantity: n
     mockCarts.set(cartId, updated);
     return updated;
   }
-  const data = await shopifyFetch<{ cartLinesUpdate: { cart: Parameters<typeof reshapeCart>[0] } }>(
-    updateCartMutation,
-    { cartId, lines: [{ id: lineId, quantity }] },
-  );
+  const data = await shopifyFetch<{
+    cartLinesUpdate: { cart: Parameters<typeof reshapeCart>[0] | null; userErrors: UserError[] };
+  }>(updateCartMutation, { cartId, lines: [{ id: lineId, quantity }] });
+  assertNoUserErrors(data.cartLinesUpdate.userErrors);
+  if (!data.cartLinesUpdate.cart) throw new Error("Shopify did not return a cart for cartLinesUpdate.");
   return reshapeCart(data.cartLinesUpdate.cart);
 }
 
@@ -396,10 +431,11 @@ export async function removeFromCart(cartId: string, lineId: string): Promise<Ca
     mockCarts.set(cartId, updated);
     return updated;
   }
-  const data = await shopifyFetch<{ cartLinesRemove: { cart: Parameters<typeof reshapeCart>[0] } }>(
-    removeFromCartMutation,
-    { cartId, lineIds: [lineId] },
-  );
+  const data = await shopifyFetch<{
+    cartLinesRemove: { cart: Parameters<typeof reshapeCart>[0] | null; userErrors: UserError[] };
+  }>(removeFromCartMutation, { cartId, lineIds: [lineId] });
+  assertNoUserErrors(data.cartLinesRemove.userErrors);
+  if (!data.cartLinesRemove.cart) throw new Error("Shopify did not return a cart for cartLinesRemove.");
   return reshapeCart(data.cartLinesRemove.cart);
 }
 
@@ -415,9 +451,12 @@ export async function updateCartAttributes(
     mockCarts.set(cartId, cart);
     return cart;
   }
-  const data = await shopifyFetch<{ cartAttributesUpdate: { cart: Parameters<typeof reshapeCart>[0] } }>(
-    cartAttributesUpdateMutation,
-    { cartId, attributes },
-  );
+  const data = await shopifyFetch<{
+    cartAttributesUpdate: { cart: Parameters<typeof reshapeCart>[0] | null; userErrors: UserError[] };
+  }>(cartAttributesUpdateMutation, { cartId, attributes });
+  assertNoUserErrors(data.cartAttributesUpdate.userErrors);
+  if (!data.cartAttributesUpdate.cart) {
+    throw new Error("Shopify did not return a cart for cartAttributesUpdate.");
+  }
   return reshapeCart(data.cartAttributesUpdate.cart);
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { removeItem, updateItemQuantity } from "@/lib/actions";
 import { trackEvent } from "@/lib/analytics/track-event";
 import { formatPrice } from "@/lib/format";
@@ -12,6 +12,7 @@ import { useCart } from "./cart-context";
 export function CartDrawer() {
   const { cart, setCart, isOpen, closeCart } = useCart();
   const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const trapRef = useFocusTrap<HTMLDivElement>(isOpen);
 
@@ -100,8 +101,13 @@ export function CartDrawer() {
                             disabled={isPending}
                             onClick={() =>
                               startTransition(async () => {
-                                const updated = await updateItemQuantity(line.id, line.quantity - 1);
-                                setCart(updated);
+                                setError(null);
+                                try {
+                                  const updated = await updateItemQuantity(line.id, line.quantity - 1);
+                                  setCart(updated);
+                                } catch {
+                                  setError("Couldn't update your cart. Please try again.");
+                                }
                               })
                             }
                             aria-label="Decrease quantity"
@@ -116,8 +122,13 @@ export function CartDrawer() {
                             disabled={isPending}
                             onClick={() =>
                               startTransition(async () => {
-                                const updated = await updateItemQuantity(line.id, line.quantity + 1);
-                                setCart(updated);
+                                setError(null);
+                                try {
+                                  const updated = await updateItemQuantity(line.id, line.quantity + 1);
+                                  setCart(updated);
+                                } catch {
+                                  setError("Couldn't update your cart. Please try again.");
+                                }
                               })
                             }
                             aria-label="Increase quantity"
@@ -135,8 +146,13 @@ export function CartDrawer() {
                       disabled={isPending}
                       onClick={() =>
                         startTransition(async () => {
-                          const updated = await removeItem(line.id);
-                          setCart(updated);
+                          setError(null);
+                          try {
+                            const updated = await removeItem(line.id);
+                            setCart(updated);
+                          } catch {
+                            setError("Couldn't update your cart. Please try again.");
+                          }
                         })
                       }
                       className="-m-2 self-start p-2 text-sm text-neutral-400 hover:text-neutral-700"
@@ -152,6 +168,11 @@ export function CartDrawer() {
 
         {cart && cart.lines.length > 0 && (
           <div className="border-t border-border-subtle p-4">
+            {error && (
+              <p className="mb-3 text-sm text-red-600" role="alert">
+                {error}
+              </p>
+            )}
             <div className="mb-4 flex items-center justify-between text-sm">
               <span>Subtotal</span>
               <span className="font-medium" aria-live="polite">

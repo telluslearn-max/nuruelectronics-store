@@ -8,6 +8,7 @@ import {
   getProductByHandle,
   getProducts,
   removeFromCart as removeFromCartInShopify,
+  sanitizeFreeTextSearchTerm,
   updateCartAttributes as updateCartAttributesInShopify,
   updateCartLine as updateCartLineInShopify,
 } from "./shopify";
@@ -32,10 +33,19 @@ async function getValidCartId(): Promise<string | null> {
 async function getOrCreateCartId(): Promise<string> {
   const existing = await getValidCartId();
   if (existing) return existing;
+  const cart = await replaceCart();
+  return cart.id;
+}
+
+/** Creates a fresh cart and points the cookie at it. Used both for the "no cart yet" case and to
+ * recover from a stale cart id whose Shopify-side cart can no longer be mutated (e.g. its
+ * checkout already completed) — `getValidCartId` can't detect that case up front since Shopify
+ * still returns the cart on a plain read; it only surfaces as a mutation failure. */
+async function replaceCart(): Promise<Cart> {
   const cart = await createCart();
   const cookieStore = await cookies();
   cookieStore.set(CART_COOKIE, cart.id, { httpOnly: true, sameSite: "lax" });
-  return cart.id;
+  return cart;
 }
 
 export async function getCart(): Promise<Cart | null> {
@@ -46,28 +56,46 @@ export async function getCart(): Promise<Cart | null> {
 
 export async function addItem(variantId: string, quantity: number = 1): Promise<Cart> {
   const cartId = await getOrCreateCartId();
-  return addToCartInShopify(cartId, [{ merchandiseId: variantId, quantity }]);
+  try {
+    return await addToCartInShopify(cartId, [{ merchandiseId: variantId, quantity }]);
+  } catch {
+    const freshCart = await replaceCart();
+    return addToCartInShopify(freshCart.id, [{ merchandiseId: variantId, quantity }]);
+  }
 }
 
 export async function addItems(lines: { variantId: string; quantity: number }[]): Promise<Cart> {
   const cartId = await getOrCreateCartId();
-  return addToCartInShopify(
-    cartId,
-    lines.map((line) => ({ merchandiseId: line.variantId, quantity: line.quantity })),
-  );
+  const shopifyLines = lines.map((line) => ({ merchandiseId: line.variantId, quantity: line.quantity }));
+  try {
+    return await addToCartInShopify(cartId, shopifyLines);
+  } catch {
+    const freshCart = await replaceCart();
+    return addToCartInShopify(freshCart.id, shopifyLines);
+  }
 }
 
 export async function updateItemQuantity(lineId: string, quantity: number): Promise<Cart> {
   const cartId = await getOrCreateCartId();
-  if (quantity <= 0) {
-    return removeFromCartInShopify(cartId, lineId);
+  try {
+    if (quantity <= 0) {
+      return await removeFromCartInShopify(cartId, lineId);
+    }
+    return await updateCartLineInShopify(cartId, lineId, quantity);
+  } catch {
+    // The line being updated belongs to a cart Shopify rejected (e.g. already checked out) — it
+    // has no counterpart to retry against, so recover onto a fresh, empty cart instead.
+    return replaceCart();
   }
-  return updateCartLineInShopify(cartId, lineId, quantity);
 }
 
 export async function removeItem(lineId: string): Promise<Cart> {
   const cartId = await getOrCreateCartId();
-  return removeFromCartInShopify(cartId, lineId);
+  try {
+    return await removeFromCartInShopify(cartId, lineId);
+  } catch {
+    return replaceCart();
+  }
 }
 
 /** Tags the current session's cart as AI-concierge-assisted, so completed orders carry it through to the AI-attribution report. */
@@ -86,7 +114,7 @@ export type SearchSuggestion = {
 export async function searchSuggestions(term: string): Promise<SearchSuggestion[]> {
   const trimmed = term.trim();
   if (trimmed.length < 2) return [];
-  const { products } = await getProducts({ searchTerm: trimmed, first: 5 });
+  const { products } = await getProducts({ searchTerm: sanitizeFreeTextSearchTerm(trimmed), first: 5 });
   return products.map((p) => ({
     handle: p.handle,
     title: p.title,

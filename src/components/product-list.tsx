@@ -5,13 +5,6 @@ import { loadMoreProducts } from "@/lib/actions";
 import type { Product } from "@/lib/shopify/types";
 import { ProductGrid } from "./product-grid";
 
-const PRICE_PRESETS: { label: string; value: number | null }[] = [
-  { label: "Any price", value: null },
-  { label: "Under $300", value: 300 },
-  { label: "Under $600", value: 600 },
-  { label: "Under $1000", value: 1000 },
-];
-
 function toggleInSet<T>(set: Set<T>, value: T): Set<T> {
   const next = new Set(set);
   if (next.has(value)) next.delete(value);
@@ -79,7 +72,6 @@ export function ProductList({
   // "Load more" still paginates the full (unfiltered) result set underneath it. Brand and Color
   // are derived from whatever's actually in the current batch, not a fixed taxonomy, so the facet
   // rows only ever offer choices that exist in view.
-  const [maxPrice, setMaxPrice] = useState<number | null>(null);
   const [selectedBrands, setSelectedBrands] = useState<Set<string>>(new Set());
   const [selectedColors, setSelectedColors] = useState<Set<string>>(new Set());
 
@@ -98,12 +90,11 @@ export function ProductList({
     return Array.from(set).sort();
   }, [products]);
 
-  const hasActiveFilters = maxPrice !== null || selectedBrands.size > 0 || selectedColors.size > 0;
+  const hasActiveFilters = selectedBrands.size > 0 || selectedColors.size > 0;
 
   const visibleProducts = useMemo(
     () =>
       products.filter((product) => {
-        if (maxPrice !== null && Number(product.priceRange.minVariantPrice.amount) > maxPrice) return false;
         if (selectedBrands.size > 0 && (!product.vendor || !selectedBrands.has(product.vendor))) return false;
         if (selectedColors.size > 0) {
           const colorOption = product.options.find((o) => o.name === "Color");
@@ -111,11 +102,10 @@ export function ProductList({
         }
         return true;
       }),
-    [products, maxPrice, selectedBrands, selectedColors],
+    [products, selectedBrands, selectedColors],
   );
 
   function clearFilters() {
-    setMaxPrice(null);
     setSelectedBrands(new Set());
     setSelectedColors(new Set());
   }
@@ -132,17 +122,6 @@ export function ProductList({
 
   return (
     <div>
-      <FacetRow label="Price">
-        {PRICE_PRESETS.map((preset) => (
-          <FacetChip
-            key={preset.label}
-            label={preset.label}
-            active={maxPrice === preset.value}
-            onClick={() => setMaxPrice(preset.value)}
-          />
-        ))}
-      </FacetRow>
-
       {brands.length > 1 && (
         <FacetRow label="Brand">
           {brands.map((brand) => (
