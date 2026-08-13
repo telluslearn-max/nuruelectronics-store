@@ -3,7 +3,7 @@ import { FunctionCallingConfigMode, type Content, type FunctionCall, type Part }
 import { CONCIERGE_MODEL, getGenAIClient } from "./vertex-client";
 import { buildSystemInstruction } from "./system-prompt";
 import { dispatchTool, functionDeclarations } from "./tools";
-import type { ConciergeEvent, ConciergeMessage, ConciergePageContext } from "./types";
+import type { ConciergeContext, ConciergeEvent, ConciergeMessage, ConciergePageContext } from "./types";
 
 const MAX_TOOL_ITERATIONS = 6;
 
@@ -14,7 +14,8 @@ function toContents(history: ConciergeMessage[]): Content[] {
 export async function runConciergeTurn(
   history: ConciergeMessage[],
   onEvent: (event: ConciergeEvent) => void,
-  pageContext?: ConciergePageContext,
+  pageContext: ConciergePageContext | undefined,
+  ctx: ConciergeContext,
 ): Promise<void> {
   const ai = getGenAIClient();
   const contents = toContents(history);
@@ -57,7 +58,7 @@ export async function runConciergeTurn(
     const responseParts: Part[] = [];
     for (const call of collectedCalls) {
       if (!call.name) continue;
-      const { resultForModel, events } = await dispatchTool(call.name, call.args ?? {});
+      const { resultForModel, events } = await dispatchTool(call.name, call.args ?? {}, ctx);
       for (const event of events) onEvent(event);
       responseParts.push({ functionResponse: { name: call.name, response: { output: resultForModel } } });
     }

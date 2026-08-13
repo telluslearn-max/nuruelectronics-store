@@ -10,6 +10,13 @@ export type ConciergePageContext = {
   productHandle?: string;
 };
 
+/** First-party identity for this turn — see src/lib/session.ts and src/lib/customer.ts. Threaded
+ * through to tool dispatch so log_customer_signal can attribute what it logs. */
+export type ConciergeContext = {
+  sessionId: string;
+  customerId: string | null;
+};
+
 export type ConciergeEvent =
   | { type: "text-delta"; text: string }
   | { type: "products"; mode: "list" | "compare"; products: Product[] }

@@ -5,7 +5,9 @@ import { isConciergeRateLimited } from "@/lib/concierge/rate-limit";
 import type { ConciergeMessage, ConciergePageContext } from "@/lib/concierge/types";
 import { isConciergeConfigured } from "@/lib/concierge/vertex-client";
 import { synthesizeSpeech, transcribeAudio } from "@/lib/concierge/voice";
+import { getCurrentDbCustomerId } from "@/lib/customer";
 import { getClientIp } from "@/lib/request-ip";
+import { getOrCreateSessionId } from "@/lib/session";
 
 // Same runtime requirement as /api/concierge/chat — Vertex auth needs Node crypto, not edge.
 export const runtime = "nodejs";
@@ -61,6 +63,8 @@ export async function POST(request: Request): Promise<Response> {
     return new Response(`Invalid request body: ${parsed.error}`, { status: 400 });
   }
   const { messages, audio, pageContext } = parsed;
+  const sessionId = await getOrCreateSessionId();
+  const customerId = await getCurrentDbCustomerId();
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({
@@ -79,6 +83,7 @@ export async function POST(request: Request): Promise<Response> {
             emit(event);
           },
           pageContext,
+          { sessionId, customerId },
         );
 
         if (finalText.trim()) {

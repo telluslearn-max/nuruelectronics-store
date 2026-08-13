@@ -22,6 +22,7 @@ import { categoryForProductType, getRelatedCategories, type Category } from "@/l
 import { ecosystemTagForProduct } from "@/lib/collections";
 import { getBuyersGuide } from "@/lib/buyers-guides";
 import { getOriginOptionValues, hasEsimOnlyWarranty } from "@/lib/origin-options";
+import { logProductView } from "@/lib/interactions";
 import { findCounterpart } from "@/lib/product-match";
 import { getProductByHandle, getProducts } from "@/lib/shopify";
 import type { Product } from "@/lib/shopify/types";
@@ -99,6 +100,8 @@ export default async function ProductPage({ params }: ProductPageProps) {
   if (!product) {
     notFound();
   }
+
+  await logProductView(product.handle);
 
   const price = product.priceRange.minVariantPrice;
   const category = categoryForProductType(product.productType);

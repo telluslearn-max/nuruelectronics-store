@@ -91,9 +91,17 @@ model Customer {
   name              String?
   phone             String?
   shopifyCustomerId String?
-  createdAt         DateTime @default(now())
+  // Short shareable code, auto-minted at the database level so every insert path
+  // (admin upsert, Shopify order import, sign-in sync) gets one for free.
+  referralCode         String   @unique @default(dbgenerated("upper(substr(md5(random()::text), 1, 6))"))
+  referredByCustomerId String?
+  referredBy           Customer?  @relation("CustomerReferrals", fields: [referredByCustomerId], references: [id])
+  referrals            Customer[] @relation("CustomerReferrals")
+  createdAt            DateTime   @default(now())
 
-  orders Order[]
+  orders       Order[]
+  interactions Interaction[]
+  feedback     Feedback[]
 }
 
 model Order {
@@ -112,6 +120,7 @@ model Order {
   estimates    Estimate[]
   invoice      Invoice?
   deliveryNote DeliveryNote?
+  feedback     Feedback[]
 
   @@index([customerId])
 }
@@ -548,4 +557,63 @@ model ReturnCase {
 
   @@index([shopifyOrderId])
   @@index([status, createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Customer Intelligence Layer — facts vs. AI-derived insight stay in separate
+// tables on purpose (see src/lib/concierge/tools.ts log_customer_signal and
+// src/lib/personalization/recommendations.ts): `Interaction` rows are Gemini's
+// *inferred* read of a shopper's intent/budget/category, tied to a first-party
+// session id (see src/lib/session.ts) and backfilled to a Customer once their
+// identity is known (sign-in, or an order tagged with that session). They are
+// never merged into Customer/Order, which stay pure facts.
+// ---------------------------------------------------------------------------
+
+enum InteractionSource {
+  CONCIERGE_CHAT
+  PRODUCT_VIEW
+  SEARCH
+}
+
+model Interaction {
+  id     String  @id @default(cuid())
+  // Nullable — an interaction can happen before the shopper is ever identified;
+  // see backfillInteractionsForCustomer in src/lib/interactions.ts.
+  customerId String?
+  customer   Customer? @relation(fields: [customerId], references: [id])
+  sessionId  String
+
+  source        InteractionSource
+  productHandle String?
+
+  // Gemini's read of the conversation, not a fact — see log_customer_signal.
+  inferredIntent        String?
+  inferredBudgetSignal  String?
+  inferredCategory      String?
+
+  createdAt DateTime @default(now())
+
+  @@index([sessionId])
+  @@index([customerId])
+  @@index([createdAt])
+}
+
+enum FeedbackCollectedVia {
+  EMAIL_FOLLOWUP
+}
+
+model Feedback {
+  id            String   @id @default(cuid())
+  orderId       String
+  order         Order    @relation(fields: [orderId], references: [id])
+  customerId    String
+  customer      Customer @relation(fields: [customerId], references: [id])
+  productHandle String?
+  rating        Int?
+  comment       String?
+  collectedVia  FeedbackCollectedVia
+  createdAt     DateTime @default(now())
+
+  @@index([orderId])
+  @@index([productHandle])
 }

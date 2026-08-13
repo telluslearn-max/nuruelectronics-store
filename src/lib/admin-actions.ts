@@ -7,6 +7,7 @@ import { requireAdminSession } from "./admin-auth";
 import { generateAccessToken, mintDocumentNumber } from "./documents";
 import { ACCOUNTS, cashAccountForMethod, postJournalEntry } from "./ledger";
 import { decrementVariantInventory, getShopifyOrderById } from "./shopify/admin-api";
+import { SESSION_CART_ATTRIBUTE_KEY } from "./session";
 import { isEmailConfigured, sendDeliveryNoteEmail as sendDeliveryNoteEmailMessage, sendEstimateEmail as sendEstimateEmailMessage, sendInvoiceEmail as sendInvoiceEmailMessage, sendReceiptEmail as sendReceiptEmailMessage } from "./email";
 import { renderDeliveryNotePdf, renderEstimatePdf, renderInvoicePdf, renderReceiptPdf } from "./pdf/render";
 import { ActionGuardError, redirectWithError, redirectWithSuccess } from "./admin-feedback";
@@ -106,6 +107,12 @@ export async function importShopifyOrder(shopifyOrderId: string): Promise<void> 
     redirectWithError("/admin/orders", "This Shopify order has no customer email on file.");
   }
 
+  // If the shopper's cart carried our first-party session id through to checkout (see
+  // attachSessionAttribute in src/lib/actions.ts), this is the "checkout completion" backfill
+  // moment (task 2): their earlier anonymous Interaction rows get attributed to the real customer
+  // the instant their order is known to us.
+  const sessionId = shopifyOrder.customAttributes.find((a) => a.key === SESSION_CART_ATTRIBUTE_KEY)?.value;
+
   const order = await prisma.$transaction(async (tx) => {
     const customer = await tx.customer.upsert({
       where: { email },
@@ -113,7 +120,7 @@ export async function importShopifyOrder(shopifyOrderId: string): Promise<void> 
       update: { shopifyCustomerId: shopifyOrder.customer?.id },
     });
 
-    return tx.order.create({
+    const created = await tx.order.create({
       data: {
         source: "shopify",
         shopifyOrderId: shopifyOrder.id,
@@ -131,6 +138,10 @@ export async function importShopifyOrder(shopifyOrderId: string): Promise<void> 
         },
       },
     });
+
+    if (sessionId) await tx.interaction.updateMany({ where: { sessionId, customerId: null }, data: { customerId: customer.id } });
+
+    return created;
   });
 
   revalidatePath("/admin/orders");
