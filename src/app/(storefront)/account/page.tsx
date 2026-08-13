@@ -5,6 +5,8 @@ import { WishlistSection } from "@/components/wishlist/wishlist-section";
 import { formatPrice } from "@/lib/format";
 import { getCurrentCustomer } from "@/lib/customer";
 import { isCustomerAuthConfigured } from "@/lib/customer-auth";
+import { prisma } from "@/lib/prisma";
+import { applyReferralCode } from "@/lib/referral-actions";
 
 export const metadata: Metadata = {
   title: "My Account",
@@ -18,12 +20,12 @@ function formatOrderDate(dateString: string) {
 export default async function AccountPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; referralError?: string; referralSuccess?: string }>;
 }) {
   // Read before the early returns below — a failed OAuth login never sets a session cookie, so
   // `customer` is always null on that path, and checking `error` after the `!customer` return
   // meant this could never actually render.
-  const { error } = await searchParams;
+  const { error, referralError, referralSuccess } = await searchParams;
 
   if (!isCustomerAuthConfigured) {
     return (
@@ -80,6 +82,10 @@ export default async function AccountPage({
       </div>
     );
   }
+
+  const dbCustomer = customer.email
+    ? await prisma.customer.findUnique({ where: { email: customer.email.toLowerCase() } })
+    : null;
 
   return (
     <div>
@@ -156,6 +162,36 @@ export default async function AccountPage({
           </ul>
         )}
       </div>
+
+      {dbCustomer && (
+        <section className="mt-12 border-t border-border-subtle pt-8">
+          <h2 className="text-lg font-medium">Referrals</h2>
+          <p className="mt-2 text-neutral-500">
+            Share your code with friends: <span className="font-mono text-foreground">{dbCustomer.referralCode}</span>
+          </p>
+          {dbCustomer.referredByCustomerId ? (
+            <p className="mt-4 text-sm text-neutral-500">You&apos;re already set up with a referral code — thanks!</p>
+          ) : (
+            <form action={applyReferralCode} className="mt-4 flex max-w-sm items-center gap-2">
+              <input
+                type="text"
+                name="referralCode"
+                placeholder="Have a referral code?"
+                maxLength={6}
+                className="w-full rounded-control border border-border-subtle px-3 py-2 text-sm uppercase outline-none focus:border-foreground"
+              />
+              <button
+                type="submit"
+                className="shrink-0 rounded-control border border-border-subtle px-4 py-2 text-sm font-medium transition hover:border-foreground"
+              >
+                Apply
+              </button>
+            </form>
+          )}
+          {referralSuccess && <p className="mt-2 text-sm text-neutral-500">Referral code applied — thanks!</p>}
+          {referralError && <p role="alert" className="mt-2 text-sm text-neutral-500">That referral code isn&apos;t valid.</p>}
+        </section>
+      )}
 
       <section className="mt-12 border-t border-border-subtle pt-8">
         <WishlistSection />

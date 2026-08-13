@@ -2,7 +2,7 @@ import "server-only";
 import { Resend } from "resend";
 import { formatPrice } from "./format";
 import { SITE_URL } from "./site";
-import type { Customer, DeliveryNote, Employee, Estimate, Invoice, Payslip, Receipt } from "@prisma/client";
+import type { Customer, DeliveryNote, Employee, Estimate, Invoice, Order, Payslip, Receipt } from "@prisma/client";
 
 const apiKey = process.env.RESEND_API_KEY;
 const from = process.env.DOCUMENT_EMAIL_FROM;
@@ -47,6 +47,31 @@ async function sendDocumentEmail(options: {
   if (error) {
     throw new Error(`Failed to send email: ${error.message}`);
   }
+}
+
+/** Like sendDocumentEmail but for messages with no PDF attachment (e.g. the feedback follow-up). */
+async function sendPlainEmail(options: { to: string; subject: string; html: string }): Promise<void> {
+  if (!resend || !from) {
+    throw new Error(
+      "Email isn't configured yet — set RESEND_API_KEY and DOCUMENT_EMAIL_FROM to send documents by email.",
+    );
+  }
+  const { error } = await resend.emails.send({ from, to: options.to, subject: options.subject, html: options.html });
+  if (error) {
+    throw new Error(`Failed to send email: ${error.message}`);
+  }
+}
+
+export async function sendFeedbackFollowupEmail(order: Order, customer: Customer, feedbackToken: string): Promise<void> {
+  if (!customer.email) throw new Error("Customer has no email on file.");
+  const link = `${SITE_URL}/feedback/${feedbackToken}`;
+  await sendPlainEmail({
+    to: customer.email,
+    subject: "How was your NURU order?",
+    html: `<p>Hi ${escapeHtml(customer.name ?? "")},</p><p>It's been a couple of weeks since your order${
+      order.shopifyOrderName ? ` ${escapeHtml(order.shopifyOrderName)}` : ""
+    } — we'd love to hear how it went. It only takes a minute:</p><p><a href="${link}">${link}</a></p>`,
+  });
 }
 
 function estimateResponseUrl(estimate: Estimate): string {

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { ADMIN_SESSION_COOKIE, isValidAdminSessionValue } from "@/lib/admin-session-token";
+import { SESSION_COOKIE, SESSION_MAX_AGE_SECONDS, getSessionSecret, mintSessionCookieValue, readSessionId } from "@/lib/session-token";
 
 const MAINTENANCE_MODE = process.env.MAINTENANCE_MODE === "true";
 
@@ -27,6 +28,26 @@ export function proxy(request: NextRequest) {
   if (MAINTENANCE_MODE && pathname !== "/maintenance") {
     return NextResponse.redirect(new URL("/maintenance", request.url));
   }
+
+  // First-party shopper session id (see src/lib/session.ts) — minted here, on
+  // first visit, so every downstream Server Component/Action/Route Handler
+  // for this request already sees it via next/headers cookies(). Used to
+  // attribute anonymous browsing/concierge signals (src/lib/interactions.ts)
+  // until the shopper identifies themselves via sign-in or checkout.
+  const secret = getSessionSecret();
+  if (readSessionId(request.cookies.get(SESSION_COOKIE)?.value, secret)) return;
+
+  const { value } = mintSessionCookieValue(secret);
+  request.cookies.set(SESSION_COOKIE, value);
+  const response = NextResponse.next({ request });
+  response.cookies.set(SESSION_COOKIE, value, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    maxAge: SESSION_MAX_AGE_SECONDS,
+    path: "/",
+  });
+  return response;
 }
 
 export const config = {

@@ -14,6 +14,7 @@ import {
 } from "./shopify";
 import type { ProductsPage } from "./shopify";
 import type { Cart, Product } from "./shopify/types";
+import { getSessionId, SESSION_CART_ATTRIBUTE_KEY } from "./session";
 
 const CART_COOKIE = "cartId";
 
@@ -51,7 +52,26 @@ async function replaceCart(): Promise<Cart> {
 export async function getCart(): Promise<Cart | null> {
   const cartId = await getValidCartId();
   if (!cartId) return null;
-  return getCartFromShopify(cartId);
+  const cart = await getCartFromShopify(cartId);
+  if (cart) {
+    // Fire-and-forget — tags the cart with this browser's session id so a later checkout
+    // completion can backfill this session's Interaction rows onto the resulting Order's customer
+    // (see importShopifyOrder in src/lib/admin-actions.ts). Short-circuits to a cheap array check
+    // once tagged, so this only costs a real Shopify write the first time per cart.
+    void attachSessionAttribute(cart).catch((error) => console.error("Failed to tag cart with session id:", error));
+  }
+  return cart;
+}
+
+async function attachSessionAttribute(cart: Cart): Promise<void> {
+  const sessionId = await getSessionId();
+  if (!sessionId) return;
+  if (cart.attributes.some((a) => a.key === SESSION_CART_ATTRIBUTE_KEY && a.value === sessionId)) return;
+  const merged = [
+    ...cart.attributes.filter((a) => a.key !== SESSION_CART_ATTRIBUTE_KEY),
+    { key: SESSION_CART_ATTRIBUTE_KEY, value: sessionId },
+  ];
+  await updateCartAttributesInShopify(cart.id, merged);
 }
 
 export async function addItem(variantId: string, quantity: number = 1): Promise<Cart> {
@@ -101,7 +121,11 @@ export async function removeItem(lineId: string): Promise<Cart> {
 /** Tags the current session's cart as AI-concierge-assisted, so completed orders carry it through to the AI-attribution report. */
 export async function markCartConciergeAssisted(): Promise<void> {
   const cartId = await getOrCreateCartId();
-  await updateCartAttributesInShopify(cartId, [{ key: "concierge_assisted", value: "true" }]);
+  // cartAttributesUpdate replaces the full attributes list, so merge with whatever's already there
+  // (e.g. the nuru_session_id tag set by getCart's attachSessionAttribute) instead of clobbering it.
+  const cart = await getCartFromShopify(cartId);
+  const merged = [...(cart?.attributes.filter((a) => a.key !== "concierge_assisted") ?? []), { key: "concierge_assisted", value: "true" }];
+  await updateCartAttributesInShopify(cartId, merged);
 }
 
 export type SearchSuggestion = {

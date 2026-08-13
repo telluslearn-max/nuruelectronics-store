@@ -11,6 +11,10 @@
     {
       "path": "/api/cron/sync-product-embeddings",
       "schedule": "0 4 * * *"
+    },
+    {
+      "path": "/api/cron/feedback-followup",
+      "schedule": "0 7 * * *"
     }
   ]
 }

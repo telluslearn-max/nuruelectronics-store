@@ -1,16 +1,19 @@
 "use server";
 
 import { CONCIERGE_MODEL, getGenAIClient, isConciergeConfigured } from "@/lib/concierge/vertex-client";
+import { getCurrentDbCustomerId } from "@/lib/customer";
+import { getCustomerRecommendationSignals, getSessionRecommendationHandles } from "@/lib/interactions";
+import { getSessionId } from "@/lib/session";
 import { getProductByHandle, getProducts } from "@/lib/shopify";
 import type { Product } from "@/lib/shopify/types";
 
 const CANDIDATE_POOL_SIZE = 60;
 const RECOMMENDATION_COUNT = 8;
 
-async function rankCandidatesWithGemini(recentTitles: string[], candidates: Product[]): Promise<string[]> {
+async function rankCandidatesWithGemini(signalTitles: string[], candidates: Product[]): Promise<string[]> {
   const ai = getGenAIClient();
   const candidateList = candidates.map((p) => `${p.handle}: ${p.title} (${p.productType})`).join("\n");
-  const prompt = `A shopper on our electronics store recently viewed: ${recentTitles.join(", ")}.\n\nFrom the candidate list below, pick the ${RECOMMENDATION_COUNT} products most likely to interest them next for a homepage "For You" section — prefer complementary or comparable products over near-duplicates of what they already viewed. Return ONLY a JSON array of handles, most relevant first — no other text.\n\n${candidateList}`;
+  const prompt = `A shopper on our electronics store has shown interest in: ${signalTitles.join(", ")}.\n\nFrom the candidate list below, pick the ${RECOMMENDATION_COUNT} products most likely to interest them next for a homepage "For You" section — prefer complementary or comparable products over near-duplicates of what they already have/viewed. Return ONLY a JSON array of handles, most relevant first — no other text.\n\n${candidateList}`;
 
   const response = await ai.models.generateContent({
     model: CONCIERGE_MODEL,
@@ -23,38 +26,53 @@ async function rankCandidatesWithGemini(recentTitles: string[], candidates: Prod
 }
 
 /**
- * Homepage "For You" recommendations from the shopper's own recently-viewed handles (the existing
- * client-side localStorage list — src/components/use-recently-viewed.ts — reused as-is rather than
- * standing up a second, server-side tracking mechanism), Gemini-ranked when there's history and
- * Vertex AI is configured. For new visitors with no history yet — or if Vertex isn't configured, or
- * the ranking call fails — falls back to storewide best sellers so the section always has real
- * products rather than disappearing for first-time visitors.
+ * Homepage "For You" recommendations, Gemini-ranked against real signal when there's any and
+ * Vertex AI is configured, falling back to storewide best sellers otherwise (new visitors, no
+ * Vertex, or a failed ranking call) so the section always has real products.
+ *
+ * The signal itself differs by who's asking — this is the fix for "same question, different
+ * customer, different recommendation":
+ * - Signed in: real Order history (categories/products actually purchased) plus this customer's
+ *   recent Interaction rows (inferred category/intent from browsing and concierge chat) — not just
+ *   whatever handles the client happens to pass.
+ * - Anonymous: server-side Interaction rows for this browser's session id, merged with the
+ *   client-supplied localStorage recently-viewed list (`recentHandles`) rather than replacing it —
+ *   the client list can predate this session's Interaction rows.
  */
 export async function getPersonalizedHomepageProducts(recentHandles: string[]): Promise<Product[]> {
   try {
-    if (recentHandles.length === 0 || !isConciergeConfigured) {
-      const { products } = await getProducts({ sortKey: "BEST_SELLING", first: RECOMMENDATION_COUNT });
-      return products;
+    const customerId = await getCurrentDbCustomerId();
+
+    let signalTitles: string[];
+    let excludeHandles: string[];
+
+    if (customerId) {
+      signalTitles = await getCustomerRecommendationSignals(customerId);
+      excludeHandles = recentHandles;
+    } else {
+      const sessionId = await getSessionId();
+      const sessionHandles = sessionId ? await getSessionRecommendationHandles(sessionId) : [];
+      const mergedHandles = Array.from(new Set([...recentHandles, ...sessionHandles]));
+      excludeHandles = mergedHandles;
+
+      const recentProducts = (await Promise.all(mergedHandles.map((h) => getProductByHandle(h)))).filter(
+        (p): p is Product => p !== null,
+      );
+      signalTitles = recentProducts.map((p) => p.title);
     }
 
-    const recentProducts = (await Promise.all(recentHandles.map((h) => getProductByHandle(h)))).filter(
-      (p): p is Product => p !== null,
-    );
-    if (recentProducts.length === 0) {
+    if (signalTitles.length === 0 || !isConciergeConfigured) {
       const { products } = await getProducts({ sortKey: "BEST_SELLING", first: RECOMMENDATION_COUNT });
       return products;
     }
 
     const { products: candidatePool } = await getProducts({ first: CANDIDATE_POOL_SIZE });
-    const candidates = candidatePool.filter((p) => !recentHandles.includes(p.handle));
+    const candidates = candidatePool.filter((p) => !excludeHandles.includes(p.handle));
     if (candidates.length === 0) return [];
 
     let rankedHandles: string[] = [];
     try {
-      rankedHandles = await rankCandidatesWithGemini(
-        recentProducts.map((p) => p.title),
-        candidates,
-      );
+      rankedHandles = await rankCandidatesWithGemini(signalTitles, candidates);
     } catch (error) {
       console.error("Gemini homepage ranking failed:", error);
     }
