@@ -7,6 +7,7 @@ import { requireAdminSession } from "./admin-auth";
 import { generateAccessToken, mintDocumentNumber } from "./documents";
 import { ACCOUNTS, cashAccountForMethod, postJournalEntry } from "./ledger";
 import { decrementVariantInventory, getShopifyOrderById } from "./shopify/admin-api";
+import { getProducts, sanitizeFreeTextSearchTerm } from "./shopify";
 import { isEmailConfigured, sendDeliveryNoteEmail as sendDeliveryNoteEmailMessage, sendEstimateEmail as sendEstimateEmailMessage, sendInvoiceEmail as sendInvoiceEmailMessage, sendReceiptEmail as sendReceiptEmailMessage } from "./email";
 import { renderDeliveryNotePdf, renderEstimatePdf, renderInvoicePdf, renderReceiptPdf } from "./pdf/render";
 import { ActionGuardError, redirectWithError, redirectWithSuccess } from "./admin-feedback";
@@ -35,6 +36,45 @@ function parseLineItems(
     });
   }
   return items;
+}
+
+export type OrderVariantSuggestion = {
+  variantId: string;
+  title: string;
+  price: string;
+  currencyCode: string;
+  imageUrl?: string;
+};
+
+/** Powers the product-search autocomplete on the manual-order line-item form, so staff pick a
+ * real Shopify product/variant instead of hand-typing its GID. Flattens matched products' variants
+ * into a flat list (capped) rather than a two-step product-then-variant picker, since a manual
+ * order line is always exactly one variant. */
+export async function searchProductVariantsForOrder(term: string): Promise<OrderVariantSuggestion[]> {
+  await requireAdminSession();
+  const trimmed = term.trim();
+  if (trimmed.length < 2) return [];
+
+  const { products } = await getProducts({
+    searchTerm: sanitizeFreeTextSearchTerm(trimmed),
+    first: 6,
+    includeExUk: true,
+  });
+
+  const suggestions: OrderVariantSuggestion[] = [];
+  for (const product of products) {
+    for (const variant of product.variants) {
+      suggestions.push({
+        variantId: variant.id,
+        title: variant.title === "Default" ? product.title : `${product.title} — ${variant.title}`,
+        price: variant.price.amount,
+        currencyCode: variant.price.currencyCode,
+        imageUrl: product.images[0]?.url,
+      });
+      if (suggestions.length >= 12) return suggestions;
+    }
+  }
+  return suggestions;
 }
 
 export async function createManualOrder(formData: FormData): Promise<void> {
