@@ -549,3 +549,66 @@ model ReturnCase {
   @@index([shopifyOrderId])
   @@index([status, createdAt])
 }
+
+// ---------------------------------------------------------------------------
+// Capital Circle — the firewalled, USDC-funded pool that hunts for profit
+// outside electronics retail (see src/lib/capital-circle/). Deliberately
+// separate from every model above: this pool can only ever lose what's
+// already inside it, and never has any claim on the core ledger.
+//
+// Phase A (current): no real Circle wallet exists yet (owner hasn't
+// completed Circle's mainnet/KYB signup — see the project's Two Circles
+// plan doc). Positions are written with status "simulated" against real,
+// live Polymarket market data, with no wallet or funds attached.
+// Phase B: once a real mainnet agent wallet exists, CapitalCircleWallet
+// rows track its address and the spending-policy caps configured on it
+// (via `circle wallet limit set`), and positions can move to "executed".
+// ---------------------------------------------------------------------------
+
+enum CapitalCircleWalletStatus {
+  pending
+  active
+  frozen
+}
+
+model CapitalCircleWallet {
+  id            String                    @id @default(cuid())
+  address       String?                   @unique
+  chain         String                    @default("polygon")
+  status        CapitalCircleWalletStatus @default(pending)
+  perTxCapUsd   Decimal?                  @db.Decimal(10, 2)
+  dailyCapUsd   Decimal?                  @db.Decimal(10, 2)
+  weeklyCapUsd  Decimal?                  @db.Decimal(10, 2)
+  monthlyCapUsd Decimal?                  @db.Decimal(10, 2)
+  createdAt     DateTime                  @default(now())
+  updatedAt     DateTime                  @updatedAt
+
+  positions CapitalCirclePosition[]
+}
+
+enum CapitalCirclePositionStatus {
+  simulated
+  approved
+  executed
+  rejected
+}
+
+model CapitalCirclePosition {
+  id         String                      @id @default(cuid())
+  walletId   String?
+  wallet     CapitalCircleWallet?        @relation(fields: [walletId], references: [id])
+  venue      String                      @default("polymarket")
+  marketId   String
+  tokenId    String?
+  question   String
+  thesis     String
+  sizeUsd    Decimal                     @db.Decimal(10, 2)
+  status     CapitalCirclePositionStatus @default(simulated)
+  txHash     String?
+  resultUsd  Decimal?                    @db.Decimal(10, 2)
+  createdAt  DateTime                    @default(now())
+  resolvedAt DateTime?
+
+  @@index([status, createdAt])
+  @@index([walletId])
+}
