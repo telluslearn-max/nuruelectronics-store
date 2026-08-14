@@ -112,8 +112,22 @@ model Order {
   estimates    Estimate[]
   invoice      Invoice?
   deliveryNote DeliveryNote?
+  costs        OrderCost[]
 
   @@index([customerId])
+}
+
+// Extra costs against an order that eat into margin — rider fee, packaging, fuel, whatever
+// applies. Varies per order, so it's a free-form label + amount rather than fixed columns.
+model OrderCost {
+  id        String   @id @default(cuid())
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  label     String
+  amount    Decimal  @db.Decimal(10, 2)
+  createdAt DateTime @default(now())
+
+  @@index([orderId])
 }
 
 model OrderItem {
@@ -220,10 +234,6 @@ model DeliveryNote {
   // so gig-delivery volume/payouts can be reported (see riders-impact report).
   riderId String?
   rider   Employee? @relation(fields: [riderId], references: [id])
-
-  // What this specific trip cost (rider payout/fuel/etc.), staff-entered when marking delivered —
-  // deducted from the order's margin (see src/lib/margin.ts).
-  riderCost Decimal? @db.Decimal(10, 2)
 
   @@index([riderId])
 }

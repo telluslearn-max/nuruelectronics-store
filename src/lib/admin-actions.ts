@@ -89,6 +89,39 @@ export async function createManualOrder(formData: FormData): Promise<void> {
   redirectWithSuccess(`/admin/orders/${order.id}`, "Order created.");
 }
 
+export async function addOrderCost(orderId: string, formData: FormData): Promise<void> {
+  await requireAdminSession();
+
+  const label = String(formData.get("label") ?? "").trim();
+  const amount = Number(formData.get("amount") ?? 0) || 0;
+
+  if (!label || amount <= 0) {
+    redirectWithError(`/admin/orders/${orderId}`, "A label and an amount greater than zero are required.");
+  }
+
+  await prisma.orderCost.create({
+    data: { orderId, label, amount: amount.toFixed(2) },
+  });
+
+  revalidatePath(`/admin/orders/${orderId}`);
+  redirectWithSuccess(`/admin/orders/${orderId}`, "Cost added.");
+}
+
+export async function deleteOrderCost(orderCostId: string): Promise<void> {
+  await requireAdminSession();
+
+  const cost = await prisma.orderCost.delete({ where: { id: orderCostId } });
+  await logAdminAction({
+    action: "orderCost.delete",
+    entityType: "orderCost",
+    entityId: orderCostId,
+    summary: `Deleted cost "${cost.label}" (${cost.amount}) from order ${cost.orderId}`,
+  });
+
+  revalidatePath(`/admin/orders/${cost.orderId}`);
+  redirectWithSuccess(`/admin/orders/${cost.orderId}`, "Cost removed.");
+}
+
 /** Imports a live Shopify order into our own Order/OrderItem tables on first use, so it can carry documents. Idempotent on shopifyOrderId. */
 export async function importShopifyOrder(shopifyOrderId: string): Promise<void> {
   await requireAdminSession();
@@ -725,8 +758,6 @@ export async function markDelivered(deliveryNoteId: string, formData: FormData):
   await requireAdminSession();
   const receivedBy = String(formData.get("receivedBy") ?? "").trim() || null;
   const riderId = String(formData.get("riderId") ?? "").trim() || null;
-  const riderCostRaw = String(formData.get("riderCost") ?? "").trim();
-  const riderCost = riderCostRaw === "" ? null : (Number(riderCostRaw) || 0).toFixed(2);
   const confirmPayment = formData.get("confirmPayment") === "on";
 
   const existing = await prisma.deliveryNote.findUniqueOrThrow({
@@ -756,7 +787,7 @@ export async function markDelivered(deliveryNoteId: string, formData: FormData):
 
   const note = await prisma.deliveryNote.update({
     where: { id: deliveryNoteId },
-    data: { status: "delivered", receivedBy, riderId, riderCost, deliveredAt: new Date() },
+    data: { status: "delivered", receivedBy, riderId, deliveredAt: new Date() },
   });
 
   if (!paymentConfirmed) {

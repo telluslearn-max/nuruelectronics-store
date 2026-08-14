@@ -27,20 +27,25 @@ export type OrderMarginSummary = {
   cost: number;
   grossMargin: number;
   grossMarginPercent: number | null;
-  riderCost: number;
+  otherCosts: number;
   netMargin: number;
   netMarginPercent: number | null;
   hasCostData: boolean;
 };
 
-export function computeOrderMargin(items: LineMarginInput[], riderCost: number): OrderMarginSummary {
+/**
+ * `otherCosts` is the sum of an order's OrderCost rows (rider fee, packaging, fuel, whatever was
+ * logged for that order) — a single already-summed number, since which costs apply varies per
+ * order and is entered manually rather than fixed columns.
+ */
+export function computeOrderMargin(items: LineMarginInput[], otherCosts: number): OrderMarginSummary {
   const revenue = items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
   const hasCostData = items.some((item) => item.unitCost != null);
   const cost = items.reduce((sum, item) => sum + (item.unitCost ?? 0) * item.quantity, 0);
   const grossMargin = revenue - cost;
   const grossMarginPercent = revenue > 0 ? (grossMargin / revenue) * 100 : null;
-  const netMargin = grossMargin - riderCost;
+  const netMargin = grossMargin - otherCosts;
   const netMarginPercent = revenue > 0 ? (netMargin / revenue) * 100 : null;
 
-  return { revenue, cost, grossMargin, grossMarginPercent, riderCost, netMargin, netMarginPercent, hasCostData };
+  return { revenue, cost, grossMargin, grossMarginPercent, otherCosts, netMargin, netMarginPercent, hasCostData };
 }

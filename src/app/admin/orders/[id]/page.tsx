@@ -11,10 +11,12 @@ import { ConfirmSubmitButton } from "@/components/admin/confirm-submit-button";
 import { FeedbackBanner } from "@/components/admin/feedback-banner";
 import { SubmitButton } from "@/components/admin/submit-button";
 import {
+  addOrderCost,
   createInvoiceFromEstimate,
   deleteDeliveryNote,
   deleteEstimate,
   deleteInvoice,
+  deleteOrderCost,
   markDelivered,
   recordPayment,
   sendDeliveryNoteEmail,
@@ -62,6 +64,7 @@ export default async function AdminOrderHubPage({
       estimates: { orderBy: { createdAt: "desc" } },
       invoice: { include: { receipts: { orderBy: { paidAt: "desc" } } } },
       deliveryNote: true,
+      costs: { orderBy: { createdAt: "asc" } },
     },
   });
 
@@ -84,13 +87,14 @@ export default async function AdminOrderHubPage({
   const formatMoney = (amount: string | number) => formatPrice(String(amount), order.currencyCode);
   const acceptedEstimateWithoutInvoice = order.estimates.find((e) => e.status === "accepted") && !order.invoice;
   const itemsSubtotal = order.items.reduce((sum, item) => sum + Number(item.lineTotal), 0);
+  const otherCostsTotal = order.costs.reduce((sum, cost) => sum + Number(cost.amount), 0);
   const orderMargin = computeOrderMargin(
     order.items.map((item) => ({
       unitPrice: Number(item.unitPrice),
       unitCost: item.unitCost == null ? null : Number(item.unitCost),
       quantity: item.quantity,
     })),
-    order.deliveryNote?.riderCost == null ? 0 : Number(order.deliveryNote.riderCost),
+    otherCostsTotal,
   );
   const formatPercent = (percent: number | null) => (percent == null ? "—" : `${percent.toFixed(1)}%`);
   const invoiceDeletable = order.invoice ? Number(order.invoice.amountPaid) === 0 : false;
@@ -147,39 +151,68 @@ export default async function AdminOrderHubPage({
             </li>
           ))}
         </ul>
-        {orderMargin.hasCostData && (
-          <div className="mt-4 rounded-card border border-border-subtle p-4 text-sm">
-            <p className={cardLabelClass}>Margin</p>
+        <div className="mt-4 rounded-card border border-border-subtle p-4 text-sm">
+          <p className={cardLabelClass}>Margin</p>
+          {(orderMargin.hasCostData || order.costs.length > 0) && (
             <div className="mt-2 space-y-1">
               <div className="flex items-center justify-between">
                 <span className="text-neutral-500">Revenue</span>
                 <span>{formatMoney(orderMargin.revenue.toFixed(2))}</span>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-neutral-500">Cost of goods</span>
-                <span>{formatMoney(orderMargin.cost.toFixed(2))}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-neutral-500">Gross margin</span>
-                <span>
-                  {formatMoney(orderMargin.grossMargin.toFixed(2))} ({formatPercent(orderMargin.grossMarginPercent)})
-                </span>
-              </div>
-              {orderMargin.riderCost > 0 && (
-                <div className="flex items-center justify-between">
-                  <span className="text-neutral-500">Rider cost</span>
-                  <span>− {formatMoney(orderMargin.riderCost.toFixed(2))}</span>
-                </div>
+              {orderMargin.hasCostData && (
+                <>
+                  <div className="flex items-center justify-between">
+                    <span className="text-neutral-500">Cost of goods</span>
+                    <span>{formatMoney(orderMargin.cost.toFixed(2))}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-neutral-500">Gross margin</span>
+                    <span>
+                      {formatMoney(orderMargin.grossMargin.toFixed(2))} ({formatPercent(orderMargin.grossMarginPercent)})
+                    </span>
+                  </div>
+                </>
               )}
+              {order.costs.map((cost) => (
+                <div key={cost.id} className="flex items-center justify-between gap-2">
+                  <span className="text-neutral-500">{cost.label}</span>
+                  <span className="flex items-center gap-2">
+                    − {formatMoney(cost.amount.toString())}
+                    <form action={deleteOrderCost.bind(null, cost.id)}>
+                      <button
+                        type="submit"
+                        aria-label={`Remove cost ${cost.label}`}
+                        className="text-neutral-400 hover:text-red-600"
+                      >
+                        ✕
+                      </button>
+                    </form>
+                  </span>
+                </div>
+              ))}
               <div className="flex items-center justify-between border-t border-border-subtle pt-1 font-medium">
-                <span>Net margin</span>
+                <span>{orderMargin.hasCostData ? "Net margin" : "Net (after other costs)"}</span>
                 <span className={orderMargin.netMargin >= 0 ? "text-green-700" : "text-red-700"}>
-                  {formatMoney(orderMargin.netMargin.toFixed(2))} ({formatPercent(orderMargin.netMarginPercent)})
+                  {formatMoney(orderMargin.netMargin.toFixed(2))}
+                  {orderMargin.hasCostData && ` (${formatPercent(orderMargin.netMarginPercent)})`}
                 </span>
               </div>
             </div>
-          </div>
-        )}
+          )}
+          <form action={addOrderCost.bind(null, order.id)} className="mt-3 flex flex-wrap items-end gap-2">
+            <div>
+              <label className="block text-[11px] text-neutral-500">Cost label</label>
+              <input type="text" name="label" required placeholder="Rider, packaging…" className={`${inputClass} w-36`} />
+            </div>
+            <div>
+              <label className="block text-[11px] text-neutral-500">Amount (KES)</label>
+              <input type="number" name="amount" min={0} step="0.01" required className={`${inputClass} w-28`} />
+            </div>
+            <SubmitButton className={secondaryButtonClass} pendingText="Adding…">
+              Add cost
+            </SubmitButton>
+          </form>
+        </div>
       </div>
 
       {/* Estimates */}
@@ -626,10 +659,6 @@ export default async function AdminOrderHubPage({
                       </option>
                     ))}
                   </select>
-                </div>
-                <div className="sm:w-40">
-                  <label className="block text-xs text-neutral-500">Rider cost (KES)</label>
-                  <input type="number" name="riderCost" min={0} step="0.01" className={inputClass} placeholder="optional" />
                 </div>
                 {!paymentConfirmed && (
                   <label className="flex items-center gap-2 text-sm text-amber-800 sm:basis-full">
