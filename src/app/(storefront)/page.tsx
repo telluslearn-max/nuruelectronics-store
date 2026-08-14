@@ -12,6 +12,13 @@ import { formatPrice } from "@/lib/format";
 import { getComingSoonProducts, getProducts } from "@/lib/shopify";
 import type { Product } from "@/lib/shopify/types";
 
+// The low-commitment first purchase — cables, cases, power banks — pulled
+// from the two categories where sub-5K items actually live in this catalog.
+// Deliberately not its own route: it's a Home rail sourced from existing
+// category queries, filtered by price, rather than new IA.
+const BUDGET_PRICE_LIMIT_KES = 5000;
+const BUDGET_SOURCE_SLUGS = ["accessories", "chargers"];
+
 // Hand-picked, cross-category — not just phones. Pulled from groups that
 // already exist in the catalog taxonomy, several called out in categories.ts
 // as the dominant vendor in their category (Razer, DJI, Vision Plus, Anker).
@@ -64,6 +71,10 @@ function FeatureCard({ product }: { product: Product }) {
 }
 
 export default async function HomePage() {
+  const budgetSourceCategories = BUDGET_SOURCE_SLUGS.map((slug) =>
+    categories.find((c) => c.slug === slug),
+  ).filter((c): c is (typeof categories)[number] => c !== undefined);
+
   const [
     flagshipPage,
     categoryHeroPages,
@@ -71,6 +82,7 @@ export default async function HomePage() {
     bestSellersPage,
     newArrivalsPage,
     popularCollectionPages,
+    budgetSourcePages,
   ] = await Promise.all([
     getProducts({
       searchTerm: "product_type:Smartphones",
@@ -89,7 +101,23 @@ export default async function HomePage() {
     Promise.all(
       popularCollectionGroups.map((group) => getProducts({ searchTerm: group.query, first: 8 })),
     ),
+    Promise.all(
+      budgetSourceCategories.map((category) =>
+        getProducts({ searchTerm: category.query, sortKey: "BEST_SELLING", first: 24 }),
+      ),
+    ),
   ]);
+
+  const seenBudgetIds = new Set<string>();
+  const budgetProducts = budgetSourcePages
+    .flatMap((page) => page.products)
+    .filter((product) => {
+      if (seenBudgetIds.has(product.id)) return false;
+      if (Number(product.priceRange.minVariantPrice.amount) > BUDGET_PRICE_LIMIT_KES) return false;
+      seenBudgetIds.add(product.id);
+      return true;
+    })
+    .slice(0, 12);
 
   const [hero, ...features] = flagshipPage.products;
   const heroPrice = hero?.priceRange.minVariantPrice;
@@ -176,6 +204,24 @@ export default async function HomePage() {
           <SectionHeading eyebrow="Just landed" title="New arrivals" subtitle="The newest additions to the NURU catalog." />
           <div className="mt-6">
             <ProductCarousel products={newArrivalsPage.products} />
+          </div>
+        </section>
+      )}
+
+      {budgetProducts.length > 0 && (
+        <section className="mt-16">
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <SectionHeading
+              eyebrow="Low commitment, high utility"
+              title="Accessories under KSh 5,000"
+              subtitle="Cables, cases, and power banks — an easy first order while you decide on the big one."
+            />
+            <Link href="/category/accessories" className="text-sm font-medium text-accent hover:opacity-80">
+              See all
+            </Link>
+          </div>
+          <div className="mt-6">
+            <ProductCarousel products={budgetProducts} />
           </div>
         </section>
       )}
