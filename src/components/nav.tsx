@@ -99,17 +99,11 @@ export function Nav({
           <div className="hidden min-w-0 flex-1 md:block">
             <SearchBox />
           </div>
-          <div className="ml-auto hidden shrink-0 items-center gap-2 md:ml-0 md:flex md:gap-4">
-            {authEnabled && (
-              <Link
-                href={customerName ? "/account" : "/api/auth/login"}
-                className="shrink-0 whitespace-nowrap text-sm font-medium text-neutral-600 transition hover:text-foreground"
-              >
-                {customerName ? customerName.split(" ")[0] : "Sign in"}
-              </Link>
-            )}
+          <div className="ml-auto flex shrink-0 items-center gap-2 md:ml-0 md:gap-4">
+            {/* Visible at every breakpoint — unlike Cart, Wishlist has no mobile tab-bar
+                entry, so this icon is its only route there. */}
             <Link
-              href="/account"
+              href="/wishlist"
               aria-label={`Wishlist${wishlistItems.length > 0 ? `, ${wishlistItems.length} items` : ""}`}
               className="relative shrink-0 rounded-control border border-border-subtle p-2 transition hover:border-foreground"
             >
@@ -120,18 +114,28 @@ export function Nav({
                 </span>
               )}
             </Link>
-            <button
-              onClick={openCart}
-              aria-label={`Open cart${itemCount > 0 ? `, ${itemCount} items` : ""}`}
-              className="relative shrink-0 rounded-control border border-border-subtle px-4 py-2 text-sm font-medium transition hover:border-foreground"
-            >
-              Cart
-              {itemCount > 0 && (
-                <span className="ml-2 inline-flex h-5 w-5 items-center justify-center rounded-control bg-accent text-xs text-accent-foreground">
-                  {itemCount}
-                </span>
+            <div className="hidden shrink-0 items-center gap-2 md:flex md:gap-4">
+              {authEnabled && (
+                <Link
+                  href={customerName ? "/account" : "/api/auth/login"}
+                  className="shrink-0 whitespace-nowrap text-sm font-medium text-neutral-600 transition hover:text-foreground"
+                >
+                  {customerName ? customerName.split(" ")[0] : "Sign in"}
+                </Link>
               )}
-            </button>
+              <button
+                onClick={openCart}
+                aria-label={`Open cart${itemCount > 0 ? `, ${itemCount} items` : ""}`}
+                className="relative shrink-0 rounded-control border border-border-subtle px-4 py-2 text-sm font-medium transition hover:border-foreground"
+              >
+                Cart
+                {itemCount > 0 && (
+                  <span className="ml-2 inline-flex h-5 w-5 items-center justify-center rounded-control bg-accent text-xs text-accent-foreground">
+                    {itemCount}
+                  </span>
+                )}
+              </button>
+            </div>
           </div>
         </div>
         <div className="mt-3 md:hidden">

@@ -1,16 +1,21 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { IBM_Plex_Mono, Manrope } from "next/font/google";
 import "./globals.css";
 import { SITE_URL } from "@/lib/site";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+// Manrope for display/body — a confident, warm grotesk rather than the
+// default Next.js starter face. IBM Plex Mono carries eyebrows, prices, and
+// spec labels — a technical face on purpose, tying the type system to the
+// catalog it's selling rather than sitting on top of it as decoration.
+const sans = Manrope({
+  variable: "--font-body",
   subsets: ["latin"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const mono = IBM_Plex_Mono({
+  variable: "--font-technical",
   subsets: ["latin"],
+  weight: ["400", "500", "600"],
 });
 
 const DESCRIPTION =
@@ -39,7 +44,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0a0a0a",
+  themeColor: "#ffffff",
   viewportFit: "cover",
 };
 
@@ -85,7 +90,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${sans.variable} ${mono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
         <script

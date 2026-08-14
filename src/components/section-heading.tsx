@@ -9,9 +9,9 @@ export function SectionHeading({
 }) {
   return (
     <div>
-      <p className="text-xs font-medium uppercase tracking-wide text-accent">{eyebrow}</p>
-      <h2 className="mt-1 text-title">{title}</h2>
-      {subtitle && <p className="mt-2 text-neutral-500">{subtitle}</p>}
+      <p className="text-eyebrow font-mono uppercase text-accent">{eyebrow}</p>
+      <h2 className="mt-2 text-title">{title}</h2>
+      {subtitle && <p className="mt-2 max-w-md text-neutral-500">{subtitle}</p>}
     </div>
   );
 }

@@ -12,6 +12,13 @@ import { formatPrice } from "@/lib/format";
 import { getComingSoonProducts, getProducts } from "@/lib/shopify";
 import type { Product } from "@/lib/shopify/types";
 
+// The low-commitment first purchase — cables, cases, power banks — pulled
+// from the two categories where sub-5K items actually live in this catalog.
+// Deliberately not its own route: it's a Home rail sourced from existing
+// category queries, filtered by price, rather than new IA.
+const BUDGET_PRICE_LIMIT_KES = 5000;
+const BUDGET_SOURCE_SLUGS = ["accessories", "chargers"];
+
 // Hand-picked, cross-category — not just phones. Pulled from groups that
 // already exist in the catalog taxonomy, several called out in categories.ts
 // as the dominant vendor in their category (Razer, DJI, Vision Plus, Anker).
@@ -64,6 +71,10 @@ function FeatureCard({ product }: { product: Product }) {
 }
 
 export default async function HomePage() {
+  const budgetSourceCategories = BUDGET_SOURCE_SLUGS.map((slug) =>
+    categories.find((c) => c.slug === slug),
+  ).filter((c): c is (typeof categories)[number] => c !== undefined);
+
   const [
     flagshipPage,
     categoryHeroPages,
@@ -71,6 +82,7 @@ export default async function HomePage() {
     bestSellersPage,
     newArrivalsPage,
     popularCollectionPages,
+    budgetSourcePages,
   ] = await Promise.all([
     getProducts({
       searchTerm: "product_type:Smartphones",
@@ -89,10 +101,25 @@ export default async function HomePage() {
     Promise.all(
       popularCollectionGroups.map((group) => getProducts({ searchTerm: group.query, first: 8 })),
     ),
+    Promise.all(
+      budgetSourceCategories.map((category) =>
+        getProducts({ searchTerm: category.query, sortKey: "BEST_SELLING", first: 24 }),
+      ),
+    ),
   ]);
 
+  const seenBudgetIds = new Set<string>();
+  const budgetProducts = budgetSourcePages
+    .flatMap((page) => page.products)
+    .filter((product) => {
+      if (seenBudgetIds.has(product.id)) return false;
+      if (Number(product.priceRange.minVariantPrice.amount) > BUDGET_PRICE_LIMIT_KES) return false;
+      seenBudgetIds.add(product.id);
+      return true;
+    })
+    .slice(0, 12);
+
   const [hero, ...features] = flagshipPage.products;
-  const heroPrice = hero?.priceRange.minVariantPrice;
 
   const bentoCategories = categories.map((category, i) => ({
     slug: category.slug,
@@ -109,40 +136,31 @@ export default async function HomePage() {
   return (
     <div>
       {hero && (
-        <section className="animate-fade-up overflow-hidden rounded-card bg-surface-dark text-surface-dark-foreground">
-          <div className="grid grid-cols-1 items-center gap-8 p-8 sm:p-12 md:grid-cols-2">
-            <div>
-              <p className="text-sm font-medium uppercase tracking-wide text-accent">
-                Genuine electronics. Delivered fast.
-              </p>
-              <h1 className="mt-2 text-title sm:text-display">{hero.title}</h1>
-              <p className="mt-4 max-w-md text-neutral-400">{firstSentence(hero.description)}</p>
-              {heroPrice && (
-                <p className="mt-4 text-lg font-medium">
-                  From {formatPrice(heroPrice.amount, heroPrice.currencyCode)}
-                </p>
-              )}
-              <div className="mt-8 flex flex-wrap gap-3">
+        <section className="animate-fade-up">
+          <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] md:items-center md:gap-8">
+            <div className="pt-2 sm:pt-6">
+              <span className="inline-flex items-center rounded-control border border-border-subtle px-2.5 py-1 text-eyebrow font-mono text-accent">
+                New
+              </span>
+              <h1 className="mt-4 text-display">{hero.title}</h1>
+              <p className="mt-5 max-w-sm text-neutral-500">{firstSentence(hero.description)}</p>
+              <div className="mt-8">
                 <Link
                   href={`/products/${hero.handle}`}
-                  className="rounded-control bg-accent px-6 py-3 text-sm font-medium text-accent-foreground transition hover:opacity-90"
+                  className="inline-flex items-center gap-2 rounded-control bg-foreground px-6 py-3.5 text-sm font-semibold text-background transition hover:opacity-90"
                 >
-                  Shop now
-                </Link>
-                <Link
-                  href="/category/phones"
-                  className="rounded-control border border-neutral-600 px-6 py-3 text-sm font-medium transition hover:border-neutral-300"
-                >
-                  Explore phones
+                  Shop {hero.title}
+                  <span aria-hidden="true">&rarr;</span>
                 </Link>
               </div>
             </div>
-            <div className="relative mx-auto aspect-square w-full max-w-sm overflow-hidden rounded-lg">
+            <div className="relative -mx-4 mt-6 aspect-[5/4] sm:mx-0 sm:aspect-[4/3] md:mt-0 md:aspect-square">
               <ProductMedia
                 image={hero.images[0]}
                 title={hero.title}
                 productType={hero.productType}
-                sizes="(min-width: 768px) 24rem, 100vw"
+                sizes="(min-width: 768px) 44rem, 100vw"
+                className="object-contain"
                 priority
               />
             </div>
@@ -176,6 +194,24 @@ export default async function HomePage() {
           <SectionHeading eyebrow="Just landed" title="New arrivals" subtitle="The newest additions to the NURU catalog." />
           <div className="mt-6">
             <ProductCarousel products={newArrivalsPage.products} />
+          </div>
+        </section>
+      )}
+
+      {budgetProducts.length > 0 && (
+        <section className="mt-16">
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <SectionHeading
+              eyebrow="Low commitment, high utility"
+              title="Accessories under KSh 5,000"
+              subtitle="Cables, cases, and power banks — an easy first order while you decide on the big one."
+            />
+            <Link href="/category/accessories" className="text-sm font-medium text-accent hover:opacity-80">
+              See all
+            </Link>
+          </div>
+          <div className="mt-6">
+            <ProductCarousel products={budgetProducts} />
           </div>
         </section>
       )}

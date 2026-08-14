@@ -4,17 +4,30 @@ import { useEffect, useRef } from "react";
 import { useFocusTrap } from "@/components/use-focus-trap";
 import type { Category } from "@/lib/categories";
 
+// Compared directly against the product's KES price elsewhere — see the matching note in
+// components/product-list.tsx, which had the same USD-labeled tiers.
+const PRICE_PRESETS = [
+  { label: "Any price", value: null },
+  { label: "Under KES 10,000", value: 10000 },
+  { label: "Under KES 50,000", value: 50000 },
+  { label: "Under KES 100,000", value: 100000 },
+];
+
 export function ExUkFilterSheet({
   categories,
   activeCategory,
+  maxPrice,
   resultCount,
   onChangeCategory,
+  onChangeMaxPrice,
   onClose,
 }: {
   categories: Category[];
   activeCategory: string | null;
+  maxPrice: number | null;
   resultCount: number;
   onChangeCategory: (slug: string | null) => void;
+  onChangeMaxPrice: (price: number | null) => void;
   onClose: () => void;
 }) {
   const closeButtonRef = useRef<HTMLButtonElement>(null);
@@ -69,6 +82,23 @@ export function ExUkFilterSheet({
               }`}
             >
               {category.label}
+            </button>
+          ))}
+        </div>
+
+        <h3 className="mb-2 mt-6 text-xs font-medium uppercase tracking-wide text-neutral-500">Price</h3>
+        <div className="flex flex-wrap gap-2">
+          {PRICE_PRESETS.map((preset) => (
+            <button
+              key={preset.label}
+              type="button"
+              aria-pressed={maxPrice === preset.value}
+              onClick={() => onChangeMaxPrice(preset.value)}
+              className={`rounded-control border px-3 py-1.5 text-sm ${
+                maxPrice === preset.value ? "border-accent bg-accent/10 text-accent" : "border-border-subtle text-neutral-600"
+              }`}
+            >
+              {preset.label}
             </button>
           ))}
         </div>
