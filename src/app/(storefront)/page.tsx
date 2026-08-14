@@ -120,7 +120,6 @@ export default async function HomePage() {
     .slice(0, 12);
 
   const [hero, ...features] = flagshipPage.products;
-  const heroPrice = hero?.priceRange.minVariantPrice;
 
   const bentoCategories = categories.map((category, i) => ({
     slug: category.slug,
@@ -137,35 +136,31 @@ export default async function HomePage() {
   return (
     <div>
       {hero && (
-        <section className="animate-fade-up overflow-hidden rounded-card bg-surface-dark text-surface-dark-foreground">
-          <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)] md:items-stretch">
-            <div className="flex flex-col justify-center p-8 sm:p-12 md:py-16">
-              <p className="text-eyebrow font-mono text-accent">
-                {hero.vendor ? `${hero.vendor} · This week's pick` : "This week's pick"}
-              </p>
-              <h1 className="mt-3 text-display">{hero.title}</h1>
-              <p className="mt-5 max-w-md text-neutral-400">{firstSentence(hero.description)}</p>
-              <div className="mt-8 flex flex-wrap items-center gap-x-5 gap-y-3">
+        <section className="animate-fade-up">
+          <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] md:items-center md:gap-8">
+            <div className="pt-2 sm:pt-6">
+              <span className="inline-flex items-center rounded-control border border-border-subtle px-2.5 py-1 text-eyebrow font-mono text-accent">
+                New
+              </span>
+              <h1 className="mt-4 text-display">{hero.title}</h1>
+              <p className="mt-5 max-w-sm text-neutral-500">{firstSentence(hero.description)}</p>
+              <div className="mt-8">
                 <Link
                   href={`/products/${hero.handle}`}
-                  className="rounded-control bg-accent px-6 py-3 text-sm font-semibold text-accent-foreground transition hover:opacity-90"
+                  className="inline-flex items-center gap-2 rounded-control bg-foreground px-6 py-3.5 text-sm font-semibold text-background transition hover:opacity-90"
                 >
-                  Shop now
+                  Shop {hero.title}
+                  <span aria-hidden="true">&rarr;</span>
                 </Link>
-                {heroPrice && (
-                  <span className="font-mono text-sm text-neutral-400">
-                    from {formatPrice(heroPrice.amount, heroPrice.currencyCode)}
-                  </span>
-                )}
               </div>
             </div>
-            <div className="relative min-h-[16rem] md:min-h-0">
+            <div className="relative -mx-4 mt-6 aspect-[5/4] sm:mx-0 sm:aspect-[4/3] md:mt-0 md:aspect-square">
               <ProductMedia
                 image={hero.images[0]}
                 title={hero.title}
                 productType={hero.productType}
                 sizes="(min-width: 768px) 44rem, 100vw"
-                className="object-contain object-bottom p-6 sm:p-10 md:object-center"
+                className="object-contain"
                 priority
               />
             </div>
