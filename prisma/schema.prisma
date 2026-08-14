@@ -123,8 +123,11 @@ model OrderItem {
   title     String
   variantId String?
   quantity  Int
-  unitPrice Decimal @db.Decimal(10, 2)
-  lineTotal Decimal @db.Decimal(10, 2)
+  unitPrice Decimal  @db.Decimal(10, 2)
+  // Cost price per unit, staff-entered — used to derive margin (unitPrice - unitCost) for
+  // reporting. Nullable: historic rows and Shopify-imported orders don't have it.
+  unitCost  Decimal? @db.Decimal(10, 2)
+  lineTotal Decimal  @db.Decimal(10, 2)
 
   @@index([orderId])
 }
@@ -217,6 +220,10 @@ model DeliveryNote {
   // so gig-delivery volume/payouts can be reported (see riders-impact report).
   riderId String?
   rider   Employee? @relation(fields: [riderId], references: [id])
+
+  // What this specific trip cost (rider payout/fuel/etc.), staff-entered when marking delivered —
+  // deducted from the order's margin (see src/lib/margin.ts).
+  riderCost Decimal? @db.Decimal(10, 2)
 
   @@index([riderId])
 }

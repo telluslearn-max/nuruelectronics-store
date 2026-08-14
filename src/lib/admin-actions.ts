@@ -15,12 +15,13 @@ import { PAYMENT_METHODS, parseEnumField } from "./parse-enum";
 
 function parseLineItems(
   formData: FormData,
-): { title: string; quantity: number; unitPrice: string; lineTotal: string; variantId?: string }[] {
-  const items: { title: string; quantity: number; unitPrice: string; lineTotal: string; variantId?: string }[] = [];
+): { title: string; quantity: number; unitPrice: string; unitCost?: string; lineTotal: string; variantId?: string }[] {
+  const items: { title: string; quantity: number; unitPrice: string; unitCost?: string; lineTotal: string; variantId?: string }[] = [];
   for (let i = 0; i < 20; i++) {
     const title = formData.get(`item_title_${i}`);
     const quantity = formData.get(`item_qty_${i}`);
     const unitPrice = formData.get(`item_price_${i}`);
+    const unitCostRaw = String(formData.get(`item_cost_${i}`) ?? "").trim();
     const variantId = String(formData.get(`item_variant_${i}`) ?? "").trim() || undefined;
     if (!title || String(title).trim() === "") continue;
     const qty = Number(quantity) || 0;
@@ -30,6 +31,7 @@ function parseLineItems(
       title: String(title).trim(),
       quantity: qty,
       unitPrice: price.toFixed(2),
+      unitCost: unitCostRaw === "" ? undefined : (Number(unitCostRaw) || 0).toFixed(2),
       lineTotal: (qty * price).toFixed(2),
       variantId,
     });
@@ -723,6 +725,8 @@ export async function markDelivered(deliveryNoteId: string, formData: FormData):
   await requireAdminSession();
   const receivedBy = String(formData.get("receivedBy") ?? "").trim() || null;
   const riderId = String(formData.get("riderId") ?? "").trim() || null;
+  const riderCostRaw = String(formData.get("riderCost") ?? "").trim();
+  const riderCost = riderCostRaw === "" ? null : (Number(riderCostRaw) || 0).toFixed(2);
   const confirmPayment = formData.get("confirmPayment") === "on";
 
   const existing = await prisma.deliveryNote.findUniqueOrThrow({
@@ -752,7 +756,7 @@ export async function markDelivered(deliveryNoteId: string, formData: FormData):
 
   const note = await prisma.deliveryNote.update({
     where: { id: deliveryNoteId },
-    data: { status: "delivered", receivedBy, riderId, deliveredAt: new Date() },
+    data: { status: "delivered", receivedBy, riderId, riderCost, deliveredAt: new Date() },
   });
 
   if (!paymentConfirmed) {

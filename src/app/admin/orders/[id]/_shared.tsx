@@ -37,14 +37,26 @@ export function ItemsCard({ items, currencyCode }: { items: OrderItem[]; currenc
     <div className={cardClass}>
       <p className={cardLabelClass}>Items</p>
       <ul className="mt-3 space-y-2 text-sm">
-        {items.map((item) => (
-          <li key={item.id} className="flex justify-between">
-            <span>
-              {item.title} × {item.quantity}
-            </span>
-            <span>{formatPrice(item.lineTotal.toString(), currencyCode)}</span>
-          </li>
-        ))}
+        {items.map((item) => {
+          const unitCost = item.unitCost == null ? null : Number(item.unitCost);
+          const marginPercent =
+            unitCost != null && Number(item.unitPrice) > 0
+              ? ((Number(item.unitPrice) - unitCost) / Number(item.unitPrice)) * 100
+              : null;
+          return (
+            <li key={item.id}>
+              <div className="flex justify-between">
+                <span>
+                  {item.title} × {item.quantity}
+                </span>
+                <span>{formatPrice(item.lineTotal.toString(), currencyCode)}</span>
+              </div>
+              {marginPercent != null && (
+                <p className="mt-0.5 text-xs text-neutral-500">Margin: {marginPercent.toFixed(1)}%</p>
+              )}
+            </li>
+          );
+        })}
       </ul>
     </div>
   );

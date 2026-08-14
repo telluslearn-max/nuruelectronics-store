@@ -49,8 +49,9 @@ export default async function NewManualOrderPage({
         <div>
           <p className="text-sm font-medium">Line items</p>
           <p className="mt-1 text-xs text-neutral-500">
-            Shopify Variant ID is optional — fill it in (and check the box below) if this item should also deduct
-            from Shopify&apos;s own stock count.
+            Cost price is optional — fill it in to see the margin (amount and %) as you type. Shopify Variant ID is
+            also optional — fill it in (and check the box below) if this item should also deduct from
+            Shopify&apos;s own stock count.
           </p>
           <LineItemsGrid />
         </div>

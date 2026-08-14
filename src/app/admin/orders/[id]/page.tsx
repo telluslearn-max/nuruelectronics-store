@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireAdminSession } from "@/lib/admin-auth";
 import { formatPrice } from "@/lib/format";
+import { computeOrderMargin } from "@/lib/margin";
 import { StatusPill } from "@/components/admin/status-pill";
 import { getShopifyOrderById } from "@/lib/shopify/admin-api";
 import { ConfirmSubmitButton } from "@/components/admin/confirm-submit-button";
@@ -83,6 +84,15 @@ export default async function AdminOrderHubPage({
   const formatMoney = (amount: string | number) => formatPrice(String(amount), order.currencyCode);
   const acceptedEstimateWithoutInvoice = order.estimates.find((e) => e.status === "accepted") && !order.invoice;
   const itemsSubtotal = order.items.reduce((sum, item) => sum + Number(item.lineTotal), 0);
+  const orderMargin = computeOrderMargin(
+    order.items.map((item) => ({
+      unitPrice: Number(item.unitPrice),
+      unitCost: item.unitCost == null ? null : Number(item.unitCost),
+      quantity: item.quantity,
+    })),
+    order.deliveryNote?.riderCost == null ? 0 : Number(order.deliveryNote.riderCost),
+  );
+  const formatPercent = (percent: number | null) => (percent == null ? "—" : `${percent.toFixed(1)}%`);
   const invoiceDeletable = order.invoice ? Number(order.invoice.amountPaid) === 0 : false;
   const invoiceEditable =
     order.invoice != null &&
@@ -137,6 +147,39 @@ export default async function AdminOrderHubPage({
             </li>
           ))}
         </ul>
+        {orderMargin.hasCostData && (
+          <div className="mt-4 rounded-card border border-border-subtle p-4 text-sm">
+            <p className={cardLabelClass}>Margin</p>
+            <div className="mt-2 space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-neutral-500">Revenue</span>
+                <span>{formatMoney(orderMargin.revenue.toFixed(2))}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-neutral-500">Cost of goods</span>
+                <span>{formatMoney(orderMargin.cost.toFixed(2))}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-neutral-500">Gross margin</span>
+                <span>
+                  {formatMoney(orderMargin.grossMargin.toFixed(2))} ({formatPercent(orderMargin.grossMarginPercent)})
+                </span>
+              </div>
+              {orderMargin.riderCost > 0 && (
+                <div className="flex items-center justify-between">
+                  <span className="text-neutral-500">Rider cost</span>
+                  <span>− {formatMoney(orderMargin.riderCost.toFixed(2))}</span>
+                </div>
+              )}
+              <div className="flex items-center justify-between border-t border-border-subtle pt-1 font-medium">
+                <span>Net margin</span>
+                <span className={orderMargin.netMargin >= 0 ? "text-green-700" : "text-red-700"}>
+                  {formatMoney(orderMargin.netMargin.toFixed(2))} ({formatPercent(orderMargin.netMarginPercent)})
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Estimates */}
@@ -583,6 +626,10 @@ export default async function AdminOrderHubPage({
                       </option>
                     ))}
                   </select>
+                </div>
+                <div className="sm:w-40">
+                  <label className="block text-xs text-neutral-500">Rider cost (KES)</label>
+                  <input type="number" name="riderCost" min={0} step="0.01" className={inputClass} placeholder="optional" />
                 </div>
                 {!paymentConfirmed && (
                   <label className="flex items-center gap-2 text-sm text-amber-800 sm:basis-full">
