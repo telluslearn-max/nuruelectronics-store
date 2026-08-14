@@ -126,6 +126,8 @@ model OrderItem {
   unitPrice Decimal @db.Decimal(10, 2)
   lineTotal Decimal @db.Decimal(10, 2)
 
+  giftCardFulfillment GiftCardFulfillment?
+
   @@index([orderId])
 }
 
@@ -548,4 +550,46 @@ model ReturnCase {
 
   @@index([shopifyOrderId])
   @@index([status, createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Reloadly gift card fulfillment — maps Shopify gift card variants (incl. PSN
+// Store cards) to a Reloadly catalog product, and records each staff-triggered
+// order placed against Reloadly's Gift Cards API (see src/lib/reloadly/client.ts,
+// src/lib/gift-card-actions.ts). One fulfillment per OrderItem line.
+// ---------------------------------------------------------------------------
+
+enum GiftCardFulfillmentStatus {
+  pending
+  completed
+  failed
+}
+
+model GiftCardProductMapping {
+  id                  String   @id @default(cuid())
+  shopifyVariantId    String   @unique
+  shopifyProductTitle String
+  reloadlyProductId   Int
+  reloadlyProductName String
+  reloadlyCountryCode String
+  createdAt           DateTime @default(now())
+}
+
+model GiftCardFulfillment {
+  id                     String                     @id @default(cuid())
+  orderItemId            String                     @unique
+  orderItem              OrderItem                  @relation(fields: [orderItemId], references: [id])
+  reloadlyProductId      Int
+  reloadlyTransactionId  String?                    @unique
+  status                 GiftCardFulfillmentStatus  @default(pending)
+  cardNumber             String?
+  pinCode                String?
+  redemptionInstructions String?
+  amount                 Decimal?                   @db.Decimal(10, 2)
+  currencyCode           String?
+  errorMessage           String?
+  deliveredAt            DateTime?
+  createdAt              DateTime                   @default(now())
+
+  @@index([orderItemId])
 }

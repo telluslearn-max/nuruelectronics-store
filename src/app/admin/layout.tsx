@@ -24,6 +24,7 @@ const NAV_LINKS = [
   { href: "/admin/customers", label: "Customers" },
   { href: "/admin/documents", label: "Documents" },
   { href: "/admin/receipts", label: "Receipts" },
+  { href: "/admin/gift-cards", label: "Gift Cards" },
   { href: "/admin/expenses", label: "Expenses" },
   { href: "/admin/suppliers", label: "Suppliers" },
   { href: "/admin/bills", label: "Bills" },

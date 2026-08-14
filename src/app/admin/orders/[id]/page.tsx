@@ -6,6 +6,7 @@ import { requireAdminSession } from "@/lib/admin-auth";
 import { formatPrice } from "@/lib/format";
 import { StatusPill } from "@/components/admin/status-pill";
 import { getShopifyOrderById } from "@/lib/shopify/admin-api";
+import { isReloadlyConfigured } from "@/lib/reloadly/client";
 import { ConfirmSubmitButton } from "@/components/admin/confirm-submit-button";
 import { FeedbackBanner } from "@/components/admin/feedback-banner";
 import { SubmitButton } from "@/components/admin/submit-button";
@@ -25,6 +26,7 @@ import {
   updateInvoice,
   voidInvoice,
 } from "@/lib/admin-actions";
+import { fulfillGiftCardItem, resendGiftCardCodeEmail } from "@/lib/gift-card-actions";
 import {
   BillToCard,
   ItemsCard,
@@ -57,7 +59,7 @@ export default async function AdminOrderHubPage({
     where: { id },
     include: {
       customer: true,
-      items: true,
+      items: { include: { giftCardFulfillment: true } },
       estimates: { orderBy: { createdAt: "desc" } },
       invoice: { include: { receipts: { orderBy: { paidAt: "desc" } } } },
       deliveryNote: true,
@@ -65,6 +67,13 @@ export default async function AdminOrderHubPage({
   });
 
   if (!order) notFound();
+
+  const giftCardVariantIds = order.items.map((item) => item.variantId).filter((id): id is string => Boolean(id));
+  const giftCardMappings = isReloadlyConfigured && giftCardVariantIds.length > 0
+    ? await prisma.giftCardProductMapping.findMany({ where: { shopifyVariantId: { in: giftCardVariantIds } } })
+    : [];
+  const giftCardMappingByVariant = new Map(giftCardMappings.map((mapping) => [mapping.shopifyVariantId, mapping]));
+  const giftCardItems = order.items.filter((item) => item.variantId && giftCardMappingByVariant.has(item.variantId));
 
   const riders =
     order.deliveryNote?.status === "pending"
@@ -606,6 +615,70 @@ export default async function AdminOrderHubPage({
           </Link>
         )}
       </section>
+
+      {/* Gift cards (Reloadly) */}
+      {giftCardItems.length > 0 && (
+        <section className="rounded-card border border-border-subtle p-5">
+          <h3 className="font-medium">Gift cards</h3>
+          <ul className="mt-3 space-y-4 text-sm">
+            {giftCardItems.map((item) => {
+              const mapping = giftCardMappingByVariant.get(item.variantId as string);
+              const fulfillment = item.giftCardFulfillment;
+              return (
+                <li key={item.id} className="border-b border-border-subtle/60 pb-4 last:border-0 last:pb-0">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <span>
+                      <span className="block font-medium">{item.title}</span>
+                      <span className="mt-1 block text-neutral-500">Reloadly product: {mapping?.reloadlyProductName}</span>
+                    </span>
+                    {fulfillment && <StatusPill status={fulfillment.status} />}
+                  </div>
+
+                  {fulfillment?.status === "completed" && (
+                    <div className="mt-3 space-y-2">
+                      <p>
+                        Code: <span className="font-mono">{fulfillment.cardNumber}</span>
+                        {fulfillment.pinCode && (
+                          <>
+                            {" "}
+                            · PIN: <span className="font-mono">{fulfillment.pinCode}</span>
+                          </>
+                        )}
+                      </p>
+                      <form action={resendGiftCardCodeEmail.bind(null, fulfillment.id)}>
+                        <SubmitButton className="underline hover:text-foreground" pendingText="Sending…">
+                          Resend email
+                        </SubmitButton>
+                      </form>
+                    </div>
+                  )}
+
+                  {fulfillment?.status === "failed" && (
+                    <p className="mt-3 text-red-600">{fulfillment.errorMessage}</p>
+                  )}
+
+                  {fulfillment?.status !== "completed" && (
+                    <form
+                      action={fulfillGiftCardItem.bind(null, item.id)}
+                      className="mt-3 grid grid-cols-1 gap-3 sm:flex sm:flex-wrap sm:items-end"
+                    >
+                      {!paymentConfirmed && (
+                        <label className="flex items-center gap-2 text-sm text-amber-800 sm:basis-full">
+                          <input type="checkbox" name="confirmPayment" required className="h-4 w-4" />
+                          I confirm payment has actually been received for this order
+                        </label>
+                      )}
+                      <SubmitButton className={`${secondaryButtonClass} w-full sm:w-auto`} pendingText="Sourcing…">
+                        {fulfillment?.status === "failed" ? "Retry" : "Redeem via Reloadly"}
+                      </SubmitButton>
+                    </form>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
     </div>
   );
 }

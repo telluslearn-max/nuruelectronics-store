@@ -2,7 +2,7 @@ import "server-only";
 import { Resend } from "resend";
 import { formatPrice } from "./format";
 import { SITE_URL } from "./site";
-import type { Customer, DeliveryNote, Employee, Estimate, Invoice, Payslip, Receipt } from "@prisma/client";
+import type { Customer, DeliveryNote, Employee, Estimate, GiftCardFulfillment, Invoice, Payslip, Receipt } from "@prisma/client";
 
 const apiKey = process.env.RESEND_API_KEY;
 const from = process.env.DOCUMENT_EMAIL_FROM;
@@ -47,6 +47,31 @@ async function sendDocumentEmail(options: {
   if (error) {
     throw new Error(`Failed to send email: ${error.message}`);
   }
+}
+
+async function sendPlainEmail(options: { to: string; subject: string; html: string }): Promise<void> {
+  if (!resend || !from) {
+    throw new Error("Email isn't configured yet — set RESEND_API_KEY and DOCUMENT_EMAIL_FROM to send email.");
+  }
+  const { error } = await resend.emails.send({ from, to: options.to, subject: options.subject, html: options.html });
+  if (error) {
+    throw new Error(`Failed to send email: ${error.message}`);
+  }
+}
+
+export async function sendGiftCardCodeEmail(fulfillment: GiftCardFulfillment, customer: Customer): Promise<void> {
+  if (!customer.email) throw new Error("Customer has no email on file.");
+  const codeHtml = fulfillment.pinCode
+    ? `<p>Card number: <strong>${escapeHtml(fulfillment.cardNumber ?? "")}</strong><br/>PIN: <strong>${escapeHtml(fulfillment.pinCode)}</strong></p>`
+    : `<p>Code: <strong>${escapeHtml(fulfillment.cardNumber ?? "")}</strong></p>`;
+  const instructionsHtml = fulfillment.redemptionInstructions
+    ? `<p>${escapeHtml(fulfillment.redemptionInstructions)}</p>`
+    : "";
+  await sendPlainEmail({
+    to: customer.email,
+    subject: "Your gift card code from NURU",
+    html: `<p>Hi ${escapeHtml(customer.name ?? "")},</p><p>Thanks for your order! Here's your gift card code:</p>${codeHtml}${instructionsHtml}`,
+  });
 }
 
 function estimateResponseUrl(estimate: Estimate): string {
