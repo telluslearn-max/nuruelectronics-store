@@ -138,39 +138,34 @@ export default async function HomePage() {
     <div>
       {hero && (
         <section className="animate-fade-up overflow-hidden rounded-card bg-surface-dark text-surface-dark-foreground">
-          <div className="grid grid-cols-1 items-center gap-8 p-8 sm:p-12 md:grid-cols-2">
-            <div>
-              <p className="text-sm font-medium uppercase tracking-wide text-accent">
-                Genuine electronics. Delivered fast.
+          <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)] md:items-stretch">
+            <div className="flex flex-col justify-center p-8 sm:p-12 md:py-16">
+              <p className="text-eyebrow font-mono text-accent">
+                {hero.vendor ? `${hero.vendor} · This week's pick` : "This week's pick"}
               </p>
-              <h1 className="mt-2 text-title sm:text-display">{hero.title}</h1>
-              <p className="mt-4 max-w-md text-neutral-400">{firstSentence(hero.description)}</p>
-              {heroPrice && (
-                <p className="mt-4 text-lg font-medium">
-                  From {formatPrice(heroPrice.amount, heroPrice.currencyCode)}
-                </p>
-              )}
-              <div className="mt-8 flex flex-wrap gap-3">
+              <h1 className="mt-3 text-display">{hero.title}</h1>
+              <p className="mt-5 max-w-md text-neutral-400">{firstSentence(hero.description)}</p>
+              <div className="mt-8 flex flex-wrap items-center gap-x-5 gap-y-3">
                 <Link
                   href={`/products/${hero.handle}`}
-                  className="rounded-control bg-accent px-6 py-3 text-sm font-medium text-accent-foreground transition hover:opacity-90"
+                  className="rounded-control bg-accent px-6 py-3 text-sm font-semibold text-accent-foreground transition hover:opacity-90"
                 >
                   Shop now
                 </Link>
-                <Link
-                  href="/category/phones"
-                  className="rounded-control border border-neutral-600 px-6 py-3 text-sm font-medium transition hover:border-neutral-300"
-                >
-                  Explore phones
-                </Link>
+                {heroPrice && (
+                  <span className="font-mono text-sm text-neutral-400">
+                    from {formatPrice(heroPrice.amount, heroPrice.currencyCode)}
+                  </span>
+                )}
               </div>
             </div>
-            <div className="relative mx-auto aspect-square w-full max-w-sm overflow-hidden rounded-lg">
+            <div className="relative min-h-[16rem] md:min-h-0">
               <ProductMedia
                 image={hero.images[0]}
                 title={hero.title}
                 productType={hero.productType}
-                sizes="(min-width: 768px) 24rem, 100vw"
+                sizes="(min-width: 768px) 44rem, 100vw"
+                className="object-contain object-bottom p-6 sm:p-10 md:object-center"
                 priority
               />
             </div>
