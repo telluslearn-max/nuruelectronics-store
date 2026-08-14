@@ -32,13 +32,13 @@ export default async function AdminOrdersPage({
 
   const [manualOrders, manualOrdersCount, shopifyPage] = await Promise.all([
     prisma.order.findMany({
-      where: { source: "manual" },
+      where: { source: { in: ["manual", "mpesa_giftcard"] } },
       orderBy: { createdAt: "desc" },
       include: { customer: true, invoice: true, estimates: true, deliveryNote: true },
       skip,
       take,
     }),
-    prisma.order.count({ where: { source: "manual" } }),
+    prisma.order.count({ where: { source: { in: ["manual", "mpesa_giftcard"] } } }),
     isShopifyAdminConfigured
       ? getShopifyOrders({ first: 25 }).catch((error: unknown) => {
           shopifyError = error instanceof Error ? error.message : "Unknown error";
@@ -67,14 +67,17 @@ export default async function AdminOrdersPage({
       <FeedbackBanner success={success} error={error} />
 
       <div className="mt-6">
-        <h3 className="text-sm font-medium text-neutral-500">Manual / WhatsApp orders</h3>
+        <h3 className="text-sm font-medium text-neutral-500">Manual / WhatsApp / M-Pesa gift card orders</h3>
         <ul className="mt-3 space-y-3">
           {manualOrders.map((order) => (
             <li key={order.id} className="rounded-card border border-border-subtle p-4 text-sm">
               <Link href={`/admin/orders/${order.id}`} className="flex flex-wrap items-center justify-between gap-3 hover:opacity-80">
                 <span>
                   <span className="block font-medium">{order.customer.name ?? order.customer.email}</span>
-                  <span className="mt-1 block text-neutral-500">{formatDate(order.createdAt)}</span>
+                  <span className="mt-1 block text-neutral-500">
+                    {formatDate(order.createdAt)}
+                    {order.source === "mpesa_giftcard" && " · M-Pesa Gift Card"}
+                  </span>
                 </span>
                 <span className="text-right text-neutral-500">
                   {order.estimates.length > 0 && <span className="block">{order.estimates.length} estimate(s)</span>}

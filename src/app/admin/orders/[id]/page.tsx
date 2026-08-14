@@ -73,7 +73,12 @@ export default async function AdminOrderHubPage({
     ? await prisma.giftCardProductMapping.findMany({ where: { shopifyVariantId: { in: giftCardVariantIds } } })
     : [];
   const giftCardMappingByVariant = new Map(giftCardMappings.map((mapping) => [mapping.shopifyVariantId, mapping]));
-  const giftCardItems = order.items.filter((item) => item.variantId && giftCardMappingByVariant.has(item.variantId));
+  // Includes items with an existing fulfillment even without a mapping — e.g. an mpesa_giftcard order's
+  // item has no Shopify variant at all, but staff still need to see its delivered code or a failed
+  // fulfillment that needs a manual refund.
+  const giftCardItems = order.items.filter(
+    (item) => (item.variantId && giftCardMappingByVariant.has(item.variantId)) || item.giftCardFulfillment,
+  );
 
   const riders =
     order.deliveryNote?.status === "pending"
@@ -657,7 +662,20 @@ export default async function AdminOrderHubPage({
                     <p className="mt-3 text-red-600">{fulfillment.errorMessage}</p>
                   )}
 
-                  {fulfillment?.status !== "completed" && (
+                  {/* This order's item came from the M-Pesa gift card checkout flow (no Shopify variant/
+                      mapping) — it was already auto-fulfilled or auto-retried by that flow, not this
+                      admin button, which requires a Shopify variant mapping to work. */}
+                  {fulfillment?.status === "failed" && !mapping && (
+                    <p className="mt-2 text-neutral-500">
+                      Paid via M-Pesa but Reloadly fulfillment failed — process a manual refund, or check{" "}
+                      <a href="/admin/gift-card-checkouts" className="underline hover:text-foreground">
+                        Gift Card Checkouts
+                      </a>
+                      .
+                    </p>
+                  )}
+
+                  {fulfillment?.status !== "completed" && mapping && (
                     <form
                       action={fulfillGiftCardItem.bind(null, item.id)}
                       className="mt-3 grid grid-cols-1 gap-3 sm:flex sm:flex-wrap sm:items-end"

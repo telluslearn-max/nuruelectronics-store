@@ -2,10 +2,13 @@ import "server-only";
 import { Resend } from "resend";
 import { formatPrice } from "./format";
 import { SITE_URL } from "./site";
+import { getLetterhead } from "./pdf/letterhead";
+import { OG_THEME } from "./og-theme";
 import type { Customer, DeliveryNote, Employee, Estimate, GiftCardFulfillment, Invoice, Payslip, Receipt } from "@prisma/client";
 
 const apiKey = process.env.RESEND_API_KEY;
 const from = process.env.DOCUMENT_EMAIL_FROM;
+const opsAlertEmail = process.env.OPS_ALERT_EMAIL;
 
 export const isEmailConfigured = Boolean(apiKey && from);
 
@@ -59,19 +62,48 @@ async function sendPlainEmail(options: { to: string; subject: string; html: stri
   }
 }
 
+/** Wraps `bodyHtml` in a branded header (logo or wordmark) + footer (support contact), reusing the same
+ * Settings-sourced letterhead the PDF documents use, so this doesn't drift from the rest of the brand. */
+async function renderBrandedEmailHtml(bodyHtml: string): Promise<string> {
+  const letterhead = await getLetterhead();
+  const headerHtml = letterhead.logoDataUri
+    ? `<img src="${letterhead.logoDataUri}" alt="${escapeHtml(letterhead.companyName)}" height="36" style="display:block;" />`
+    : `<span style="font-size:20px;font-weight:700;color:${OG_THEME.foreground};">${escapeHtml(letterhead.companyName)}</span>`;
+  const contactLine = [letterhead.companyEmail, letterhead.companyPhone].filter(Boolean).map((v) => escapeHtml(v as string)).join(" &middot; ");
+
+  return `
+    <div style="max-width:480px;margin:0 auto;font-family:Arial,Helvetica,sans-serif;color:#18181b;">
+      <div style="background:${OG_THEME.background};padding:20px 24px;border-radius:8px 8px 0 0;">${headerHtml}</div>
+      <div style="border:1px solid #e5e5e5;border-top:none;padding:24px;border-radius:0 0 8px 8px;">${bodyHtml}</div>
+      ${contactLine ? `<p style="margin-top:16px;color:#71717a;font-size:12px;text-align:center;">${contactLine}</p>` : ""}
+    </div>
+  `;
+}
+
 export async function sendGiftCardCodeEmail(fulfillment: GiftCardFulfillment, customer: Customer): Promise<void> {
   if (!customer.email) throw new Error("Customer has no email on file.");
-  const codeHtml = fulfillment.pinCode
-    ? `<p>Card number: <strong>${escapeHtml(fulfillment.cardNumber ?? "")}</strong><br/>PIN: <strong>${escapeHtml(fulfillment.pinCode)}</strong></p>`
-    : `<p>Code: <strong>${escapeHtml(fulfillment.cardNumber ?? "")}</strong></p>`;
+  const codeHtml = `
+    <div style="margin:16px 0;padding:16px;background:#fafafa;border-left:4px solid ${OG_THEME.accent};border-radius:4px;">
+      <p style="margin:0;">Code: <strong>${escapeHtml(fulfillment.cardNumber ?? "")}</strong></p>
+      ${fulfillment.pinCode ? `<p style="margin:4px 0 0;">PIN: <strong>${escapeHtml(fulfillment.pinCode)}</strong></p>` : ""}
+    </div>
+  `;
   const instructionsHtml = fulfillment.redemptionInstructions
     ? `<p>${escapeHtml(fulfillment.redemptionInstructions)}</p>`
     : "";
+  const bodyHtml = `<p>Hi ${escapeHtml(customer.name ?? "")},</p><p>Thanks for your order! Here's your gift card code:</p>${codeHtml}${instructionsHtml}`;
   await sendPlainEmail({
     to: customer.email,
     subject: "Your gift card code from NURU",
-    html: `<p>Hi ${escapeHtml(customer.name ?? "")},</p><p>Thanks for your order! Here's your gift card code:</p>${codeHtml}${instructionsHtml}`,
+    html: await renderBrandedEmailHtml(bodyHtml),
   });
+}
+
+/** Internal ops notification (e.g. "customer paid, Reloadly fulfillment failed") — best-effort, silently
+ * skipped rather than throwing when OPS_ALERT_EMAIL isn't set, since this alerting channel is optional. */
+export async function sendOpsAlertEmail(subject: string, html: string): Promise<void> {
+  if (!opsAlertEmail) return;
+  await sendPlainEmail({ to: opsAlertEmail, subject, html });
 }
 
 function estimateResponseUrl(estimate: Estimate): string {

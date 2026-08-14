@@ -20,20 +20,29 @@ export default function GiftCardsPage() {
           Digital gift cards for the platforms and stores you already use. No wrapping, no
           shipping — just a code, sent straight to you.
         </p>
-        <Link
-          href="/category/gaming?group=gift-cards"
-          className="mt-8 inline-flex items-center gap-2 rounded-full bg-accent px-5 py-2.5 text-sm font-medium text-accent-foreground transition hover:opacity-90"
-        >
-          Shop gift cards
-        </Link>
+        <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+          {[
+            { slug: "playstation", label: "PlayStation" },
+            { slug: "xbox", label: "Xbox" },
+            { slug: "nintendo", label: "Nintendo" },
+          ].map((category) => (
+            <Link
+              key={category.slug}
+              href={`/gift-cards/${category.slug}`}
+              className="inline-flex items-center gap-2 rounded-full bg-accent px-5 py-2.5 text-sm font-medium text-accent-foreground transition hover:opacity-90"
+            >
+              {category.label}
+            </Link>
+          ))}
+        </div>
       </div>
 
       <div className="mx-auto mt-16 grid max-w-3xl gap-6 sm:grid-cols-2">
         <div className="rounded-card border border-border-subtle p-6">
-          <h2 className="font-semibold">Digital delivery</h2>
+          <h2 className="font-semibold">Instant delivery</h2>
           <p className="mt-2 text-sm text-neutral-500">
-            Your code is sent via WhatsApp or email after payment, usually within a few hours. No
-            shipping needed, so it works anywhere we deliver from.
+            Pay via M-Pesa and your code is sourced and sent automatically — by email and WhatsApp — no
+            waiting on a human. No shipping needed either, since it&apos;s a digital code.
           </p>
         </div>
         <div className="rounded-card border border-border-subtle p-6">

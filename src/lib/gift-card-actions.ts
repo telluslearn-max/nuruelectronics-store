@@ -4,10 +4,12 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "./prisma";
 import { requireAdminSession } from "./admin-auth";
 import { getShopifyOrderById } from "./shopify/admin-api";
-import { isEmailConfigured, sendGiftCardCodeEmail } from "./email";
+import { isEmailConfigured, sendGiftCardCodeEmail, sendOpsAlertEmail } from "./email";
+import { isWhatsAppCloudConfigured, sendGiftCardCodeWhatsApp } from "./whatsapp-cloud-api";
 import { redirectWithError, redirectWithSuccess } from "./admin-feedback";
 import { logAdminAction } from "./audit-log";
 import { getGiftCardRedeemCode, isReloadlyConfigured, placeGiftCardOrder } from "./reloadly/client";
+import { MINIMUM_MARKUP_PERCENT, clampMarkupPercent } from "./gift-card-pricing";
 
 export async function createGiftCardMapping(formData: FormData): Promise<void> {
   await requireAdminSession();
@@ -59,13 +61,222 @@ export async function deleteGiftCardMapping(mappingId: string): Promise<void> {
   redirectWithSuccess("/admin/gift-cards", "Mapping removed.");
 }
 
+export async function createGiftCardOffering(formData: FormData): Promise<void> {
+  await requireAdminSession();
+
+  const reloadlyProductId = Number(formData.get("reloadlyProductId"));
+  const displayName = String(formData.get("displayName") ?? "").trim();
+  const category = String(formData.get("category") ?? "other").trim() || "other";
+  const reloadlyCountryCode = String(formData.get("reloadlyCountryCode") ?? "").trim();
+  const reloadlyCurrencyCode = String(formData.get("reloadlyCurrencyCode") ?? "").trim();
+  const denominationType = String(formData.get("denominationType") ?? "").trim();
+  const fixedDenominationsRaw = String(formData.get("fixedDenominations") ?? "").trim();
+  const minDenominationRaw = String(formData.get("minDenomination") ?? "").trim();
+  const maxDenominationRaw = String(formData.get("maxDenomination") ?? "").trim();
+  const markupPercent = clampMarkupPercent(Number(formData.get("markupPercent")) || MINIMUM_MARKUP_PERCENT);
+
+  if (!reloadlyProductId || !displayName || !reloadlyCountryCode || !reloadlyCurrencyCode || !denominationType) {
+    redirectWithError("/admin/gift-cards", "Missing required fields for the offering.");
+  }
+
+  const existing = await prisma.giftCardOffering.findUnique({ where: { reloadlyProductId } });
+  if (existing) {
+    redirectWithError("/admin/gift-cards", "That Reloadly product is already published as a storefront offering.");
+  }
+
+  const fixedDenominations = fixedDenominationsRaw
+    ? fixedDenominationsRaw
+        .split(",")
+        .map((v) => Number(v.trim()))
+        .filter((v) => !Number.isNaN(v))
+    : [];
+
+  const offering = await prisma.giftCardOffering.create({
+    data: {
+      reloadlyProductId,
+      displayName,
+      category,
+      reloadlyCountryCode,
+      reloadlyCurrencyCode,
+      denominationType,
+      fixedDenominations,
+      minDenomination: minDenominationRaw ? Number(minDenominationRaw) : null,
+      maxDenomination: maxDenominationRaw ? Number(maxDenominationRaw) : null,
+      markupPercent,
+      published: true,
+    },
+  });
+
+  await logAdminAction({
+    action: "gift_card_offering.create",
+    entityType: "giftCardOffering",
+    entityId: offering.id,
+    summary: `Published storefront offering "${displayName}" (Reloadly product #${reloadlyProductId})`,
+  });
+
+  revalidatePath("/admin/gift-cards");
+  redirectWithSuccess("/admin/gift-cards", "Offering published to the storefront.");
+}
+
+export async function updateGiftCardOffering(offeringId: string, formData: FormData): Promise<void> {
+  await requireAdminSession();
+
+  const markupPercentRaw = Number(formData.get("markupPercent"));
+  const markupPercent = clampMarkupPercent(Number.isFinite(markupPercentRaw) ? markupPercentRaw : MINIMUM_MARKUP_PERCENT);
+  const published = formData.get("published") === "on";
+
+  const offering = await prisma.giftCardOffering.update({
+    where: { id: offeringId },
+    data: { markupPercent, published },
+  });
+
+  await logAdminAction({
+    action: "gift_card_offering.update",
+    entityType: "giftCardOffering",
+    entityId: offering.id,
+    summary: `Updated storefront offering "${offering.displayName}" (markup ${markupPercent}%, published: ${published})`,
+  });
+
+  revalidatePath("/admin/gift-cards");
+  redirectWithSuccess("/admin/gift-cards", "Offering updated.");
+}
+
+export async function deleteGiftCardOffering(offeringId: string): Promise<void> {
+  await requireAdminSession();
+
+  const offering = await prisma.giftCardOffering.findUniqueOrThrow({ where: { id: offeringId } });
+  try {
+    await prisma.giftCardOffering.delete({ where: { id: offeringId } });
+  } catch {
+    redirectWithError("/admin/gift-cards", "Can't delete this offering — it already has checkouts against it. Unpublish it instead.");
+  }
+
+  await logAdminAction({
+    action: "gift_card_offering.delete",
+    entityType: "giftCardOffering",
+    entityId: offering.id,
+    summary: `Removed storefront offering "${offering.displayName}"`,
+  });
+
+  revalidatePath("/admin/gift-cards");
+  redirectWithSuccess("/admin/gift-cards", "Offering removed.");
+}
+
+export type FulfillmentResult = { status: "completed" | "failed"; errorMessage?: string };
+
+/**
+ * Shared core: places the Reloadly order, stores the redeem code, and best-effort notifies the customer
+ * by email/WhatsApp. This is the only place a Reloadly gift card order is actually placed — both the
+ * admin-triggered action below and the automatic M-Pesa checkout confirmation
+ * (src/lib/gift-card-checkout-actions.ts) call this instead of duplicating the logic.
+ *
+ * `reloadlyUnitPrice` is the amount to charge Reloadly, in the gift card's own currency (e.g. USD) — NOT
+ * the customer-facing KES retail price, which has FX conversion and markup baked in and would wildly
+ * overpay/underpay Reloadly if passed here by mistake. When omitted, falls back to the OrderItem's own
+ * `unitPrice` (the admin-triggered Shopify-mapped flow has no separate markup/FX layer, so its Shopify
+ * variant price is assumed to already be the Reloadly-currency amount).
+ */
+export async function runGiftCardFulfillment(
+  orderItemId: string,
+  reloadlyProductId: number,
+  reloadlyUnitPrice?: number,
+): Promise<FulfillmentResult> {
+  const item = await prisma.orderItem.findUniqueOrThrow({
+    where: { id: orderItemId },
+    include: { order: { include: { customer: true } } },
+  });
+
+  await prisma.giftCardFulfillment.upsert({
+    where: { orderItemId },
+    create: { orderItemId, reloadlyProductId, status: "pending" },
+    update: { status: "pending", errorMessage: null },
+  });
+
+  let fulfillment;
+  try {
+    const order = await placeGiftCardOrder({
+      productId: reloadlyProductId,
+      quantity: item.quantity,
+      unitPrice: reloadlyUnitPrice ?? Number(item.unitPrice),
+      // Deterministic from the line item, so a re-attempt after a partial failure reuses the same
+      // Reloadly order instead of placing (and paying for) a duplicate one.
+      customIdentifier: orderItemId,
+    });
+    const codes = await getGiftCardRedeemCode(order.transactionId);
+    const code = codes[0];
+    if (!code) throw new Error("Reloadly didn't return a redeem code for this order.");
+
+    fulfillment = await prisma.giftCardFulfillment.update({
+      where: { orderItemId },
+      data: {
+        status: "completed",
+        reloadlyTransactionId: String(order.transactionId),
+        cardNumber: code.cardNumber,
+        pinCode: code.pinCode,
+        amount: order.amount,
+        currencyCode: order.currencyCode,
+        deliveredAt: new Date(),
+        errorMessage: null,
+      },
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error placing the Reloadly order.";
+    await prisma.giftCardFulfillment.update({ where: { orderItemId }, data: { status: "failed", errorMessage: message } });
+    await logAdminAction({
+      action: "gift_card.fulfillment_failed",
+      entityType: "giftCardFulfillment",
+      entityId: orderItemId,
+      summary: `Reloadly order failed for order ${item.orderId}: ${message}`,
+    });
+    try {
+      await sendOpsAlertEmail(
+        "Gift card fulfillment failed — customer paid, code not delivered",
+        `<p>Order ${item.orderId} (item ${orderItemId}): ${message}</p><p>Check /admin/orders/${item.orderId} — retry the redemption or process a manual refund.</p>`,
+      );
+    } catch (alertError) {
+      console.error("[gift-card] ops alert email failed:", alertError);
+    }
+    return { status: "failed", errorMessage: message };
+  }
+
+  await logAdminAction({
+    action: "gift_card.fulfilled",
+    entityType: "giftCardFulfillment",
+    entityId: fulfillment.id,
+    summary: `Sourced a gift card from Reloadly for order ${item.orderId}`,
+  });
+
+  // Notification failures must never flip a successful redemption to "failed" — kept in their own
+  // try/catch, separate from the Reloadly-order-placement block above.
+  try {
+    if (isEmailConfigured && item.order.customer.email) {
+      await sendGiftCardCodeEmail(fulfillment, item.order.customer);
+    }
+  } catch (notifyError) {
+    console.error("[gift-card] email notification failed:", notifyError);
+  }
+  try {
+    if (isWhatsAppCloudConfigured && item.order.customer.phone) {
+      await sendGiftCardCodeWhatsApp(item.order.customer.phone, {
+        offeringName: item.title,
+        cardNumber: fulfillment.cardNumber ?? "",
+        pinCode: fulfillment.pinCode,
+      });
+    }
+  } catch (notifyError) {
+    console.error("[gift-card] WhatsApp notification failed:", notifyError);
+  }
+
+  return { status: "completed" };
+}
+
 export async function fulfillGiftCardItem(orderItemId: string, formData: FormData): Promise<void> {
   await requireAdminSession();
   const confirmPayment = formData.get("confirmPayment") === "on";
 
   const item = await prisma.orderItem.findUniqueOrThrow({
     where: { id: orderItemId },
-    include: { order: { include: { customer: true, invoice: true } }, giftCardFulfillment: true },
+    include: { order: { include: { invoice: true } }, giftCardFulfillment: true },
   });
   const orderPage = `/admin/orders/${item.orderId}`;
 
@@ -110,63 +321,12 @@ export async function fulfillGiftCardItem(orderItemId: string, formData: FormDat
     });
   }
 
-  await prisma.giftCardFulfillment.upsert({
-    where: { orderItemId },
-    create: { orderItemId, reloadlyProductId: mapping.reloadlyProductId, status: "pending" },
-    update: { status: "pending", errorMessage: null },
-  });
-
-  try {
-    const order = await placeGiftCardOrder({
-      productId: mapping.reloadlyProductId,
-      quantity: item.quantity,
-      unitPrice: Number(item.unitPrice),
-      // Deterministic from the line item, so a re-click after a partial failure reuses the same
-      // Reloadly order instead of placing (and paying for) a duplicate one.
-      customIdentifier: orderItemId,
-    });
-    const codes = await getGiftCardRedeemCode(order.transactionId);
-    const code = codes[0];
-    if (!code) throw new Error("Reloadly didn't return a redeem code for this order.");
-
-    const fulfillment = await prisma.giftCardFulfillment.update({
-      where: { orderItemId },
-      data: {
-        status: "completed",
-        reloadlyTransactionId: String(order.transactionId),
-        cardNumber: code.cardNumber,
-        pinCode: code.pinCode,
-        amount: order.amount,
-        currencyCode: order.currencyCode,
-        deliveredAt: new Date(),
-        errorMessage: null,
-      },
-    });
-
-    await logAdminAction({
-      action: "gift_card.fulfilled",
-      entityType: "giftCardFulfillment",
-      entityId: fulfillment.id,
-      summary: `Sourced a gift card from Reloadly for order ${item.orderId}`,
-    });
-
-    if (isEmailConfigured && item.order.customer.email) {
-      await sendGiftCardCodeEmail(fulfillment, item.order.customer);
-    }
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Unknown error placing the Reloadly order.";
-    await prisma.giftCardFulfillment.update({ where: { orderItemId }, data: { status: "failed", errorMessage: message } });
-    await logAdminAction({
-      action: "gift_card.fulfillment_failed",
-      entityType: "giftCardFulfillment",
-      entityId: orderItemId,
-      summary: `Reloadly order failed for order ${item.orderId}: ${message}`,
-    });
-    revalidatePath(orderPage);
-    redirectWithError(orderPage, `Gift card order failed: ${message}`);
-  }
+  const result = await runGiftCardFulfillment(orderItemId, mapping.reloadlyProductId);
 
   revalidatePath(orderPage);
+  if (result.status === "failed") {
+    redirectWithError(orderPage, `Gift card order failed: ${result.errorMessage}`);
+  }
   redirectWithSuccess(orderPage, "Gift card sourced and emailed to the customer.");
 }
 

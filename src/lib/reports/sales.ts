@@ -20,7 +20,7 @@ export async function getSalesReport(): Promise<SalesReport> {
 
   const [manualOrders, shopifyPage] = await Promise.all([
     prisma.order.findMany({
-      where: { source: "manual" },
+      where: { source: { in: ["manual", "mpesa_giftcard"] } },
       include: { customer: true, items: true },
       orderBy: { createdAt: "desc" },
     }),
@@ -37,7 +37,7 @@ export async function getSalesReport(): Promise<SalesReport> {
       id: order.id,
       date: order.createdAt,
       customer: order.customer.name ?? order.customer.email,
-      source: "Manual",
+      source: order.source === "mpesa_giftcard" ? "M-Pesa Gift Card" : "Manual",
       total: order.items.reduce((sum, item) => sum + Number(item.lineTotal), 0),
       currency: order.currencyCode,
     })),

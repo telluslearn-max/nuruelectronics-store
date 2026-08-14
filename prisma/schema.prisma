@@ -13,6 +13,7 @@ datasource db {
 enum OrderSource {
   shopify
   manual
+  mpesa_giftcard
 }
 
 enum EstimateStatus {
@@ -112,6 +113,7 @@ model Order {
   estimates    Estimate[]
   invoice      Invoice?
   deliveryNote DeliveryNote?
+  giftCardCheckout GiftCardCheckout?
 
   @@index([customerId])
 }
@@ -479,6 +481,10 @@ model Settings {
   documentNumberPrefixDeliveryNote String?
   documentNumberPrefixBill         String?
   documentNumberPrefixPayslip      String?
+  // USD→KES rate for pricing non-KES-denominated Reloadly gift card offerings (see
+  // src/lib/gift-card-pricing.ts). Kept fresh by the daily sync-fx-rate cron.
+  usdToKesRate                     Decimal? @db.Decimal(10, 4)
+  usdToKesRateUpdatedAt            DateTime?
   updatedAt                        DateTime @updatedAt
 }
 
@@ -592,4 +598,65 @@ model GiftCardFulfillment {
   createdAt              DateTime                   @default(now())
 
   @@index([orderItemId])
+}
+
+// ---------------------------------------------------------------------------
+// Self-serve gift card storefront — a customer-facing checkout independent of
+// Shopify, paid via M-Pesa into NCBA's shared Paybill (880100) and confirmed
+// via the NCBA Loop webhook (see src/lib/ncba-loop/client.ts,
+// src/app/api/ncba-loop/webhook/route.ts) or a staff manual override (see
+// src/lib/gift-card-checkout-actions.ts). GiftCardOffering is priced straight
+// off Reloadly's own catalog (src/lib/gift-card-pricing.ts) rather than a
+// Shopify product/variant, so the whole catalog scales without hand-created
+// Shopify SKUs per denomination/region.
+// ---------------------------------------------------------------------------
+
+model GiftCardOffering {
+  id                   String    @id @default(cuid())
+  reloadlyProductId    Int       @unique
+  displayName          String
+  category             String
+  imageUrl             String?
+  reloadlyCountryCode  String
+  reloadlyCurrencyCode String
+  denominationType     String
+  fixedDenominations   Decimal[] @db.Decimal(10, 2)
+  minDenomination      Decimal?  @db.Decimal(10, 2)
+  maxDenomination      Decimal?  @db.Decimal(10, 2)
+  // Business floor is 20% — enforced in code (gift-card-actions.ts, gift-card-pricing.ts), not just this default.
+  markupPercent        Decimal   @default(20) @db.Decimal(5, 2)
+  published            Boolean   @default(false)
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  checkouts GiftCardCheckout[]
+}
+
+enum GiftCardCheckoutStatus {
+  pending
+  paid
+  expired
+}
+
+model GiftCardCheckout {
+  id                 String                  @id @default(cuid())
+  offeringId         String
+  offering           GiftCardOffering        @relation(fields: [offeringId], references: [id])
+  denominationAmount Decimal                 @db.Decimal(10, 2)
+  priceKes           Decimal                 @db.Decimal(10, 2)
+  customerEmail      String
+  customerPhone      String
+  status             GiftCardCheckoutStatus  @default(pending)
+  // Short, human-typeable code shown to the customer as the M-Pesa payment reference to type when paying
+  // NCBA's Paybill manually — this is how the payment is matched back to this checkout, since the NCBA
+  // Loop webhook has no per-transaction callback URL/token to key off.
+  checkoutCode       String                  @unique
+  mpesaReceiptNumber String?
+  // How this got confirmed paid — "ncba_loop" | "admin_manual". Null until paid.
+  confirmedVia       String?
+  orderId            String?                 @unique
+  order              Order?                  @relation(fields: [orderId], references: [id])
+  createdAt          DateTime                @default(now())
+
+  @@index([status])
 }
