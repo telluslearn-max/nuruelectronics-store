@@ -9,6 +9,7 @@ import type { Product } from "@/lib/shopify/types";
 import { ExUkBrandOnboarding } from "./ex-uk-brand-onboarding";
 import { ExUkBrandSwitcher } from "./ex-uk-brand-switcher";
 import { ExUkFilterSheet } from "./ex-uk-filter-sheet";
+import { ExUkGrid } from "./ex-uk-grid";
 import { ExUkTopBar } from "./ex-uk-top-bar";
 import { ExUkLocalStorageNotice } from "./local-storage-notice";
 import { SwipeDeck } from "./swipe-deck";
@@ -105,13 +106,26 @@ export function ExUkDiscoverScreen({
       />
       <ExUkBrandSwitcher value={effectiveBrand} onChange={setBrand} />
       <ExUkLocalStorageNotice />
-      <div className="flex flex-1 flex-col overflow-hidden">
+      {/* Two different UIs for two different input models, swapped by CSS breakpoint (not a JS
+          viewport check, which would flash the wrong one on first paint) — swiping is a phone
+          gesture nobody performs with a mouse, so sm: and up gets a real browse grid instead of a
+          resized version of the phone deck. See ex-uk-grid.tsx for why it's not just SwipeDeck at
+          a different size. */}
+      <div className="flex flex-1 flex-col overflow-hidden sm:hidden">
         <SwipeDeck
           products={filteredProducts}
           savingsByHandle={savingsByHandle}
           isFiltered={isFiltered}
           onClearFilters={clearFilters}
           highlightHandle={highlightHandle}
+        />
+      </div>
+      <div className="hidden flex-1 flex-col overflow-hidden sm:flex">
+        <ExUkGrid
+          products={filteredProducts}
+          savingsByHandle={savingsByHandle}
+          isFiltered={isFiltered}
+          onClearFilters={clearFilters}
         />
       </div>
 

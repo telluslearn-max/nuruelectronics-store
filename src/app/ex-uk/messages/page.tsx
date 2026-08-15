@@ -24,7 +24,10 @@ export default function ExUkMessagesPage() {
   return (
     <>
       <ExUkTopBar title="Messages" backHref="/ex-uk" backLabel="Discover" />
-      <div className="flex-1 overflow-y-auto">
+      {/* The shell caps at max-w-6xl for Discover's grid, but a list of match rows just looks
+          sparse stretched that wide — keep this one a comfortable phone-width reading column
+          on desktop, same idea as the chat screen (ex-uk-conversation.tsx). */}
+      <div className="flex-1 overflow-y-auto sm:mx-auto sm:w-full sm:max-w-md">
         <RecentMatchesRow matches={matches} />
 
         {matches.length === 0 ? (

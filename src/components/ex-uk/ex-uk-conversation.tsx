@@ -41,7 +41,10 @@ function ConversationBody({
   }, []);
 
   return (
-    <div className="flex flex-1 flex-col overflow-hidden">
+    // The shell caps at max-w-6xl for Discover's grid; message bubbles use max-w-[90%] of their
+    // own container (concierge-message.tsx), so without a narrower cap here they'd stretch
+    // almost the full 6xl width on desktop. Keep this a normal chat-width column instead.
+    <div className="flex flex-1 flex-col overflow-hidden sm:mx-auto sm:w-full sm:max-w-md">
       <div className="flex-1 overflow-y-auto">
         <ConciergeMessageList messages={messages} isStreaming={isStreaming || recordingState === "processing"} />
       </div>
