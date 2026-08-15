@@ -18,9 +18,16 @@ export default async function ExUkLayout({ children }: { children: React.ReactNo
 
   return (
     <CartProvider initialCart={cart}>
-      <div className="flex h-dvh flex-col bg-background">
-        {children}
-        <ExUkBottomTabBar />
+      {/* On phones the column fills the viewport exactly like any other page, so the neutral
+          backdrop never shows. On wider screens it caps to a phone-width column against a
+          contrasting backdrop instead of stretching the swipe cards, drag gestures, and bottom
+          tab bar across the full browser width — the "app-like shell" this route is meant to be,
+          not the whole page. */}
+      <div className="flex h-dvh justify-center bg-neutral-100 sm:py-6">
+        <div className="flex h-full w-full max-w-md flex-col bg-background sm:rounded-card sm:shadow-lg">
+          {children}
+          <ExUkBottomTabBar />
+        </div>
       </div>
     </CartProvider>
   );
