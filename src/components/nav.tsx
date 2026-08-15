@@ -158,9 +158,14 @@ export function Nav({
                       href={entry.href}
                       aria-current={isCurrent ? "page" : undefined}
                       className={
-                        isCurrent
-                          ? "font-medium text-foreground"
-                          : "text-neutral-500 transition hover:text-foreground"
+                        // Ex-UK gets a standing accent treatment (not just on hover/active) —
+                        // otherwise it reads as just another flat-text peer of Shop/Brand/Need/
+                        // Support and shoppers have no reason to notice it exists.
+                        entry.id === "ex-uk"
+                          ? "font-medium text-accent"
+                          : isCurrent
+                            ? "font-medium text-foreground"
+                            : "text-neutral-500 transition hover:text-foreground"
                       }
                     >
                       {entry.label}
