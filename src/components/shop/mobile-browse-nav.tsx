@@ -131,8 +131,21 @@ export function MobileBrowseNav() {
           return (
             <li key={entry.id} className={index > 0 ? "border-t border-border-subtle" : undefined}>
               <div className="flex items-center">
-                <Link href={entry.href} className="flex flex-1 items-center gap-3 px-4 py-3.5 text-sm font-medium">
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border-subtle bg-neutral-50 text-neutral-500">
+                <Link
+                  href={entry.href}
+                  className={`flex flex-1 items-center gap-3 px-4 py-3.5 text-sm font-medium ${
+                    entry.id === "ex-uk" ? "text-accent" : ""
+                  }`}
+                >
+                  <span
+                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border ${
+                      // Same reasoning as the desktop nav — Ex-UK needs a standing accent
+                      // treatment, not the same neutral pill as every other browse entry.
+                      entry.id === "ex-uk"
+                        ? "border-accent/30 bg-accent/10 text-accent"
+                        : "border-border-subtle bg-neutral-50 text-neutral-500"
+                    }`}
+                  >
                     <NavIcon kind={entry.icon} className="h-4 w-4" />
                   </span>
                   {entry.label}

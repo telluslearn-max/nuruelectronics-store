@@ -71,6 +71,7 @@ export default async function HomePage() {
     bestSellersPage,
     newArrivalsPage,
     popularCollectionPages,
+    exUkPage,
   ] = await Promise.all([
     getProducts({
       searchTerm: "product_type:Smartphones",
@@ -89,7 +90,12 @@ export default async function HomePage() {
     Promise.all(
       popularCollectionGroups.map((group) => getProducts({ searchTerm: group.query, first: 8 })),
     ),
+    // Cheapest Ex-UK unit, just for the homepage teaser's "From KES X" line — the actual browsing
+    // happens on /ex-uk itself, which excludes ex-uk-tagged products from every other surface by
+    // default (see getProducts), so this is the one deliberate opt-in on this page.
+    getProducts({ searchTerm: "tag:ex-uk", includeExUk: true, sortKey: "PRICE", first: 1 }),
   ]);
+  const cheapestExUk = exUkPage.products[0];
 
   const [hero, ...features] = flagshipPage.products;
   const heroPrice = hero?.priceRange.minVariantPrice;
@@ -155,6 +161,28 @@ export default async function HomePage() {
           {features.map((product) => (
             <FeatureCard key={product.id} product={product} />
           ))}
+        </section>
+      )}
+
+      {cheapestExUk && (
+        <section className="mt-16">
+          <Link
+            href="/ex-uk"
+            className="group flex flex-col gap-6 overflow-hidden rounded-card bg-accent px-8 py-10 text-accent-foreground transition hover:opacity-95 sm:flex-row sm:items-center sm:justify-between"
+          >
+            <div>
+              <p className="text-sm font-medium uppercase tracking-wide text-accent-foreground/80">Swipe. Save. Repeat.</p>
+              <h2 className="mt-2 text-xl font-semibold sm:text-2xl">Ex-UK: unboxed units, still under warranty</h2>
+              <p className="mt-2 max-w-md text-sm text-accent-foreground/80">
+                Genuine imported phones at a lower price, from{" "}
+                {formatPrice(cheapestExUk.priceRange.minVariantPrice.amount, cheapestExUk.priceRange.minVariantPrice.currencyCode)}{" "}
+                — swipe through the deck and pick yours.
+              </p>
+            </div>
+            <span className="shrink-0 rounded-control bg-accent-foreground px-6 py-3 text-sm font-medium text-accent transition group-hover:opacity-90">
+              Start swiping →
+            </span>
+          </Link>
         </section>
       )}
 
