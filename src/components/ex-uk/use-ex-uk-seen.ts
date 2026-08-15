@@ -48,5 +48,14 @@ export function useExUkSeen() {
     });
   }, []);
 
-  return { seen, markSeen, unmarkSeen };
+  // Bulk reset for the "start over" action once a shopper has swiped through the whole deck —
+  // clears passed *and* matched cards from the seen-list so everything reappears, but leaves
+  // matches/messages (use-ex-uk-matches.ts / use-ex-uk-inbox.ts) untouched: re-swiping right on
+  // an already-matched card is a harmless no-op there (addMatch dedupes by handle).
+  const clearSeen = useCallback(() => {
+    window.localStorage.removeItem(STORAGE_KEY);
+    setSeen(new Set());
+  }, []);
+
+  return { seen, markSeen, unmarkSeen, clearSeen };
 }

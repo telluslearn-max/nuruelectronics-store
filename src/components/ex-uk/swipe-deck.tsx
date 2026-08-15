@@ -46,7 +46,7 @@ export function SwipeDeck({
   const [justMatched, setJustMatched] = useState<Product | null>(null);
   const [announcement, setAnnouncement] = useState("");
   const { addMatch, removeMatch } = useExUkMatches();
-  const { seen, markSeen, unmarkSeen } = useExUkSeen();
+  const { seen, markSeen, unmarkSeen, clearSeen } = useExUkSeen();
   const topCardRef = useRef<SwipeCardHandle>(null);
 
   // Cards already swiped in a previous visit (either direction) are filtered out here — not by
@@ -85,6 +85,14 @@ export function SwipeDeck({
     );
     setLastAction(null);
     setIndex((i) => Math.max(0, i - 1));
+  }
+
+  function handleStartOver() {
+    clearSeen();
+    setIndex(0);
+    setLastAction(null);
+    setJustMatched(null);
+    setAnnouncement("Starting over — every Ex-UK unit is back in the deck.");
   }
 
   return (
@@ -161,7 +169,20 @@ export function SwipeDeck({
         ) : (
           <div className="flex h-full flex-col items-center justify-center gap-2 rounded-card border border-dashed border-border-subtle p-8 text-center">
             <p className="text-base font-medium">That&apos;s every Ex-UK unit for now</p>
-            <p className="text-sm text-neutral-500">Check your matches in Messages, or check back soon for new stock.</p>
+            <p className="text-sm text-neutral-500">
+              {products.length > 0
+                ? "You've swiped through all of them. Start over to see them again, or check back soon for new stock."
+                : "Check your matches in Messages, or check back soon for new stock."}
+            </p>
+            {products.length > 0 && (
+              <button
+                type="button"
+                onClick={handleStartOver}
+                className="mt-2 rounded-control border border-border-subtle px-4 py-2 text-sm font-medium transition hover:border-foreground"
+              >
+                Start over
+              </button>
+            )}
           </div>
         )}
 
