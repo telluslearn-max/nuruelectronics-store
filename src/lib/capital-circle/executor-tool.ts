@@ -1,8 +1,11 @@
 import "server-only";
+import { Chain, ClobClient, OrderType, Side } from "@polymarket/clob-client-v2";
 import { prisma } from "../prisma";
 import { logAdminAction } from "../audit-log";
 import { CAPITAL_CIRCLE_LIVE } from "./config";
-import { isCircleWalletConfigured, getCircleWalletClient } from "./circle-wallet-client";
+import { isCircleWalletConfigured, getClobSigner } from "./circle-wallet-client";
+
+const CLOB_HOST = "https://clob.polymarket.com";
 
 export type RecordPositionInput = {
   conditionId: string;
@@ -58,13 +61,25 @@ export async function recordPosition(input: RecordPositionInput): Promise<Record
     };
   }
 
-  const wallet = getCircleWalletClient();
   try {
-    const { txHash } = await wallet.signAndSendPolymarketOrder({
-      tokenId: input.tokenId,
-      sizeUsd: input.sizeUsd,
-      side: "BUY",
-    });
+    // L1 auth (wallet signature) to derive L2 API creds, then a fully-authed
+    // client to place the order — see @polymarket/clob-client-v2's README.
+    const signer = getClobSigner();
+    const authClient = new ClobClient({ host: CLOB_HOST, chain: Chain.POLYGON, signer, throwOnError: true });
+    const creds = await authClient.createOrDeriveApiKey();
+    const tradingClient = new ClobClient({ host: CLOB_HOST, chain: Chain.POLYGON, signer, creds, throwOnError: true });
+
+    const response = await tradingClient.createAndPostMarketOrder(
+      { tokenID: input.tokenId, amount: input.sizeUsd, side: Side.BUY },
+      undefined,
+      OrderType.FOK,
+    );
+    if (!response.success) {
+      throw new Error(response.errorMsg || "Order was not accepted.");
+    }
+    // Settlement tx hash is best-effort/async — fall back to the order id so there's always a real reference to look up.
+    const txHash = response.transactionsHashes?.[0] ?? response.orderID;
+
     const position = await prisma.capitalCirclePosition.create({
       data: {
         venue: "polymarket",
