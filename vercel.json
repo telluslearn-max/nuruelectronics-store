@@ -11,6 +11,10 @@
     {
       "path": "/api/cron/sync-product-embeddings",
       "schedule": "0 4 * * *"
+    },
+    {
+      "path": "/api/cron/capital-circle-cycle",
+      "schedule": "0 5 * * 1"
     }
   ]
 }
