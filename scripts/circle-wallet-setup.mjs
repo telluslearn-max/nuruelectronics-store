@@ -1,23 +1,23 @@
-// One-time Capital Circle provisioning script — run this yourself, locally,
-// with your own mainnet Circle API key. Never run this inside a shared
-// session: it generates and registers your Entity Secret, which must stay
-// as secret as a private key (see @circle-fin/developer-controlled-wallets'
-// own README warning).
+// One-time provisioning for the Capital Circle's Circle Agent Wallet.
 //
-// What it does, per Circle's official Developer-Controlled Wallets flow:
-//   1. Generates a new Entity Secret and prints it (also copy it somewhere
-//      safe immediately — this is the only time it's shown).
-//   2. Registers it with Circle using your API key (downloads a recovery
-//      file — store that securely too, same as the secret itself).
-//   3. Creates a wallet set, then one Polygon mainnet wallet inside it.
-//   4. Prints the four values that go into .env.local / Vercel's env vars:
-//      CIRCLE_API_KEY, CIRCLE_ENTITY_SECRET, CIRCLE_WALLET_ID, CIRCLE_WALLET_ADDRESS.
+// SECURITY: run this on your own machine, never in a shared/remote session —
+// it generates and registers your Entity Secret, the single credential that
+// can move real money out of this wallet. Never paste the secret it prints,
+// or the recovery file it downloads, anywhere but your own secrets manager.
 //
-// After this, follow the plan doc's remaining Phase B steps (circle wallet
-// limit set for spending caps, contract-allowlist, funding) — this script
-// only gets you a wallet to point those at.
+// Usage, in order (see the plan doc's Phase B checklist for context):
+//   node scripts/circle-wallet-setup.mjs generate-secret
+//     -> prints a new Entity Secret. Copy it now; it is never shown again.
+//   node scripts/circle-wallet-setup.mjs register --entity-secret <secret>
+//     -> registers it with Circle, downloads a recovery file into this
+//        directory. Move that file somewhere safe immediately.
+//   node scripts/circle-wallet-setup.mjs create-wallet --entity-secret <secret>
+//     -> creates a wallet set + one MATIC (Polygon mainnet) wallet, prints
+//        the id/address to save as CIRCLE_WALLET_ID/CIRCLE_WALLET_ADDRESS.
 //
-// Usage: CIRCLE_API_KEY=<your-mainnet-api-key> node scripts/circle-wallet-setup.mjs
+// Requires CIRCLE_API_KEY in .env.local (the mainnet key — see the console's
+// environment selector). Set CIRCLE_ENTITY_SECRET there too once you have it,
+// alongside CIRCLE_WALLET_ID/CIRCLE_WALLET_ADDRESS from the last step.
 import "dotenv/config";
 import {
   generateEntitySecret,
@@ -26,47 +26,52 @@ import {
 } from "@circle-fin/developer-controlled-wallets";
 
 const apiKey = process.env.CIRCLE_API_KEY;
+const command = process.argv[2];
+
+function flag(name) {
+  const i = process.argv.indexOf(`--${name}`);
+  return i === -1 ? undefined : process.argv[i + 1];
+}
+
 if (!apiKey) {
-  console.error("Set CIRCLE_API_KEY (your mainnet key from console.circle.com) before running this.");
+  console.error("Set CIRCLE_API_KEY in .env.local first (the mainnet key).");
   process.exit(1);
 }
 
-console.log("Generating a new Entity Secret — copy this line somewhere safe right now:\n");
-generateEntitySecret();
+if (command === "generate-secret") {
+  console.log("Generating a new Entity Secret — copy it now, it will not be shown again:\n");
+  generateEntitySecret();
+} else if (command === "register") {
+  const entitySecret = flag("entity-secret");
+  if (!entitySecret) {
+    console.error("Usage: node scripts/circle-wallet-setup.mjs register --entity-secret <secret>");
+    process.exit(1);
+  }
+  const response = await registerEntitySecretCiphertext({ apiKey, entitySecret });
+  console.log("Registered. Recovery file downloaded to this directory — move it somewhere safe now.");
+  console.log(response.data?.recoveryFile ? "Recovery file content also printed above by the SDK." : "");
+} else if (command === "create-wallet") {
+  const entitySecret = flag("entity-secret");
+  if (!entitySecret) {
+    console.error("Usage: node scripts/circle-wallet-setup.mjs create-wallet --entity-secret <secret>");
+    process.exit(1);
+  }
+  const client = initiateDeveloperControlledWalletsClient({ apiKey, entitySecret });
 
-console.log(
-  "\nPaste the Entity Secret printed above as ENTITY_SECRET and re-run:\n" +
-    "  CIRCLE_API_KEY=... ENTITY_SECRET=... node scripts/circle-wallet-setup.mjs --register\n",
-);
+  const walletSet = await client.createWalletSet({ name: "Capital Circle" });
+  const walletSetId = walletSet.data?.walletSet?.id;
+  console.log("Created wallet set:", walletSetId);
 
-const entitySecret = process.env.ENTITY_SECRET;
-if (!entitySecret || !process.argv.includes("--register")) {
-  process.exit(0);
+  const wallets = await client.createWallets({ blockchains: ["MATIC"], count: 1, walletSetId });
+  const wallet = wallets.data?.wallets?.[0];
+  console.log("\nCreated wallet — save these as env vars:");
+  console.log("CIRCLE_WALLET_ID=", wallet?.id);
+  console.log("CIRCLE_WALLET_ADDRESS=", wallet?.address);
+  console.log(
+    "\nNext: fund this address with USDC on Polygon, then set the spending policy with the Circle CLI " +
+      "(circle wallet limit set — see the plan doc's Phase B step 4) before CAPITAL_CIRCLE_LIVE=true.",
+  );
+} else {
+  console.log("Usage: node scripts/circle-wallet-setup.mjs <generate-secret|register|create-wallet> [--entity-secret <secret>]");
+  process.exit(1);
 }
-
-const registerResponse = await registerEntitySecretCiphertext({ apiKey, entitySecret });
-console.log("Registered. Recovery file contents (store this securely too):");
-console.log(JSON.stringify(registerResponse.data?.recoveryFile, null, 2));
-
-const client = initiateDeveloperControlledWalletsClient({ apiKey, entitySecret });
-
-const walletSetResponse = await client.createWalletSet({ name: "Capital Circle" });
-const walletSetId = walletSetResponse.data?.walletSet?.id;
-console.log("\nCreated wallet set:", walletSetId);
-
-const walletsResponse = await client.createWallets({
-  blockchains: ["MATIC"], // Polygon mainnet — see plan doc on why Polymarket needs this specific chain.
-  count: 1,
-  walletSetId: walletSetId ?? "",
-});
-const wallet = walletsResponse.data?.wallets?.[0];
-
-console.log("\nCreated wallet — put these in .env.local and Vercel's env vars:\n");
-console.log(`CIRCLE_API_KEY=${apiKey}`);
-console.log(`CIRCLE_ENTITY_SECRET=${entitySecret}`);
-console.log(`CIRCLE_WALLET_ID=${wallet?.id ?? "<missing — check the response above>"}`);
-console.log(`CIRCLE_WALLET_ADDRESS=${wallet?.address ?? "<missing — check the response above>"}`);
-console.log(
-  "\nNext: set spending-policy caps and the Polymarket contract-allowlist with the Circle CLI " +
-    "(circle wallet limit set — see the plan doc), then fund the wallet.",
-);
