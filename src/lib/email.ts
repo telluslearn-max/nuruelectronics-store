@@ -3,9 +3,11 @@ import { Resend } from "resend";
 import { formatPrice } from "./format";
 import { SITE_URL } from "./site";
 import type { Customer, DeliveryNote, Employee, Estimate, Invoice, Payslip, Receipt } from "@prisma/client";
+import type { ProductReadinessViolation } from "./shopify/admin-api";
 
 const apiKey = process.env.RESEND_API_KEY;
 const from = process.env.DOCUMENT_EMAIL_FROM;
+const productReadinessOwnerEmail = process.env.PRODUCT_READINESS_OWNER_EMAIL;
 
 export const isEmailConfigured = Boolean(apiKey && from);
 
@@ -47,6 +49,48 @@ async function sendDocumentEmail(options: {
   if (error) {
     throw new Error(`Failed to send email: ${error.message}`);
   }
+}
+
+/**
+ * Attachment-less sibling of sendDocumentEmail, for notifications rather than
+ * documents. Unlike sendDocumentEmail, this degrades non-fatally when email
+ * isn't configured — it's used from crons that shouldn't fail just because
+ * nobody's set up Resend yet.
+ */
+export async function sendPlainEmail(options: { to: string; subject: string; html: string }): Promise<void> {
+  if (!resend || !from) {
+    console.log(`[email] not configured — skipping "${options.subject}" to ${options.to}.`);
+    return;
+  }
+  const { error } = await resend.emails.send({ from, to: options.to, subject: options.subject, html: options.html });
+  if (error) {
+    throw new Error(`Failed to send email: ${error.message}`);
+  }
+}
+
+/**
+ * Notifies the owner which live products would fail the readiness bar (image, real
+ * price, real description, SEO fields) — the cron itself only logs, so without this
+ * there's no way to know a listing needs attention short of running the check
+ * manually. Degrades non-fatally when PRODUCT_READINESS_OWNER_EMAIL isn't set —
+ * a missing notification should never fail the cron.
+ */
+export async function sendProductReadinessEmail(checked: number, violations: ProductReadinessViolation[]): Promise<void> {
+  if (!productReadinessOwnerEmail) {
+    console.log("[product-readiness] PRODUCT_READINESS_OWNER_EMAIL not set — skipping readiness notification.");
+    return;
+  }
+  if (violations.length === 0) return; // Nothing to flag — don't email a clean bill of health daily.
+
+  const dateLabel = new Intl.DateTimeFormat("en-KE", { dateStyle: "medium" }).format(new Date());
+  const rows = violations
+    .map((v) => `<li><strong>${escapeHtml(v.title)}</strong> (/${escapeHtml(v.handle)}): ${escapeHtml(v.reasons.join(", "))}</li>`)
+    .join("");
+  await sendPlainEmail({
+    to: productReadinessOwnerEmail,
+    subject: `${violations.length} product${violations.length === 1 ? "" : "s"} failing readiness checks (${dateLabel})`,
+    html: `<p>${violations.length} of ${checked} checked products are missing an image, a real price, a real description, or SEO fields:</p><ul>${rows}</ul>`,
+  });
 }
 
 function estimateResponseUrl(estimate: Estimate): string {
