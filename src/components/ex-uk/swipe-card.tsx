@@ -81,8 +81,11 @@ function Stamp({
         style={{
           color,
           transform: `scale(${scale})`,
-          textShadow: outlineShadow("var(--background)"),
-          WebkitTextStroke: `2.5px var(--background)`,
+          // Fixed white, not var(--background) — this outlines against ExUkProductCard's own
+          // fixed bg-neutral-900 underneath the stamp, not the page background behind the card,
+          // which stopped being reliably light once Ex-UK adopted its own dark theme.
+          textShadow: outlineShadow("#fff"),
+          WebkitTextStroke: "2.5px #fff",
           paintOrder: "stroke fill",
           filter: "drop-shadow(0 3px 5px rgba(0,0,0,0.35))",
         }}
@@ -93,11 +96,20 @@ function Stamp({
   );
 }
 
-/** The single draggable top card in the deck. Drag with pointer events, or call `swipe()` imperatively from the deck's ❤️/✕ buttons. */
+/** The single draggable top card in the deck. Drag with pointer events, or call `swipe()` imperatively from the deck's pass button. */
 export const SwipeCard = forwardRef<
   SwipeCardHandle,
-  { product: Product; savings?: Savings | null; onSwiped: (direction: "left" | "right") => void; onTap?: () => void }
->(function SwipeCard({ product, savings, onSwiped, onTap }, ref) {
+  {
+    product: Product;
+    savings?: Savings | null;
+    onSwiped: (direction: "left" | "right") => void;
+    onTap?: () => void;
+    /** Card's own bookmark badge — saves to the wishlist (independent of the swipe decision, does
+     * not advance the deck), see use-ex-uk-bookmark.ts. */
+    bookmarked?: boolean;
+    onBookmark?: () => void;
+  }
+>(function SwipeCard({ product, savings, onSwiped, onTap, bookmarked, onBookmark }, ref) {
     const [delta, setDelta] = useState({ x: 0, y: 0 });
     const [exiting, setExiting] = useState<"left" | "right" | null>(null);
     const dragRef = useRef<DragState | null>(null);
@@ -174,7 +186,7 @@ export const SwipeCard = forwardRef<
         style={{ transform, transition, touchAction: "pan-y" }}
         className="absolute inset-0 cursor-grab active:cursor-grabbing"
       >
-        <ExUkProductCard product={product} savings={savings} />
+        <ExUkProductCard product={product} savings={savings} bookmarked={bookmarked} onBookmark={onBookmark} />
         <Stamp
           label="LOVE"
           side="right"

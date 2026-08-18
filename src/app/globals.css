@@ -69,6 +69,64 @@
   color: rgba(255, 255, 255, 0.68);
 }
 
+/* Scoped dark theme for the Ex-UK swipe/browse app (src/app/ex-uk/layout.tsx) — same mechanism
+   as .theme-gaming-dark above. ExUkProductCard already renders on a fixed near-black surface
+   (bg-neutral-900) with edge-to-edge photography, so darkening the surrounding chrome (top bar,
+   tab bar, filter sheet, grid/detail backgrounds) makes the whole experience read as one dark,
+   photo-forward app instead of a dark card floating on a white page. */
+.theme-ex-uk-dark {
+  --background: #0a0a0a;
+  --foreground: #f5f5f7;
+  --border-subtle: #27272a;
+}
+.theme-ex-uk-dark .bg-neutral-50 {
+  background-color: rgba(255, 255, 255, 0.04);
+}
+.theme-ex-uk-dark .bg-neutral-100 {
+  background-color: rgba(255, 255, 255, 0.07);
+}
+/* ProductMedia's no-photo placeholder (product-media.tsx) — same override as .theme-gaming-dark. */
+.theme-ex-uk-dark .bg-gradient-to-br {
+  background-image: linear-gradient(to bottom right, #1c1c1e, #050505);
+}
+.theme-ex-uk-dark .hover\:bg-neutral-100:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+}
+.theme-ex-uk-dark .hover\:bg-neutral-200:hover {
+  background-color: rgba(255, 255, 255, 0.12);
+}
+.theme-ex-uk-dark .hover\:border-neutral-400:hover {
+  border-color: rgba(255, 255, 255, 0.3);
+}
+.theme-ex-uk-dark .text-neutral-500 {
+  color: rgba(255, 255, 255, 0.55);
+}
+.theme-ex-uk-dark .text-neutral-600 {
+  color: rgba(255, 255, 255, 0.68);
+}
+.theme-ex-uk-dark .text-neutral-700 {
+  color: rgba(255, 255, 255, 0.78);
+}
+.theme-ex-uk-dark .hover\:text-neutral-700:hover {
+  color: rgba(255, 255, 255, 0.85);
+}
+/* Condition-grade badges (condition-grade.ts) and the savings pill in ex-uk-product-detail.tsx
+   use light-mode-tuned "…-700" text colors for their translucent variant, shown on this scoped
+   dark background rather than inside the always-dark product card (which uses the solid
+   cardBadgeClass variant instead and needs no override). */
+.theme-ex-uk-dark .text-emerald-700 {
+  color: #6ee7b7;
+}
+.theme-ex-uk-dark .text-amber-700 {
+  color: #fcd34d;
+}
+.theme-ex-uk-dark .text-rose-700 {
+  color: #fda4af;
+}
+.theme-ex-uk-dark .text-green-700 {
+  color: #86efac;
+}
+
 /* Seasonal theme (Dec 1–26; see src/lib/seasonal-theme.ts). Deliberately leaves
    --background/--foreground/--border-subtle/--accent untouched — --accent (#d4472e) already
    reads as a warm Christmas red, and touching it would re-tint the focus ring, every CTA, and
