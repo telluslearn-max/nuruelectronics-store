@@ -31,7 +31,8 @@ export default function BnplTermsPage() {
           is provided by licensed third-party BNPL partners, not by {LEGAL_ENTITY_NAME}.{" "}
           {LEGAL_ENTITY_NAME}&apos;s role is to show you the plan figures, refer you to the
           relevant partner, and make the product available for your assessment. It is currently
-          available on Apple-brand products and on Samsung, Google, OnePlus, and Nothing Phone
+          available on iPhone, iPad, and MacBook only (not other Apple-brand products, such as
+          Apple Watch, AirPods, or Apple TV) and on Samsung, Google, OnePlus, and Nothing Phone
           products; other brands (Infinix, Oppo, Tecno, Vivo, Xiaomi) are &quot;coming soon&quot;
           and not yet live. Even on a live brand, BNPL is only offered on the specific models and
           storage/RAM configurations our partner has priced — not every model or configuration is
@@ -40,7 +41,7 @@ export default function BnplTermsPage() {
       </LegalSection>
 
       <LegalSection heading="2. Eligibility">
-        <p>Requirements differ by which partner services the product. For Apple products:</p>
+        <p>Requirements differ by which partner services the product. For iPhone, iPad, and MacBook:</p>
         <ul className="list-disc space-y-1 pl-5">
           <li>A valid national ID.</li>
           <li>3 months of M-Pesa statements.</li>
@@ -67,7 +68,7 @@ export default function BnplTermsPage() {
         </p>
         <ul className="list-disc space-y-1 pl-5">
           <li>
-            <strong>Apple (weekly/monthly plans):</strong> a deposit (40% weekly, 50% monthly) is
+            <strong>iPhone, iPad, MacBook (weekly/monthly plans):</strong> a deposit (40% weekly, 50% monthly) is
             paid up front, and the remaining balance — marked up 1.5x (you repay 1.5 times that
             balance) — is repaid over 12 weekly or 3 monthly installments.
           </li>

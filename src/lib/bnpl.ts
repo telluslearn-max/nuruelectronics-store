@@ -119,7 +119,7 @@ export function resolveBnplPlan(
   variant: ProductVariant | undefined,
   planId: BnplPlanId,
 ): BnplPlan | null {
-  const tier = getBnplTier(product.tags);
+  const tier = getBnplTier(product.tags, product.productType);
   if (tier === "formula") return calculateFormulaBnplPlan(Number((variant?.price ?? product.priceRange.minVariantPrice).amount), planId as "weekly" | "monthly");
   if (tier === "lookup") return lookupAndroidBnplPlan(product, variant, planId as "3-month" | "6-month");
   return null;
@@ -128,14 +128,33 @@ export function resolveBnplPlan(
 /** Brand tags on the generic 1.5x-markup formula. */
 export const BNPL_FORMULA_BRAND_TAGS = ["apple"];
 
+/**
+ * Apple's BNPL formula is scoped to iPhone, iPad, and MacBook only — not "Apple-brand products"
+ * generally (audit finding H5). An Apple Watch, AirPods, or Apple TV still carries the "apple"
+ * tag but isn't BNPL-eligible, so tag alone isn't a sufficient check; product_type is the only
+ * reliable signal for which product line an item belongs to (see categories.ts: Smartphones =
+ * phones, Tablets = tablets, Laptops = computers).
+ */
+export const APPLE_BNPL_ELIGIBLE_PRODUCT_TYPES = ["Smartphones", "Tablets", "Laptops"];
+
 /** Brand tags priced via the fixed partner rate-card lookup. */
 export const BNPL_LOOKUP_BRAND_TAGS = ["samsung", "google", "oneplus", "nothing"];
 
 /** Brand tags BNPL is planned for but not yet live. */
 export const BNPL_COMING_SOON_BRAND_TAGS = ["infinix", "oppo", "tecno", "vivo", "xiaomi"];
 
-export function getBnplTier(tags: string[]): BnplTier | "coming-soon" | "none" {
-  if (tags.some((tag) => BNPL_FORMULA_BRAND_TAGS.includes(tag))) return "formula";
+/**
+ * `productType` is required, not optional — every caller has a full `Product` in scope, and a
+ * missing productType silently falling through to "any apple-tagged item is eligible" is exactly
+ * the H5 bug this function exists to prevent.
+ */
+export function getBnplTier(tags: string[], productType: string): BnplTier | "coming-soon" | "none" {
+  if (
+    tags.some((tag) => BNPL_FORMULA_BRAND_TAGS.includes(tag)) &&
+    APPLE_BNPL_ELIGIBLE_PRODUCT_TYPES.includes(productType)
+  ) {
+    return "formula";
+  }
   if (tags.some((tag) => BNPL_LOOKUP_BRAND_TAGS.includes(tag))) return "lookup";
   if (tags.some((tag) => BNPL_COMING_SOON_BRAND_TAGS.includes(tag))) return "coming-soon";
   return "none";

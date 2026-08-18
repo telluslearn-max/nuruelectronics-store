@@ -46,7 +46,7 @@ export async function explainBnplPlan(
   const product = await getProductByHandle(handle);
   if (!product) return { error: "Product not found." };
 
-  const tier = getBnplTier(product.tags);
+  const tier = getBnplTier(product.tags, product.productType);
   if (tier === "coming-soon") {
     const brand = getBnplComingSoonBrand(product.tags) ?? product.title;
     return { eligible: false, comingSoonBrand: brand, waitlistMessage: buildBnplWaitlistMessage(product, brand) };
