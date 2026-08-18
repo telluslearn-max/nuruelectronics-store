@@ -4,7 +4,10 @@ import Link from "next/link";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { removeItem, updateItemQuantity } from "@/lib/actions";
 import { trackEvent } from "@/lib/analytics/track-event";
+import { isCheckoutUsable } from "@/lib/checkout";
+import { buildWhatsAppHandoffMessage } from "@/lib/concierge/whatsapp-tool";
 import { formatPrice } from "@/lib/format";
+import { buildWhatsAppUrl } from "@/lib/whatsapp";
 import { ProductMedia } from "@/components/product-media";
 import { useFocusTrap } from "@/components/use-focus-trap";
 import { useCart } from "./cart-context";
@@ -37,6 +40,18 @@ export function CartDrawer() {
   }, [isOpen]);
 
   if (!isOpen) return null;
+
+  const checkoutUsable = isCheckoutUsable(cart?.checkoutUrl);
+  const whatsappCheckoutHref = cart
+    ? buildWhatsAppUrl(buildWhatsAppHandoffMessage({ summary: "I'd like to check out.", cart }))
+    : null;
+  function trackBeginCheckout() {
+    if (!cart) return;
+    trackEvent("begin_checkout", {
+      currency: cart.cost.totalAmount.currencyCode,
+      value: Number(cart.cost.totalAmount.amount),
+    });
+  }
 
   return (
     <div
@@ -180,18 +195,29 @@ export function CartDrawer() {
                 <span className="text-xs font-normal text-neutral-400" title="VAT is calculated and added at checkout.">excl. VAT</span>
               </span>
             </div>
-            <a
-              href={cart.checkoutUrl}
-              onClick={() =>
-                trackEvent("begin_checkout", {
-                  currency: cart.cost.totalAmount.currencyCode,
-                  value: Number(cart.cost.totalAmount.amount),
-                })
-              }
-              className="block w-full rounded-control bg-accent px-6 py-3 text-center text-sm font-medium text-accent-foreground transition hover:opacity-90"
-            >
-              Checkout
-            </a>
+            {checkoutUsable ? (
+              <a
+                href={cart.checkoutUrl}
+                onClick={trackBeginCheckout}
+                className="block w-full rounded-control bg-accent px-6 py-3 text-center text-sm font-medium text-accent-foreground transition hover:opacity-90"
+              >
+                Checkout
+              </a>
+            ) : whatsappCheckoutHref ? (
+              <a
+                href={whatsappCheckoutHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={trackBeginCheckout}
+                className="block w-full rounded-control bg-accent px-6 py-3 text-center text-sm font-medium text-accent-foreground transition hover:opacity-90"
+              >
+                Order via WhatsApp
+              </a>
+            ) : (
+              <p className="text-center text-sm text-red-600" role="alert">
+                Checkout is temporarily unavailable — please contact support.
+              </p>
+            )}
             <Link
               href="/cart"
               onClick={closeCart}

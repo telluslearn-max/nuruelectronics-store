@@ -1,5 +1,6 @@
 import { ProductCompareTable } from "@/components/product-compare-table";
 import { ConciergeCheckoutCta } from "./concierge-checkout-cta";
+import { ConciergeMarkdown } from "./concierge-markdown";
 import { ConciergeProductCard } from "./concierge-product-card";
 import { ConciergeProductRecommendations } from "./concierge-product-recommendations";
 import type { ConciergeDisplayMessage } from "./use-concierge-messages";
@@ -17,17 +18,16 @@ export function ConciergeMessage({
   return (
     <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
       <div className={`max-w-[90%] ${isUser ? "" : "w-full"}`}>
-        {message.text && (
-          <div
-            className={
-              isUser
-                ? "rounded-control bg-foreground px-3.5 py-2 text-sm text-background"
-                : "px-1 text-sm leading-relaxed whitespace-pre-wrap"
-            }
-          >
-            {message.text}
-          </div>
-        )}
+        {message.text &&
+          (isUser ? (
+            <div className="rounded-control bg-foreground px-3.5 py-2 text-sm text-background whitespace-pre-wrap">
+              {message.text}
+            </div>
+          ) : (
+            <div className="px-1 text-sm leading-relaxed">
+              <ConciergeMarkdown text={message.text} />
+            </div>
+          ))}
 
         {message.products && message.products.mode === "compare" && message.products.products.length >= 2 && (
           <div className="mt-3 overflow-x-auto rounded-card border border-border-subtle">

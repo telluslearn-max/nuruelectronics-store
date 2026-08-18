@@ -161,7 +161,7 @@ const getExUkSavingsDeclaration: FunctionDeclaration = {
 const explainBnplPlanDeclaration: FunctionDeclaration = {
   name: "explain_bnpl_plan",
   description:
-    "Look up the real Buy Now, Pay Later terms for a product by its handle — deposit, installment amount, and eligibility requirements. Never state BNPL numbers or eligibility without calling this first. BNPL is live for Apple (weekly/monthly plans) and for Samsung/Google/OnePlus/Nothing (3-month/6-month plans, exact model+storage/RAM specific) — other brands are coming soon. If the result says needsVariantSelection, ask the shopper which storage/RAM they want and call again with variantId.",
+    "Look up the real Buy Now, Pay Later terms for a product by its handle — deposit, installment amount, and eligibility requirements. Never state BNPL numbers or eligibility without calling this first. The result has both totalPayable (the installment-plan subtotal only — for Apple's formula-tier plans this excludes the deposit) and totalCost (the true all-in figure: deposit + every installment) — when the shopper asks what they'll pay in total or whether they can afford it, quote totalCost, not totalPayable. BNPL is live for Apple (weekly/monthly plans) and for Samsung/Google/OnePlus/Nothing (3-month/6-month plans, exact model+storage/RAM specific) — other brands are coming soon. If the result says needsVariantSelection, ask the shopper which storage/RAM they want and call again with variantId.",
   parametersJsonSchema: {
     type: "object",
     properties: {
@@ -404,6 +404,7 @@ export async function dispatchTool(
               termCount: result.termCount,
               termUnit: result.termUnit,
               totalPayable: result.totalPayable,
+              totalCost: result.totalCost,
               currencyCode: result.currencyCode,
             },
             requirements: result.requirements,

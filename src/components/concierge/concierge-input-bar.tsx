@@ -21,6 +21,7 @@ export function ConciergeInputBar({
   recordingState,
   onStartRecording,
   onStopRecording,
+  isStreaming = false,
 }: {
   input: string;
   onInputChange: (value: string) => void;
@@ -30,11 +31,16 @@ export function ConciergeInputBar({
   recordingState: ConciergeRecordingState;
   onStartRecording: () => void;
   onStopRecording: () => void;
+  /** While the concierge is still replying, block sending another message — without this a
+   * shopper who couldn't tell their first message had gone through (audit finding M1, caused by
+   * the scroll trap this now-fixed CSS bug produced) could fire a second one on top of it. */
+  isStreaming?: boolean;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
 
   function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
+    if (isStreaming) return;
     const text = input;
     onInputChange("");
     onSubmit(text);
@@ -78,7 +84,7 @@ export function ConciergeInputBar({
           onChange={(e) => onInputChange(e.target.value)}
           onFocus={onFocus}
           disabled={isVoiceBusy}
-          placeholder="Ask anything…"
+          placeholder={isStreaming ? "Concierge is replying…" : "Ask anything…"}
           className="flex-1 rounded-control border border-border-subtle px-3.5 py-2.5 text-sm outline-none focus:border-foreground disabled:opacity-50"
         />
         {isVoiceSupported && (
@@ -99,10 +105,10 @@ export function ConciergeInputBar({
         )}
         <button
           type="submit"
-          disabled={!input.trim() || isVoiceBusy}
+          disabled={!input.trim() || isVoiceBusy || isStreaming}
           className="rounded-control bg-foreground px-4 py-2.5 text-sm font-medium text-background transition disabled:opacity-40"
         >
-          Send
+          {isStreaming ? "Sending…" : "Send"}
         </button>
       </form>
     </div>

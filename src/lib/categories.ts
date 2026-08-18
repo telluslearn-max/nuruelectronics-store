@@ -267,9 +267,13 @@ export const categories: Category[] = [
   {
     slug: "cameras",
     label: "Cameras",
-    // Streaming Devices / Media Players live here rather than under
-    // Appliances — closer to content-creation/small-electronics than
-    // whitegoods.
+    // Streaming Devices / Media Players are filed under this category slug
+    // (closer to content-creation/small-electronics than whitegoods) but
+    // stay out of the default `query` — a shopper browsing "Cameras" with no
+    // filter applied shouldn't see a set-top box as if it were a camera.
+    // They're still reachable via the explicit "Streaming & Media" chip
+    // below, and `types` still lists them so categoryForProductType() keeps
+    // routing those products here for breadcrumbs/related-category logic.
     types: [
       "Cameras",
       "Camera Accessories",
@@ -279,15 +283,7 @@ export const categories: Category[] = [
       "Streaming Devices",
       "Media Players",
     ],
-    query: productTypeQuery([
-      "Cameras",
-      "Camera Accessories",
-      "Instant Cameras",
-      "Photo Accessories",
-      "Gimbals",
-      "Streaming Devices",
-      "Media Players",
-    ]),
+    query: productTypeQuery(["Cameras", "Camera Accessories", "Instant Cameras", "Photo Accessories", "Gimbals"]),
     blurb: "Cameras, gimbals, and gear for creators.",
     art: "camera",
     groups: [

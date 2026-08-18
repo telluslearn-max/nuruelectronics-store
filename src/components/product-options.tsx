@@ -15,6 +15,7 @@ import { TradeInSection } from "@/components/trade-in-section";
 import { WhatsAppOrderButton } from "@/components/whatsapp-order-button";
 import { addItem } from "@/lib/actions";
 import { getProductBadges } from "@/lib/badges";
+import { isCheckoutUsable } from "@/lib/checkout";
 import { isDigitalProduct } from "@/lib/digital-products";
 import { resolveSwatchColor } from "@/lib/color-swatches";
 import { formatPrice } from "@/lib/format";
@@ -56,9 +57,22 @@ function variantMatches(variant: ProductVariant, selected: Record<string, string
   return variant.selectedOptions.every((option) => selected[option.name] === option.value);
 }
 
+/**
+ * Homepage/category listings always advertise the cheapest variant's price ("From KES X" —
+ * product.priceRange.minVariantPrice). Defaulting the PDP to variants[0] instead (Shopify's
+ * creation-order default, not price order) can land a shopper on a configuration far pricier
+ * than what got them to click through (audit finding H2) — so start on the cheapest
+ * available-for-sale variant instead, falling back to the cheapest overall if none are in stock.
+ */
+function cheapestVariant(variants: ProductVariant[]): ProductVariant | undefined {
+  const byPrice = (a: ProductVariant, b: ProductVariant) => Number(a.price.amount) - Number(b.price.amount);
+  const available = variants.filter((v) => v.availableForSale).sort(byPrice);
+  return available[0] ?? [...variants].sort(byPrice)[0];
+}
+
 export function ProductOptions({ product }: { product: Product }) {
   const [selected, setSelected] = useState<Record<string, string>>(() => {
-    const initial = product.variants[0]?.selectedOptions ?? [];
+    const initial = cheapestVariant(product.variants)?.selectedOptions ?? [];
     return Object.fromEntries(initial.map((o) => [o.name, o.value]));
   });
   const [quantity, setQuantity] = useState(1);
@@ -132,6 +146,10 @@ export function ProductOptions({ product }: { product: Product }) {
       try {
         const cart = await addItem(selectedVariant.id, quantity);
         setCart(cart);
+        if (!isCheckoutUsable(cart.checkoutUrl)) {
+          setBuyNowError("Checkout isn't available right now — please order via WhatsApp below.");
+          return;
+        }
         window.location.href = cart.checkoutUrl;
       } catch {
         setBuyNowError("Couldn't start checkout — please try again, or order via WhatsApp below.");

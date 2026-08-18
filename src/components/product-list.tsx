@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { loadMoreProducts } from "@/lib/actions";
+import { buildWhatsAppUrl } from "@/lib/whatsapp";
 import type { Product } from "@/lib/shopify/types";
 import { ProductGrid } from "./product-grid";
 
@@ -49,6 +50,32 @@ function FacetRow({ label, children }: { label: string; children: React.ReactNod
   );
 }
 
+function EmptyCategoryState({ label }: { label?: string }) {
+  const whatsappHref = buildWhatsAppUrl(
+    label ? `Hi! I'm looking for ${label.toLowerCase()} on nuruelectronics.com — do you have any in stock?` : "Hi! Do you have this in stock?",
+  );
+  return (
+    <div className="flex flex-col items-center justify-center gap-2 rounded-card border border-dashed border-border-subtle p-12 text-center">
+      <p className="text-sm font-medium">
+        {label ? `${label} is coming soon` : "Coming soon"}
+      </p>
+      <p className="max-w-sm text-sm text-neutral-500">
+        We&rsquo;re still stocking this category — message us on WhatsApp and we&rsquo;ll help you find what you need.
+      </p>
+      {whatsappHref && (
+        <a
+          href={whatsappHref}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-2 rounded-control border border-border-subtle px-4 py-2 text-sm font-medium transition hover:border-foreground"
+        >
+          Message us on WhatsApp
+        </a>
+      )}
+    </div>
+  );
+}
+
 export function ProductList({
   initialProducts,
   initialHasNextPage,
@@ -56,6 +83,7 @@ export function ProductList({
   searchTerm,
   sort,
   quickAdd = true,
+  emptyStateLabel,
 }: {
   initialProducts: Product[];
   initialHasNextPage: boolean;
@@ -63,6 +91,8 @@ export function ProductList({
   searchTerm?: string;
   sort?: { sortKey: "PRICE" | "BEST_SELLING" | "CREATED_AT"; reverse: boolean };
   quickAdd?: boolean;
+  /** Category label shown in the "coming soon" message when this list starts out with zero products. */
+  emptyStateLabel?: string;
 }) {
   const [products, setProducts] = useState(initialProducts);
   const [hasNextPage, setHasNextPage] = useState(initialHasNextPage);
@@ -172,6 +202,8 @@ export function ProductList({
             Clear filters
           </button>
         </div>
+      ) : products.length === 0 ? (
+        <EmptyCategoryState label={emptyStateLabel} />
       ) : (
         <ProductGrid products={visibleProducts} quickAdd={quickAdd} />
       )}

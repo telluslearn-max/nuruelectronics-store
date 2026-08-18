@@ -8,6 +8,10 @@ import { isRouteActive } from "@/lib/route-active";
 import { useWishlist } from "./wishlist/wishlist-context";
 import { useCart } from "./cart/cart-context";
 import { SearchBox } from "./search-box";
+import { useMediaQuery } from "./use-media-query";
+
+/** Matches Tailwind's `md` breakpoint, which is what gates the desktop vs. mobile SearchBox below. */
+const IS_DESKTOP_QUERY = "(min-width: 768px)";
 
 function ChevronIcon({ className }: { className?: string }) {
   return (
@@ -45,6 +49,7 @@ export function Nav({
   const { items: wishlistItems } = useWishlist();
   const pathname = usePathname();
   const itemCount = cart?.totalQuantity ?? 0;
+  const isDesktop = useMediaQuery(IS_DESKTOP_QUERY);
   const [openId, setOpenId] = useState<string | null>(null);
   const headerRef = useRef<HTMLElement>(null);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -89,14 +94,17 @@ export function Nav({
   return (
     <header
       ref={headerRef}
-      className="sticky top-0 z-40 border-b border-border-subtle bg-background/80 backdrop-blur"
+      // isolate + will-change-transform force this sticky+backdrop-blur header onto its own
+      // compositor layer, which some browsers otherwise fail to fully re-rasterize on scroll —
+      // leaving a stale blurred "ghost" of the page content baked into the bar (audit finding M2).
+      className="sticky top-0 z-40 isolate w-full border-b border-border-subtle bg-background/80 backdrop-blur will-change-transform"
     >
       <div className="mx-auto max-w-6xl px-4 py-4">
         <div className="flex items-center gap-2 sm:gap-4">
           <Link href="/" className="shrink-0 text-lg font-semibold tracking-tight">
             NURU
           </Link>
-          <div className="hidden min-w-0 flex-1 md:block">
+          <div className="hidden min-w-0 flex-1 md:block" aria-hidden={!isDesktop}>
             <SearchBox />
           </div>
           <div className="ml-auto hidden shrink-0 items-center gap-2 md:ml-0 md:flex md:gap-4">
@@ -134,7 +142,7 @@ export function Nav({
             </button>
           </div>
         </div>
-        <div className="mt-3 md:hidden">
+        <div className="mt-3 md:hidden" aria-hidden={isDesktop}>
           <SearchBox />
         </div>
       </div>

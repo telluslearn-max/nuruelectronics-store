@@ -3,6 +3,26 @@ import { CategoryTiles } from "@/components/category-tiles";
 import { ProductList } from "@/components/product-list";
 import { isSemanticSearchReady, searchProductsSemantic } from "@/lib/search/semantic-search";
 import { getProducts, sanitizeFreeTextSearchTerm } from "@/lib/shopify";
+import type { Product } from "@/lib/shopify/types";
+
+/**
+ * Shopify's own relevance ranking has no notion of "this is the product family the shopper is
+ * naming" vs. "this happens to mention that word" — a search for "iphone" can rank accessories
+ * (cases, chargers, cross-compatible cables) alongside or ahead of the actual iPhone lineup
+ * (audit finding H1). A product whose title starts with the query is almost certainly the thing
+ * being searched for, so it's pulled to the front rather than trusting Shopify's ranking alone.
+ */
+function boostTitleMatches(products: Product[], query: string): Product[] {
+  const normalizedQuery = query.trim().toLowerCase();
+  if (!normalizedQuery) return products;
+  const rank = (product: Product) => {
+    const title = product.title.toLowerCase();
+    if (title.startsWith(normalizedQuery)) return 0;
+    if (title.includes(normalizedQuery)) return 1;
+    return 2;
+  };
+  return [...products].sort((a, b) => rank(a) - rank(b));
+}
 
 type SearchPageProps = {
   searchParams: Promise<{ q?: string }>;
@@ -29,7 +49,7 @@ async function findMatchingProducts(query: string) {
     return { products: ranked, hasNextPage: false, endCursor: null, isSemantic: true };
   }
   const page = await getProducts({ searchTerm: sanitizeFreeTextSearchTerm(query) });
-  return { ...page, isSemantic: false };
+  return { ...page, products: boostTitleMatches(page.products, query), isSemantic: false };
 }
 
 export default async function SearchPage({ searchParams }: SearchPageProps) {

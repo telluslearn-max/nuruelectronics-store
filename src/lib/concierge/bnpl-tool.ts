@@ -23,6 +23,10 @@ export type BnplExplainerResult =
       termCount: number;
       termUnit: "week" | "month";
       totalPayable: string;
+      /** The real all-in cost — deposit + every installment. Always state this (not totalPayable
+       * alone) when the shopper asks what they'll pay in total; totalPayable excludes the deposit
+       * for Apple's formula-tier plans. */
+      totalCost: string;
       currencyCode: string;
       requirements: string[];
       /** Text for the concierge to surface as a "Continue on WhatsApp" CTA once the shopper wants to apply. */
@@ -80,6 +84,7 @@ export async function explainBnplPlan(
     termCount: plan.termCount,
     termUnit: plan.termUnit,
     totalPayable: plan.totalPayable.toFixed(2),
+    totalCost: plan.totalCost.toFixed(2),
     currencyCode: price.currencyCode,
     requirements: BNPL_ELIGIBILITY_REQUIREMENTS[plan.tier],
     applicationMessage: buildBnplApplicationMessage(product, price.currencyCode, plan),
