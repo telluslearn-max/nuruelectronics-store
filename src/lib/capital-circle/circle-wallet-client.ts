@@ -123,10 +123,11 @@ export type WalletTransferResult = { id: string };
  * enforces nothing itself beyond what Circle's API rejects outright.
  */
 export async function transferUsdc(destinationAddress: string, amountUsdc: number): Promise<WalletTransferResult> {
+  // blockchain is deliberately omitted: Circle's SDK types forbid passing it alongside walletId
+  // ("Cannot be used with walletId") — the chain is already fixed by which wallet walletId names.
   const response = await getClient().createTransaction({
     walletId: walletId!,
     tokenAddress: USDC_POLYGON_CONTRACT,
-    blockchain: (isTestnet ? "MATIC-AMOY" : "MATIC") as "MATIC-AMOY" | "MATIC",
     amount: [amountUsdc.toString()],
     destinationAddress,
     fee: { type: "level", config: { feeLevel: "MEDIUM" } },
