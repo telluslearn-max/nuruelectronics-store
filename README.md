@@ -1,36 +1,49 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# NURU — AI-Native Autonomous Retail & Financial Operating System
 
-## Getting Started
+NURU is a B2C consumer electronics and gaming enterprise powered by Google Gemini 2.x, Vertex AI, and Google Cloud.
 
-First, run the development server:
+## 🚀 Overview
 
+- **Front-of-House:** Multilingual Gemini 2.x Shopping Concierge (English, Swahili, Sheng) with neural voice synthesis, Ex-UK certified savings comparison, and Lipa Pole Pole (BNPL) financing.
+- **Autonomous Support:** Autonomous warranty and return claims adjudication with direct double-entry General Ledger posting in PostgreSQL.
+- **Enterprise ERP:** Cash-basis P&L engine with 1-click Google Sheets synchronization via the Google Sheets API.
+- **Autonomous Treasury:** Capital Circle multi-agent loop with Circle Developer-Controlled Wallets on Polygon and database spend limits.
+
+## 🛠️ Google Cloud Deployment (Cloud Run)
+
+### Project Configuration
+- **GCP Project ID:** `nuru-platform-2026`
+- **GCP Project Name:** `nuru`
+- **Region:** `us-central1`
+
+### 1. Build and Deploy via Cloud Build
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+gcloud builds submit --config cloudbuild.yaml --project=nuru-platform-2026
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 2. Direct Deploy to Cloud Run
+```bash
+gcloud run deploy nuru-platform \
+  --source . \
+  --region us-central1 \
+  --allow-unauthenticated \
+  --project=nuru-platform-2026
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 💻 Local Development
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. Install dependencies:
+   ```bash
+   npm install
+   ```
 
-## Learn More
+2. Run database migrations:
+   ```bash
+   npx prisma migrate dev
+   ```
 
-To learn more about Next.js, take a look at the following resources:
+3. Start the Next.js development server:
+   ```bash
+   npm run dev
+   ```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.

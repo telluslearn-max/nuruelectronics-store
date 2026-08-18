@@ -182,15 +182,17 @@ model Invoice {
 }
 
 model Receipt {
-  id        String        @id @default(cuid())
-  number    String        @unique
-  invoiceId String
-  invoice   Invoice       @relation(fields: [invoiceId], references: [id])
-  amount    Decimal       @db.Decimal(10, 2)
-  method    PaymentMethod
-  reference String?
-  paidAt    DateTime
-  createdAt DateTime      @default(now())
+  id                   String        @id @default(cuid())
+  number               String        @unique
+  invoiceId            String
+  invoice              Invoice       @relation(fields: [invoiceId], references: [id])
+  amount               Decimal       @db.Decimal(10, 2)
+  method               PaymentMethod
+  reference            String?
+  paidAt               DateTime
+  whatsappSentAt       DateTime?
+  reviewFollowUpSentAt DateTime?
+  createdAt            DateTime      @default(now())
 
   @@index([invoiceId])
 }

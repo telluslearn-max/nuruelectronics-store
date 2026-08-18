@@ -20,6 +20,7 @@ import {
   sendEstimateEmail,
   sendInvoiceEmail,
   sendReceiptEmail,
+  sendReceiptWhatsApp,
   updateDeliveryNote,
   updateEstimate,
   updateInvoice,
@@ -460,6 +461,13 @@ export default async function AdminOrderHubPage({
                             Send email
                           </SubmitButton>
                         </form>
+                        {!receipt.whatsappSentAt && (
+                          <form action={sendReceiptWhatsApp.bind(null, receipt.id)}>
+                            <SubmitButton className="underline hover:text-foreground" pendingText="Sending…">
+                              Send WhatsApp
+                            </SubmitButton>
+                          </form>
+                        )}
                       </div>
                     </li>
                   ))}
