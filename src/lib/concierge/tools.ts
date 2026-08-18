@@ -9,6 +9,7 @@ import { BNPL_PLAN_IDS, explainBnplPlan } from "./bnpl-tool";
 import { addToCartTool, removeCartItem, updateCartItemQuantity } from "./cart-tools";
 import { compareProducts, getProductDetails, listKitsOrEcosystems, searchProducts } from "./catalog-tools";
 import { getExUkSavings } from "./ex-uk-tool";
+import { searchGamingVouchers } from "./gaming-tools";
 import { checkOrderStatus, fileReturnOrRefund } from "./support-tool";
 import type { ConciergeEvent } from "./types";
 import { buildWhatsAppHandoffMessage, isWhatsAppHandoffConfigured } from "./whatsapp-tool";
@@ -237,6 +238,19 @@ const openWhatsAppHandoffDeclaration: FunctionDeclaration = {
   },
 };
 
+const searchGamingVouchersDeclaration: FunctionDeclaration = {
+  name: "search_gaming_vouchers",
+  description:
+    "Search digital gaming gift cards and game keys (PlayStation Network PSN, Steam Wallet, Xbox Game Pass, Nintendo eShop, Roblox, Razer Gold) with instant KES pricing and live availability.",
+  parametersJsonSchema: {
+    type: "object",
+    properties: {
+      query: { type: "string", description: "Search term e.g. 'PlayStation', 'Steam', 'Xbox', 'Nintendo'." },
+    },
+    required: ["query"],
+  },
+};
+
 export const functionDeclarations: FunctionDeclaration[] = [
   searchProductsDeclaration,
   getProductDetailsDeclaration,
@@ -250,6 +264,7 @@ export const functionDeclarations: FunctionDeclaration[] = [
   getExUkSavingsDeclaration,
   checkOrderStatusDeclaration,
   requestReturnOrRefundDeclaration,
+  searchGamingVouchersDeclaration,
   openCheckoutDeclaration,
   ...(isWhatsAppHandoffConfigured ? [openWhatsAppHandoffDeclaration] : []),
 ];
@@ -488,6 +503,12 @@ export async function dispatchTool(
       const cart = await getCart();
       const message = buildWhatsAppHandoffMessage({ summary, cart });
       return { resultForModel: { ok: true }, events: [{ type: "whatsapp", message }] };
+    }
+
+    case "search_gaming_vouchers": {
+      const query = typeof args.query === "string" ? args.query : "";
+      const vouchers = await searchGamingVouchers(query);
+      return { resultForModel: vouchers, events: [] };
     }
 
     default:

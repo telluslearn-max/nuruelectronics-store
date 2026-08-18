@@ -25,6 +25,8 @@ function buildFreeTextQuery(text: string): string {
   return words.map((w) => `(title:*${w}* OR vendor:*${w}* OR tag:*${w}*)`).join(" AND ");
 }
 
+import { isSemanticSearchReady, searchProductsSemantic } from "@/lib/search/semantic-search";
+
 export async function searchProducts(args: {
   query?: string;
   categorySlug?: string;
@@ -35,6 +37,23 @@ export async function searchProducts(args: {
   const { query, categorySlug, ecosystemSlug, kitSlug, first } = args;
 
   const trimmedQuery = query?.trim();
+
+  // For conversational, intent-based natural language queries without explicit category/ecosystem facets,
+  // leverage Vertex AI text-embedding-004 semantic similarity if embeddings are indexed.
+  if (trimmedQuery && !categorySlug && !ecosystemSlug && !kitSlug) {
+    try {
+      if (await isSemanticSearchReady()) {
+        const { products: allProducts } = await getProducts({ first: 100, includeSpecs: true });
+        const semanticResults = await searchProductsSemantic(trimmedQuery, allProducts, first ?? 8);
+        if (semanticResults.length > 0) {
+          return semanticResults;
+        }
+      }
+    } catch {
+      // Fallback to keyword matching
+    }
+  }
+
   let searchTerm = trimmedQuery ? buildFreeTextQuery(trimmedQuery) : undefined;
   if (categorySlug) {
     const category = categories.find((c) => c.slug === categorySlug);

@@ -8,10 +8,13 @@ import { generateAccessToken, mintDocumentNumber } from "./documents";
 import { ACCOUNTS, cashAccountForMethod, postJournalEntry } from "./ledger";
 import { decrementVariantInventory, getShopifyOrderById } from "./shopify/admin-api";
 import { isEmailConfigured, sendDeliveryNoteEmail as sendDeliveryNoteEmailMessage, sendEstimateEmail as sendEstimateEmailMessage, sendInvoiceEmail as sendInvoiceEmailMessage, sendReceiptEmail as sendReceiptEmailMessage } from "./email";
+import { isWhatsAppSendConfigured, normalizeWhatsAppPhone, sendWhatsAppTemplate } from "./whatsapp-business";
 import { renderDeliveryNotePdf, renderEstimatePdf, renderInvoicePdf, renderReceiptPdf } from "./pdf/render";
 import { ActionGuardError, redirectWithError, redirectWithSuccess } from "./admin-feedback";
 import { logAdminAction } from "./audit-log";
 import { PAYMENT_METHODS, parseEnumField } from "./parse-enum";
+import { formatPrice } from "./format";
+import { SITE_URL } from "./site";
 
 function parseLineItems(
   formData: FormData,
@@ -727,6 +730,40 @@ export async function sendReceiptEmail(receiptId: string): Promise<void> {
 
   revalidatePath(`/admin/orders/${receipt.invoice.orderId}`);
   redirectWithSuccess(`/admin/orders/${receipt.invoice.orderId}`, "Receipt emailed.");
+}
+
+const WHATSAPP_RECEIPT_TEMPLATE_SID = process.env.TWILIO_WHATSAPP_RECEIPT_TEMPLATE_SID;
+
+export async function sendReceiptWhatsApp(receiptId: string): Promise<void> {
+  await requireAdminSession();
+  const receipt = await prisma.receipt.findUniqueOrThrow({
+    where: { id: receiptId },
+    include: { invoice: { include: { order: { include: { customer: true } } } } },
+  });
+  const orderPath = `/admin/orders/${receipt.invoice.orderId}`;
+
+  if (!isWhatsAppSendConfigured || !WHATSAPP_RECEIPT_TEMPLATE_SID) {
+    redirectWithError(
+      orderPath,
+      "WhatsApp sending isn't configured — set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_WHATSAPP_FROM, and TWILIO_WHATSAPP_RECEIPT_TEMPLATE_SID.",
+    );
+  }
+  const customer = receipt.invoice.order.customer;
+  const to = customer.phone ? normalizeWhatsAppPhone(customer.phone) : null;
+  if (!to) {
+    redirectWithError(orderPath, "Customer has no WhatsApp-capable phone number on file.");
+  }
+
+  await sendWhatsAppTemplate(to, WHATSAPP_RECEIPT_TEMPLATE_SID, {
+    "1": customer.name ?? "there",
+    "2": receipt.number,
+    "3": formatPrice(receipt.amount.toString(), receipt.invoice.order.currencyCode),
+    "4": `${SITE_URL}/account/documents`,
+  });
+  await prisma.receipt.update({ where: { id: receiptId }, data: { whatsappSentAt: new Date() } });
+
+  revalidatePath(orderPath);
+  redirectWithSuccess(orderPath, "Receipt sent via WhatsApp.");
 }
 
 export async function voidInvoice(invoiceId: string): Promise<void> {
