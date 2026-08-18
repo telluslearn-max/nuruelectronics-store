@@ -5,8 +5,54 @@ import { computeSavings, findCounterpart, type Savings } from "@/lib/product-mat
 import { getProducts } from "@/lib/shopify";
 
 export const metadata: Metadata = {
+  title: { absolute: "Ex-UK Deals — Unboxed, UK-Imported Phones in Kenya | NURU" },
   description:
-    "Unboxed ex-UK units at a lower price, every one covered by a 1-year warranty. Swipe right to love, left to pass.",
+    "Genuine ex-UK phones and electronics at a lower price than new, every unit still covered by a 1-year warranty. Browse or swipe through unboxed, UK-imported units on NURU.",
+};
+
+// The audit's own recommendation was to add visible FAQ content here, but this route is
+// deliberately a full-screen, gesture-driven app shell (swipe deck on mobile, grid on desktop —
+// see ex-uk-discover-screen.tsx) with no natural place for a static content block without
+// reworking that design. Shipping the FAQPage schema on its own is the safe middle ground; making
+// this content visible too belongs with the ex-UK trust/content cluster the audit calls out as a
+// separate follow-up (a supporting blog post), not a change to this app shell.
+const exUkFaqJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: [
+    {
+      "@type": "Question",
+      name: "What is an Ex-UK phone?",
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: "An Ex-UK unit is a genuine, previously-owned phone or device imported from the UK, inspected and graded for condition before it's listed — not a copy or a knockoff. It's sold at a lower price than the equivalent brand-new unit.",
+      },
+    },
+    {
+      "@type": "Question",
+      name: "Is it safe to buy a refurbished or Ex-UK phone in Kenya?",
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: "Yes — every Ex-UK unit on NURU is inspected before listing and comes with a 1-year warranty, the same as many new-device warranties. Condition and battery health are shown on each listing before you buy.",
+      },
+    },
+    {
+      "@type": "Question",
+      name: "What warranty do Ex-UK units have?",
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: "Every Ex-UK unit is covered by a 1-year warranty, regardless of its condition grade.",
+      },
+    },
+    {
+      "@type": "Question",
+      name: "How much cheaper is an Ex-UK phone than buying new?",
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: "Savings vary by model and condition, but Ex-UK units are consistently listed below the equivalent new unit's price — each listing shows the exact savings against the current new price.",
+      },
+    },
+  ],
 };
 
 export default async function ExUkPage() {
@@ -34,8 +80,14 @@ export default async function ExUkPage() {
   );
 
   return (
-    <Suspense>
-      <ExUkDiscoverScreen products={products} savingsByHandle={savingsByHandle} />
-    </Suspense>
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(exUkFaqJsonLd) }}
+      />
+      <Suspense>
+        <ExUkDiscoverScreen products={products} savingsByHandle={savingsByHandle} />
+      </Suspense>
+    </>
   );
 }

@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { Breadcrumb } from "@/components/breadcrumb";
 import { getArticleByHandle } from "@/lib/shopify";
 import { truncate } from "@/lib/format";
+import { buildArticleJsonLd } from "@/lib/structured-data";
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
@@ -39,8 +40,14 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
     notFound();
   }
 
+  const articleJsonLd = buildArticleJsonLd(article, handle);
+
   return (
     <div>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(articleJsonLd) }}
+      />
       <Breadcrumb
         items={[
           { label: "Home", href: "/" },

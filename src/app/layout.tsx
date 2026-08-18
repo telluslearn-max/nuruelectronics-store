@@ -16,10 +16,14 @@ const geistMono = Geist_Mono({
 const DESCRIPTION =
   "Shop genuine electronics in Kenya at NURU — phones, laptops, audio, gaming, cameras, and appliances from top brands, with fast Nairobi delivery.";
 
+// Fallback for any route that doesn't set its own metadata (cart, wishlist, search, compare,
+// coming-soon, legal pages) — was a bare "NURU" with no entity signal for what the brand
+// actually is (SEO/AEO audit finding). Pages that already export their own metadata (home,
+// category, product, ecosystem, etc.) are unaffected by this default.
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: "NURU",
+    default: "NURU — Genuine Electronics in Kenya",
     template: "%s | NURU",
   },
   description: DESCRIPTION,
@@ -28,12 +32,12 @@ export const metadata: Metadata = {
     type: "website",
     siteName: "NURU",
     locale: "en_KE",
-    title: "NURU",
+    title: "NURU — Genuine Electronics in Kenya",
     description: DESCRIPTION,
   },
   twitter: {
     card: "summary_large_image",
-    title: "NURU",
+    title: "NURU — Genuine Electronics in Kenya",
     description: DESCRIPTION,
   },
 };

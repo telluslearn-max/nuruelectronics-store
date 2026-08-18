@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { BentoGrid } from "@/components/bento-grid";
 import { ComingSoonCarousel } from "@/components/coming-soon-carousel";
@@ -63,6 +64,30 @@ function FeatureCard({ product }: { product: Product }) {
   );
 }
 
+// The homepage inherited the root layout's bare "NURU" default (no page-specific
+// generateMetadata existed at all) — the single highest-leverage fix in the SEO/AEO audit,
+// since title/description is what both classic search snippets and AI answer engines use as a
+// compressed entity summary for the page most likely to be a first read of the brand.
+// `title.absolute` bypasses the root layout's "%s | NURU" template so this renders exactly as
+// written instead of "...| NURU | NURU".
+export const metadata: Metadata = {
+  title: {
+    absolute: "NURU — Genuine Phones, Laptops & Electronics in Kenya | Fast Nairobi Delivery",
+  },
+  description:
+    "Shop genuine phones, laptops, audio, gaming, cameras, and appliances in Kenya — 100% authentic with manufacturer warranty, fast Nairobi delivery, and Buy Now Pay Later available.",
+  openGraph: {
+    title: "NURU — Genuine Phones, Laptops & Electronics in Kenya",
+    description:
+      "Shop genuine phones, laptops, audio, gaming, cameras, and appliances in Kenya — 100% authentic with manufacturer warranty and fast Nairobi delivery.",
+  },
+  twitter: {
+    title: "NURU — Genuine Phones, Laptops & Electronics in Kenya",
+    description:
+      "Shop genuine phones, laptops, audio, gaming, cameras, and appliances in Kenya — 100% authentic with manufacturer warranty and fast Nairobi delivery.",
+  },
+};
+
 export default async function HomePage() {
   const [
     flagshipPage,
@@ -122,8 +147,12 @@ export default async function HomePage() {
         <section className="overflow-hidden rounded-card bg-surface-dark text-surface-dark-foreground">
           <div className="grid grid-cols-1 items-center gap-8 p-8 sm:p-12 md:grid-cols-2">
             <div>
+              {/* The H1 stays the current flagship product's name (dynamic, personalized) rather
+                  than a static keyword phrase — per the audit's recommendation, the keyword
+                  coverage goes here instead, in copy that was already visible and already made
+                  sense in context, rather than as hidden/duplicate text purely for SEO. */}
               <p className="text-sm font-medium uppercase tracking-wide text-accent">
-                Genuine electronics. Delivered fast.
+                Genuine phones, laptops &amp; electronics in Kenya. Delivered fast.
               </p>
               <h1 className="mt-2 text-title sm:text-display">{hero.title}</h1>
               <p className="mt-4 max-w-md text-neutral-400">{firstSentence(hero.description)}</p>

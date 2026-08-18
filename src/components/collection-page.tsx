@@ -5,7 +5,7 @@ import { FeatureCarousel } from "@/components/feature-carousel";
 import { ProductList } from "@/components/product-list";
 import { RelatedCategories, type RelatedCategoryEntry } from "@/components/related-categories";
 import { SectionHeading } from "@/components/section-heading";
-import { SITE_URL } from "@/lib/site";
+import { buildItemListJsonLd } from "@/lib/structured-data";
 import type { Product } from "@/lib/shopify/types";
 
 export type CollectionSortKey = "PRICE" | "BEST_SELLING" | "CREATED_AT";
@@ -82,17 +82,7 @@ export function CollectionPage({
   /** Long-form buying guide, shown after the product listing — category pages only. */
   categoryGuide?: ReactNode;
 }) {
-  const itemListJsonLd = {
-    "@context": "https://schema.org",
-    "@type": "ItemList",
-    name: title,
-    itemListElement: products.map((product, index) => ({
-      "@type": "ListItem",
-      position: index + 1,
-      url: `${SITE_URL}/products/${product.handle}`,
-      name: product.title,
-    })),
-  };
+  const itemListJsonLd = buildItemListJsonLd(title, products);
 
   return (
     <div>
