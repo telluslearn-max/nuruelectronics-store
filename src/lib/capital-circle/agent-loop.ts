@@ -12,11 +12,14 @@ export type CapitalCircleCycleResult = {
 };
 
 /**
- * One weekly cycle, driven by a fixed task instruction rather than chat
- * history — there's no shopper on the other end. Otherwise mirrors
- * concierge/agent-loop.ts's bounded tool-calling loop shape exactly: call
- * the model, dispatch any function calls, feed results back, repeat until
- * the model stops calling tools or the iteration cap is hit.
+ * One hourly cycle, driven by a fixed task instruction rather than chat
+ * history — there's no shopper on the other end. Runs every hour (see
+ * vercel.json) to match the 2-hour market-resolution horizon in
+ * system-prompt.ts; a less frequent cadence would mean most short-horizon
+ * windows never get looked at. Otherwise mirrors concierge/agent-loop.ts's
+ * bounded tool-calling loop shape exactly: call the model, dispatch any
+ * function calls, feed results back, repeat until the model stops calling
+ * tools or the iteration cap is hit.
  */
 export async function runCapitalCircleCycle(): Promise<CapitalCircleCycleResult> {
   if (!isCapitalCircleConfigured) {
@@ -30,7 +33,7 @@ export async function runCapitalCircleCycle(): Promise<CapitalCircleCycleResult>
   const ai = getGenAIClient();
   const systemInstruction = buildCapitalCircleSystemInstruction();
   const contents: Content[] = [
-    { role: "user", parts: [{ text: "Run this week's Capital Circle cycle." }] },
+    { role: "user", parts: [{ text: "Run this hour's Capital Circle cycle." }] },
   ];
 
   let toolCallCount = 0;

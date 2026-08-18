@@ -587,6 +587,7 @@ model CapitalCircleWallet {
   updatedAt      DateTime                  @updatedAt
 
   positions CapitalCirclePosition[]
+  sweeps    CapitalCircleSweep[]
 }
 
 enum CapitalCirclePositionStatus {
@@ -614,4 +615,40 @@ model CapitalCirclePosition {
 
   @@index([status, createdAt])
   @@index([walletId])
+}
+
+// The weekly "take 40% of real profit, stage it for conversion" step. This
+// model only ever gets a status flip from a human (see
+// src/lib/capital-circle/sweep-actions.ts) after they've manually converted
+// USD to USDC via Circle Mint/an exchange and sent it to the wallet — no
+// code path here calls a payment or exchange API.
+enum CapitalCircleSweepStatus {
+  pending
+  confirmed
+}
+
+model CapitalCircleSweep {
+  id                  String                   @id @default(cuid())
+  /// Monday 00:00 of the week this sweep covers.
+  weekStart           DateTime
+  /// Exclusive — the following Monday 00:00.
+  weekEnd             DateTime
+  totalProfitUsd      Decimal                  @db.Decimal(10, 2)
+  splitPercent        Decimal                  @default(40) @db.Decimal(5, 2)
+  sweepAmountUsd      Decimal                  @db.Decimal(10, 2)
+  status              CapitalCircleSweepStatus @default(pending)
+  /// Set by the Circle webhook (see /api/webhooks/circle) when it detects a matching
+  /// inbound USDC transfer — pre-fills the confirm form but never confirms on its own.
+  detectedUsdcAmount  Decimal?                 @db.Decimal(10, 2)
+  detectedAt          DateTime?
+  detectedTxHash      String?
+  confirmedUsdcAmount Decimal?                 @db.Decimal(10, 2)
+  confirmedBy         String?
+  confirmedAt         DateTime?
+  walletId            String?
+  wallet              CapitalCircleWallet?     @relation(fields: [walletId], references: [id])
+  createdAt           DateTime                 @default(now())
+
+  @@unique([weekStart])
+  @@index([status, weekStart])
 }

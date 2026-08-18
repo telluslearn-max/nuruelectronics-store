@@ -2,10 +2,12 @@ import "server-only";
 import { Resend } from "resend";
 import { formatPrice } from "./format";
 import { SITE_URL } from "./site";
-import type { Customer, DeliveryNote, Employee, Estimate, Invoice, Payslip, Receipt } from "@prisma/client";
+import type { CapitalCircleSweep, Customer, DeliveryNote, Employee, Estimate, Invoice, Payslip, Receipt } from "@prisma/client";
+import type { CapitalCircleCycleResult } from "./capital-circle/agent-loop";
 
 const apiKey = process.env.RESEND_API_KEY;
 const from = process.env.DOCUMENT_EMAIL_FROM;
+const capitalCircleOwnerEmail = process.env.CAPITAL_CIRCLE_OWNER_EMAIL;
 
 export const isEmailConfigured = Boolean(apiKey && from);
 
@@ -47,6 +49,67 @@ async function sendDocumentEmail(options: {
   if (error) {
     throw new Error(`Failed to send email: ${error.message}`);
   }
+}
+
+/**
+ * Attachment-less sibling of sendDocumentEmail, for notifications rather than
+ * documents. Unlike sendDocumentEmail, this degrades non-fatally when email
+ * isn't configured — it's used from crons that shouldn't fail just because
+ * nobody's set up Resend yet.
+ */
+export async function sendPlainEmail(options: { to: string; subject: string; html: string }): Promise<void> {
+  if (!resend || !from) {
+    console.log(`[email] not configured — skipping "${options.subject}" to ${options.to}.`);
+    return;
+  }
+  const { error } = await resend.emails.send({ from, to: options.to, subject: options.subject, html: options.html });
+  if (error) {
+    throw new Error(`Failed to send email: ${error.message}`);
+  }
+}
+
+/**
+ * Notifies the owner that a week's sweep is staged and needs a manual
+ * USD→USDC conversion + confirmation. Degrades non-fatally (logs and
+ * returns) when CAPITAL_CIRCLE_OWNER_EMAIL isn't set, same as when email
+ * itself isn't configured — the sweep row still exists either way.
+ */
+export async function sendSweepReadyEmail(sweep: CapitalCircleSweep): Promise<void> {
+  if (!capitalCircleOwnerEmail) {
+    console.log("[capital-circle] CAPITAL_CIRCLE_OWNER_EMAIL not set — skipping sweep-ready notification.");
+    return;
+  }
+  const weekLabel = new Intl.DateTimeFormat("en-KE", { dateStyle: "medium" }).format(sweep.weekStart);
+  const reportUrl = `${SITE_URL}/admin/reports/capital-circle`;
+  await sendPlainEmail({
+    to: capitalCircleOwnerEmail,
+    subject: `Capital Circle: $${Number(sweep.sweepAmountUsd).toFixed(2)} ready to sweep (week of ${weekLabel})`,
+    html: `<p>This week's profit was $${Number(sweep.totalProfitUsd).toFixed(2)}. ${Number(sweep.splitPercent)}% of that — $${Number(sweep.sweepAmountUsd).toFixed(2)} — is staged for the Capital Circle wallet.</p><p>Convert it to USDC (Circle Mint or an exchange), send it to the wallet, then confirm the amount received here: <a href="${reportUrl}">${reportUrl}</a></p>`,
+  });
+}
+
+/**
+ * Notifies the owner what the weekly Researcher/Risk-Sizing/Executor cycle actually did — the
+ * cron itself only logs to console, so without this there's no way to know what market it
+ * researched or what it decided short of checking the admin page. Degrades non-fatally when
+ * CAPITAL_CIRCLE_OWNER_EMAIL isn't set, same as sendSweepReadyEmail — a missing notification
+ * should never fail the cron or hide that the cycle ran.
+ */
+export async function sendCapitalCircleCycleEmail(result: CapitalCircleCycleResult): Promise<void> {
+  if (!capitalCircleOwnerEmail) {
+    console.log("[capital-circle] CAPITAL_CIRCLE_OWNER_EMAIL not set — skipping cycle-summary notification.");
+    return;
+  }
+  const dateLabel = new Intl.DateTimeFormat("en-KE", { dateStyle: "medium" }).format(new Date());
+  const reportUrl = `${SITE_URL}/admin/reports/capital-circle`;
+  const summaryHtml = escapeHtml(result.summary).replace(/\n/g, "<br>");
+  await sendPlainEmail({
+    to: capitalCircleOwnerEmail,
+    subject: result.ran
+      ? `Capital Circle: this week's cycle summary (${dateLabel})`
+      : `Capital Circle: this week's cycle didn't run (${dateLabel})`,
+    html: `<p>${summaryHtml}</p><p>${result.toolCallCount} tool call${result.toolCallCount === 1 ? "" : "s"} this cycle. Full position history: <a href="${reportUrl}">${reportUrl}</a></p>`,
+  });
 }
 
 function estimateResponseUrl(estimate: Estimate): string {

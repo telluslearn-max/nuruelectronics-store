@@ -1,13 +1,23 @@
 import "server-only";
 import { initiateDeveloperControlledWalletsClient } from "@circle-fin/developer-controlled-wallets";
 
-const apiKey = process.env.CIRCLE_API_KEY;
-const entitySecret = process.env.CIRCLE_ENTITY_SECRET;
+/**
+ * Testnet mode is opt-in and separate from CAPITAL_CIRCLE_LIVE: it lets Phase A prove Circle's
+ * wallet API (signTypedData, balance) actually works end-to-end against the real Amoy testnet
+ * wallet already created by circle-wallet-setup.mjs, without needing mainnet KYB. It must never
+ * be combined with CAPITAL_CIRCLE_LIVE=true — recordPosition's Polymarket CLOB calls only work
+ * against a real funded mainnet wallet.
+ */
+const isTestnet = process.env.CAPITAL_CIRCLE_WALLET_NETWORK === "testnet";
+
+const apiKey = isTestnet ? process.env.CIRCLE_TESTNET_API_KEY : process.env.CIRCLE_API_KEY;
+const entitySecret = isTestnet ? process.env.CIRCLE_TESTNET_ENTITY_SECRET : process.env.CIRCLE_ENTITY_SECRET;
 /** Circle's own internal wallet id — required by their SDK for balance/signing calls, distinct from the on-chain address. */
-const walletId = process.env.CIRCLE_WALLET_ID;
-const walletAddress = process.env.CIRCLE_WALLET_ADDRESS;
+const walletId = isTestnet ? process.env.CIRCLE_TESTNET_WALLET_ID : process.env.CIRCLE_WALLET_ID;
+const walletAddress = isTestnet ? process.env.CIRCLE_TESTNET_WALLET_ADDRESS : process.env.CIRCLE_WALLET_ADDRESS;
 
 export const isCircleWalletConfigured = Boolean(apiKey && entitySecret && walletId && walletAddress);
+export const isCircleWalletTestnet = isTestnet;
 
 let client: ReturnType<typeof initiateDeveloperControlledWalletsClient> | null = null;
 
@@ -31,9 +41,10 @@ function getClient() {
  * (types including EIP712Domain, domain, primaryType, message) as one
  * string, while Polymarket's signer only hands us domain/types/value
  * separately. This mapping is standard EIP-712, not Circle- or
- * Polymarket-specific, but the resulting signature has not been tested
- * against a live wallet yet (no reachable Circle/Polymarket API from this
- * sandbox) — verify against a real signature before trusting it with funds.
+ * Polymarket-specific. Verified against the real testnet wallet — see
+ * scripts/verify-circle-testnet-wallet.ts — which confirms a signature
+ * produced this way recovers to the wallet's own address via viem's
+ * verifyTypedData, independent of Circle's own SDK.
  */
 const DOMAIN_FIELD_TYPES: Record<string, string> = {
   name: "string",
@@ -98,3 +109,83 @@ export async function getBalanceUsdc(): Promise<number> {
 }
 
 export const circleWalletAddress = walletAddress ?? null;
+
+/** USDC's contract address on Polygon mainnet — from `circle contract address usdc --chain MATIC`, same constant used by wallet-qr.ts. */
+export const USDC_POLYGON_CONTRACT = "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359";
+
+export type WalletTransferResult = { id: string };
+
+/**
+ * The only function in this file that can move funds OUT of the wallet on-chain — everything
+ * else here only signs off-chain data (Polymarket orders) or reads balance. Callers are expected
+ * to have already validated the destination and amount against their own guardrails (fixed
+ * destination, hard cap) before calling this — this function trusts its caller completely and
+ * enforces nothing itself beyond what Circle's API rejects outright.
+ */
+export async function transferUsdc(destinationAddress: string, amountUsdc: number): Promise<WalletTransferResult> {
+  const response = await getClient().createTransaction({
+    walletId: walletId!,
+    tokenAddress: USDC_POLYGON_CONTRACT,
+    blockchain: (isTestnet ? "MATIC-AMOY" : "MATIC") as "MATIC-AMOY" | "MATIC",
+    amount: [amountUsdc.toString()],
+    destinationAddress,
+    fee: { type: "level", config: { feeLevel: "MEDIUM" } },
+  });
+  const id = response.data?.id;
+  if (!id) throw new Error("Circle createTransaction returned no transaction id.");
+  return { id };
+}
+
+/**
+ * EIP-3009 TransferWithAuthorization types — the exact gasless-USDC-transfer signature the x402
+ * payment protocol's "exact" EVM scheme (and EIP-3009-compatible tokens generally) use. Verified
+ * verbatim against x402-foundation/x402's canonical source
+ * (mechanisms/evm/src/exact/client/eip3009.ts and constants.ts authorizationTypes), not guessed.
+ */
+const TRANSFER_WITH_AUTHORIZATION_TYPES = {
+  TransferWithAuthorization: [
+    { name: "from", type: "address" },
+    { name: "to", type: "address" },
+    { name: "value", type: "uint256" },
+    { name: "validAfter", type: "uint256" },
+    { name: "validBefore", type: "uint256" },
+    { name: "nonce", type: "bytes32" },
+  ],
+};
+
+export type Eip3009Authorization = {
+  to: string;
+  /** Smallest-unit decimal string (e.g. USDC's 6-decimal amount) — kept as a string throughout, never a bigint, since Circle's signTypedData takes the complete typed-data spec as one JSON string and JSON has no bigint type. */
+  value: string;
+  validAfter: string;
+  validBefore: string;
+  /** 0x-prefixed 32-byte hex. */
+  nonce: string;
+};
+
+/**
+ * Signs an EIP-3009 TransferWithAuthorization from this wallet — same signing primitive as
+ * getClobSigner(), different message schema. Like transferUsdc(), this trusts its caller
+ * completely: no allowlist, no cap, no destination validation happens here. Callers (x402-pay.ts)
+ * are expected to have already validated everything before calling this.
+ */
+export async function signTransferAuthorization(
+  authorization: Eip3009Authorization,
+  domain: { name: string; version: string; chainId: number; verifyingContract: string },
+): Promise<`0x${string}`> {
+  const message = {
+    from: walletAddress!,
+    to: authorization.to,
+    value: authorization.value,
+    validAfter: authorization.validAfter,
+    validBefore: authorization.validBefore,
+    nonce: authorization.nonce,
+  };
+  const response = await getClient().signTypedData({
+    walletId: walletId!,
+    data: buildCircleTypedDataJson(domain, TRANSFER_WITH_AUTHORIZATION_TYPES, message),
+  });
+  const signature = response.data?.signature;
+  if (!signature) throw new Error("Circle signTypedData returned no signature.");
+  return signature as `0x${string}`;
+}

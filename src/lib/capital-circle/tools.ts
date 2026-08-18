@@ -3,10 +3,12 @@ import type { FunctionDeclaration } from "@google/genai";
 import { researchPolymarketMarkets } from "./research-tool";
 import { sizePosition } from "./sizing-tool";
 import { recordPosition } from "./executor-tool";
+import { payForResource } from "./x402-pay";
+import { logAdminAction } from "../audit-log";
 
 const researchPolymarketMarketsDeclaration: FunctionDeclaration = {
   name: "research_polymarket_markets",
-  description: "List real, live, active Polymarket prediction markets (question, condition id, outcome token ids). Never invent a market — always call this before referencing one.",
+  description: "List real, live, active Polymarket prediction markets resolving within the next 2 hours — question, condition id, and each outcome's token id, label (e.g. Yes/No), and current implied price. Never invent a market, outcome, or price — always call this before referencing one.",
   parametersJsonSchema: {
     type: "object",
     properties: {
@@ -43,10 +45,24 @@ const recordPositionDeclaration: FunctionDeclaration = {
   },
 };
 
+const fetchPaidMarketDataDeclaration: FunctionDeclaration = {
+  name: "fetch_paid_market_data",
+  description:
+    "Fetch data from a paid market-intelligence service via x402 (pay-per-call USDC), for services the app has explicitly allowlisted. Use this when public Polymarket data alone isn't enough to form or check a thesis. Calling a non-allowlisted URL or exceeding the per-call price cap fails with a clear error — never invent data in place of a failed call.",
+  parametersJsonSchema: {
+    type: "object",
+    properties: {
+      url: { type: "string", description: "Full URL of the paid endpoint to call. Must be on the app's X402_ALLOWED_HOSTS allowlist." },
+    },
+    required: ["url"],
+  },
+};
+
 export const functionDeclarations: FunctionDeclaration[] = [
   researchPolymarketMarketsDeclaration,
   sizePositionDeclaration,
   recordPositionDeclaration,
+  fetchPaidMarketDataDeclaration,
 ];
 
 export async function dispatchTool(
@@ -58,9 +74,39 @@ export async function dispatchTool(
       const limit = typeof args.limit === "number" ? args.limit : undefined;
       try {
         const markets = await researchPolymarketMarkets(limit);
+        // The model's own final summary is the only other record of a "no trade" week — logging
+        // what the tool actually returned means that claim can be checked against real data
+        // afterward, rather than trusted at face value. Caught mattering for real: one cycle
+        // claimed "all available markets had resolution dates far in the future" when a manual
+        // recheck moments later showed real markets 0.6-1.7h away — this log is what would have
+        // settled whether that was a data gap or the model misdescribing what it saw.
+        await logAdminAction({
+          action: "capital-circle.research.markets-returned",
+          entityType: "capital_circle_research",
+          summary: `research_polymarket_markets returned ${markets.length} market(s) within the resolution window.`,
+          metadata: {
+            count: markets.length,
+            markets: markets.map((m) => ({
+              question: m.question,
+              hoursAway: Number(((m.endDate.getTime() - Date.now()) / 3600000).toFixed(2)),
+              // Prices at research time, not just which markets existed — so a summary's specific
+              // price claims (e.g. "Up: 0.9675") are checkable after the fact too, not just its
+              // list of market names. Prices move continuously, so this is the only way to verify
+              // a past claim once time has passed.
+              prices: m.tokens.map((t) => `${t.outcome}: ${t.price}`).join(", "),
+            })),
+          },
+        });
         return { resultForModel: markets };
       } catch (error) {
-        return { resultForModel: { error: error instanceof Error ? error.message : "Failed to fetch markets." } };
+        const message = error instanceof Error ? error.message : "Failed to fetch markets.";
+        await logAdminAction({
+          action: "capital-circle.research.markets-failed",
+          entityType: "capital_circle_research",
+          summary: `research_polymarket_markets failed: ${message}`,
+          metadata: { error: message },
+        });
+        return { resultForModel: { error: message } };
       }
     }
 
@@ -84,6 +130,24 @@ export async function dispatchTool(
       }
       const result = await recordPosition({ conditionId, tokenId, question, thesis, sizeUsd });
       return { resultForModel: result };
+    }
+
+    case "fetch_paid_market_data": {
+      const url = typeof args.url === "string" ? args.url : "";
+      if (!url) {
+        return { resultForModel: { error: "Missing url." } };
+      }
+      try {
+        const response = await payForResource(url);
+        const contentType = response.headers.get("content-type") ?? "";
+        const body = contentType.includes("application/json") ? await response.json() : await response.text();
+        if (!response.ok) {
+          return { resultForModel: { error: `Request failed (HTTP ${response.status}).`, body } };
+        }
+        return { resultForModel: body };
+      } catch (error) {
+        return { resultForModel: { error: error instanceof Error ? error.message : "Payment or fetch failed." } };
+      }
     }
 
     default:

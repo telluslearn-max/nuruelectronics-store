@@ -32,6 +32,7 @@ const REPORT_SECTIONS: { title: string; reports: { href: string; label: string }
       { href: "/admin/reports/ai-attribution", label: "AI Concierge Attribution" },
       { href: "/admin/reports/riders-impact", label: "Rider Job-Creation Impact" },
       { href: "/admin/reports/capital-circle", label: "Capital Circle" },
+      { href: "/admin/reports/capital-circle-performance", label: "Capital Circle Performance" },
     ],
   },
 ];

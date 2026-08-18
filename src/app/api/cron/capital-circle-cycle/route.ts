@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { runCapitalCircleCycle } from "@/lib/capital-circle/agent-loop";
+import { sendCapitalCircleCycleEmail } from "@/lib/email";
 import { constantTimeEqual } from "@/lib/admin-session-token";
 
 function isAuthorized(request: Request): boolean {
@@ -13,6 +14,11 @@ export async function GET(request: Request) {
   try {
     const result = await runCapitalCircleCycle();
     console.log("[cron:capital-circle-cycle]", result);
+    // Only for cycles that actually ran — an unconfigured Capital Circle staying unconfigured
+    // isn't news worth a weekly email, but every real outcome (including "no trade") is.
+    if (result.ran) {
+      await sendCapitalCircleCycleEmail(result);
+    }
     return NextResponse.json(result);
   } catch (error) {
     console.error("[cron:capital-circle-cycle] failed:", error);

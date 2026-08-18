@@ -18,6 +18,14 @@ export const CAPITAL_CIRCLE_LIVE = process.env.CAPITAL_CIRCLE_LIVE === "true";
  */
 export const DEFAULT_PER_POSITION_CAP_USD = Number(process.env.CAPITAL_CIRCLE_DEFAULT_CAP_USD ?? 25);
 
+/**
+ * Share of each week's real profit staged for conversion into the Capital
+ * Circle wallet. Recorded on every CapitalCircleSweep row too (not just read
+ * from here), so a historical sweep's actual split stays correct even if
+ * this default changes later.
+ */
+export const CAPITAL_CIRCLE_SWEEP_PERCENT = Number(process.env.CAPITAL_CIRCLE_SWEEP_PERCENT ?? 40);
+
 /** Pinned explicitly rather than an alias, so a model swap is a deliberate change. */
 export const CAPITAL_CIRCLE_MODEL = "gemini-2.5-flash";
 
