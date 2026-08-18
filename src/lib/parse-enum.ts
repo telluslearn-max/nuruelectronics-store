@@ -1,10 +1,11 @@
 import "server-only";
-import type { ExpenseCategory, ExpensePaymentSource, PaymentMethod } from "@prisma/client";
+import type { CapitalCircleWalletStatus, ExpenseCategory, ExpensePaymentSource, PaymentMethod } from "@prisma/client";
 import { redirectWithError } from "./admin-feedback";
 
 export const PAYMENT_METHODS = ["cash", "mpesa"] as const satisfies readonly PaymentMethod[];
 export const EXPENSE_CATEGORIES = ["cogs", "sga", "other"] as const satisfies readonly ExpenseCategory[];
 export const EXPENSE_PAYMENT_SOURCES = ["cash", "mpesa", "petty_cash"] as const satisfies readonly ExpensePaymentSource[];
+export const CAPITAL_CIRCLE_WALLET_STATUSES = ["pending", "active", "frozen"] as const satisfies readonly CapitalCircleWalletStatus[];
 
 /**
  * Validates a FormData string field against an allowlist before it's treated as a Prisma

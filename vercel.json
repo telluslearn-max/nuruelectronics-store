@@ -11,6 +11,18 @@
     {
       "path": "/api/cron/sync-product-embeddings",
       "schedule": "0 4 * * *"
+    },
+    {
+      "path": "/api/cron/profit-sweep",
+      "schedule": "0 5 * * 1"
+    },
+    {
+      "path": "/api/cron/whatsapp-review-followup",
+      "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/cron/product-readiness",
+      "schedule": "0 8 * * *"
     }
   ]
 }

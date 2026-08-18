@@ -45,3 +45,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Local-only secrets scratch files — never commit
+.circle-testnet-entity-secret.tmp
+
+recovery_file_*.dat
