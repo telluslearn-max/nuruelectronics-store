@@ -1,14 +1,31 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Faq } from "@/components/faq";
 import { WhatsAppIcon } from "@/components/whatsapp-order-button";
 import { getCategory } from "@/lib/categories";
 import { TRADE_IN_CATEGORY_SLUGS } from "@/lib/trade-in";
 import { buildWhatsAppUrl } from "@/lib/whatsapp";
 
 export const metadata: Metadata = {
-  title: "Trade-In",
-  description: "Trade in your old device for credit toward something new at NURU.",
+  title: "Trade In Your Old Phone or Device in Kenya",
+  description:
+    "Trade in your old phone, laptop, or game for credit toward something new at NURU — message us on WhatsApp with the make, model, and condition for a valuation.",
 };
+
+const TRADE_IN_FAQS = [
+  {
+    q: "How do I trade in my old phone or device in Kenya?",
+    a: "Message us on WhatsApp with your device's make, model, and condition, and we'll give you a valuation — no need to bring it in first.",
+  },
+  {
+    q: "What can I trade in?",
+    a: "Phones, tablets, computers, audio gear, gaming consoles and games, cameras, and more — see the categories above for what we currently accept.",
+  },
+  {
+    q: "Can I trade in a game I already own?",
+    a: "Yes — swap a game you already own toward a new one, or trade it for credit. Message us to arrange the swap.",
+  },
+];
 
 const tradeInCategories = TRADE_IN_CATEGORY_SLUGS.map((slug) => getCategory(slug)).filter(
   (category): category is NonNullable<typeof category> => category !== undefined,
@@ -75,6 +92,11 @@ export default function TradeInPage() {
             Trade in a game
           </a>
         )}
+      </div>
+
+      <div className="mx-auto mt-16 max-w-2xl">
+        <h2 className="mb-4 text-center text-lg font-semibold">Common questions</h2>
+        <Faq items={TRADE_IN_FAQS} />
       </div>
     </div>
   );

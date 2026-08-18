@@ -10,6 +10,7 @@ import { TrustBadges } from "@/components/trust-badges";
 import { categories, categoryForProductType, categoryMembershipQuery, type Category } from "@/lib/categories";
 import { getEcosystem } from "@/lib/collections";
 import { getProducts } from "@/lib/shopify";
+import { buildItemListJsonLd } from "@/lib/structured-data";
 
 type EcosystemPageProps = {
   params: Promise<{ slug: string }>;
@@ -109,8 +110,17 @@ export default async function EcosystemPage({ params, searchParams }: EcosystemP
       ? null
       : await getProducts({ searchTerm: ecosystem.query, sortKey: "BEST_SELLING", first: 4 });
 
+    // The featured/hub layout (multi-category flagship brands: Apple, Samsung, etc.) doesn't go
+    // through CollectionPage, which is where every other listing page gets its ItemList schema —
+    // added directly here so these richest-content ecosystem pages aren't the one gap.
+    const itemListJsonLd = buildItemListJsonLd(ecosystem.label, listing.products);
+
     return (
       <div>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(itemListJsonLd) }}
+        />
         {breadcrumb}
 
         <div className="mb-10">

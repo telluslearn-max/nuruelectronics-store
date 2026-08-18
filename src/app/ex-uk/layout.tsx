@@ -4,7 +4,7 @@ import { ExUkBottomTabBar } from "@/components/ex-uk/ex-uk-bottom-tab-bar";
 import { getCart } from "@/lib/actions";
 
 export const metadata: Metadata = {
-  title: { default: "Ex-UK", template: "%s | Ex-UK" },
+  title: { default: "Ex-UK Deals | NURU", template: "%s | Ex-UK" },
 };
 
 /**

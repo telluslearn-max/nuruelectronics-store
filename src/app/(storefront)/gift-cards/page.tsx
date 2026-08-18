@@ -1,12 +1,25 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Faq } from "@/components/faq";
 import { WhatsAppIcon } from "@/components/whatsapp-order-button";
 import { buildWhatsAppUrl } from "@/lib/whatsapp";
 
 export const metadata: Metadata = {
-  title: "Gift Cards",
-  description: "Digital gift cards, delivered fast, at NURU.",
+  title: "Digital Gift Cards Kenya",
+  description:
+    "Digital gift cards for the platforms and stores you already use, delivered fast via WhatsApp or email — no shipping needed, anywhere in Kenya.",
 };
+
+const GIFT_CARD_FAQS = [
+  {
+    q: "How fast do I get my gift card in Kenya?",
+    a: "Your code is sent via WhatsApp or email after payment, usually within a few hours. No shipping needed, so it works anywhere we deliver from.",
+  },
+  {
+    q: "Do gift cards work with any account, or just a specific region?",
+    a: "Some gift cards only redeem on an account registered to a specific region (e.g. a US store card needs a US account). Each card's page lists its region — check it before ordering.",
+  },
+];
 
 export default function GiftCardsPage() {
   const whatsappHref = buildWhatsAppUrl("Hi! I have a question about gift cards.");
@@ -63,6 +76,11 @@ export default function GiftCardsPage() {
           </a>
         </div>
       )}
+
+      <div className="mx-auto mt-16 max-w-2xl">
+        <h2 className="mb-4 text-center text-lg font-semibold">Common questions</h2>
+        <Faq items={GIFT_CARD_FAQS} />
+      </div>
     </div>
   );
 }
