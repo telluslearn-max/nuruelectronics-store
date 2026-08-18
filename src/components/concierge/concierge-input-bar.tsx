@@ -91,7 +91,13 @@ export function ConciergeInputBar({
           <button
             type="button"
             onClick={recordingState === "recording" ? onStopRecording : onStartRecording}
-            disabled={recordingState === "processing"}
+            // Blocks starting a NEW recording while a text reply is still streaming — voice and
+            // text turns use separate abort controllers (use-concierge-voice.ts /
+            // use-concierge-chat.ts) with no cross-awareness, so without this a shopper could
+            // fire a second, concurrent turn via voice, the same race isStreaming was added to
+            // close for text (audit finding M1). Doesn't block stopping an already-in-progress
+            // recording, which can only happen if it started before the text turn did.
+            disabled={recordingState === "processing" || (recordingState === "idle" && isStreaming)}
             aria-label={micLabel}
             aria-pressed={recordingState === "recording"}
             className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full border transition disabled:opacity-40 ${

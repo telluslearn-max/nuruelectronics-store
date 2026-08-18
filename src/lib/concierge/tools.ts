@@ -4,6 +4,7 @@ import type { ReturnCaseReason } from "@prisma/client";
 import { getCart, markCartConciergeAssisted } from "@/lib/actions";
 import { logAdminAction } from "@/lib/audit-log";
 import type { BnplPlanId } from "@/lib/bnpl";
+import { isCheckoutUsable } from "@/lib/checkout";
 import type { Cart, Product } from "@/lib/shopify/types";
 import { BNPL_PLAN_IDS, explainBnplPlan } from "./bnpl-tool";
 import { addToCartTool, removeCartItem, updateCartItemQuantity } from "./cart-tools";
@@ -481,6 +482,13 @@ export async function dispatchTool(
         entityId: cart.id,
         summary: "AI concierge surfaced the checkout link",
       }).catch((error) => console.error("logAdminAction failed", error));
+      // Same mock-checkout-URL guard the storefront cart/PDP use (src/lib/checkout.ts) — without
+      // it, a shopper in an environment where Shopify checkout isn't configured would get handed
+      // a dead link through the concierge, the one surface the storefront-side C3 fix didn't reach.
+      if (!isCheckoutUsable(cart.checkoutUrl)) {
+        const message = buildWhatsAppHandoffMessage({ summary: "I'd like to check out.", cart });
+        return { resultForModel: { ok: true, checkoutUnavailable: true }, events: [{ type: "whatsapp", message }] };
+      }
       return { resultForModel: { ok: true, url: cart.checkoutUrl }, events: [{ type: "checkout", url: cart.checkoutUrl }] };
     }
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef } from "react";
+import { useHorizontalWheelPassthrough } from "./use-horizontal-wheel-passthrough";
 
 function ChevronLeftIcon() {
   return (
@@ -30,17 +31,7 @@ export function CarouselShell({ children }: { children: React.ReactNode }) {
     trackRef.current?.scrollBy({ left: direction * 320, behavior: "smooth" });
   }
 
-  // A vertical mouse-wheel gesture over this horizontal-only track could otherwise get
-  // swallowed instead of scrolling the page underneath (audit finding M5) — some
-  // browser/trackpad combinations route any wheel event to the nearest overflow-x
-  // scroller regardless of gesture direction, especially with scroll-snap active. Only
-  // intervene when the gesture is genuinely vertical; a horizontal/diagonal gesture is
-  // left to the browser's native carousel scrolling.
-  function handleWheel(event: React.WheelEvent<HTMLDivElement>) {
-    if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
-    event.preventDefault();
-    window.scrollBy({ top: event.deltaY });
-  }
+  const handleWheel = useHorizontalWheelPassthrough<HTMLDivElement>();
 
   return (
     <div className="relative">

@@ -2,25 +2,12 @@
 
 import { useRef, useState } from "react";
 import type { Product } from "@/lib/shopify/types";
+import { useHorizontalWheelPassthrough } from "../use-horizontal-wheel-passthrough";
 import { ConciergeCarouselCard } from "./concierge-carousel-card";
 import { ConciergeProductCard } from "./concierge-product-card";
 
 const CAROUSEL_CAP = 6;
 const GAP_PX = 12; // matches gap-3
-
-/** Walks up from `element` to find the nearest vertically-scrollable ancestor (e.g. the
-    concierge sheet's chat panel) and scrolls it — doesn't assume a fixed DOM depth. */
-function scrollNearestVerticalAncestor(element: HTMLElement, deltaY: number) {
-  let node: HTMLElement | null = element.parentElement;
-  while (node) {
-    if (/(auto|scroll)/.test(getComputedStyle(node).overflowY) && node.scrollHeight > node.clientHeight) {
-      node.scrollBy({ top: deltaY });
-      return;
-    }
-    node = node.parentElement;
-  }
-  window.scrollBy({ top: deltaY });
-}
 
 export function ConciergeProductRecommendations({ products }: { products: Product[] }) {
   const trackRef = useRef<HTMLDivElement>(null);
@@ -51,15 +38,7 @@ export function ConciergeProductRecommendations({ products }: { products: Produc
     track.scrollTo({ left: index * width, behavior: reduceMotion ? "auto" : "smooth" });
   }
 
-  // This carousel sits inside the concierge's own vertically-scrolling chat panel, so a
-  // vertical wheel gesture over it getting swallowed doesn't just block the page — it can
-  // make the whole chat panel look stuck (audit finding M1). Only intervene when the
-  // gesture is genuinely vertical; horizontal/diagonal scrolling still drives the carousel.
-  function handleWheel(event: React.WheelEvent<HTMLDivElement>) {
-    if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
-    event.preventDefault();
-    scrollNearestVerticalAncestor(event.currentTarget, event.deltaY);
-  }
+  const handleWheel = useHorizontalWheelPassthrough<HTMLDivElement>();
 
   return (
     <div className="mt-3 rounded-card border border-border-subtle p-3">

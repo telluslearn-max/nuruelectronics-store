@@ -1,14 +1,19 @@
+"use client";
+
 import Link from "next/link";
+import { useHorizontalWheelPassthrough } from "../use-horizontal-wheel-passthrough";
 import { HeartIcon } from "./action-icons";
 import type { ExUkMatch } from "./use-ex-uk-matches";
 
 export function RecentMatchesRow({ matches }: { matches: ExUkMatch[] }) {
+  const handleWheel = useHorizontalWheelPassthrough<HTMLDivElement>();
+
   if (matches.length === 0) return null;
 
   return (
     <div className="border-b border-border-subtle px-4 py-3">
       <p className="mb-2 text-xs font-medium uppercase tracking-wide text-neutral-500">Recent matches</p>
-      <div className="flex gap-3 overflow-x-auto">
+      <div className="flex gap-3 overflow-x-auto overscroll-x-contain" onWheel={handleWheel}>
         {matches.map((match) => (
           <Link
             key={match.handle}

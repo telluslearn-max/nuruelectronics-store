@@ -84,6 +84,7 @@ export function ProductList({
   sort,
   quickAdd = true,
   emptyStateLabel,
+  titleBoostQuery,
 }: {
   initialProducts: Product[];
   initialHasNextPage: boolean;
@@ -93,6 +94,10 @@ export function ProductList({
   quickAdd?: boolean;
   /** Category label shown in the "coming soon" message when this list starts out with zero products. */
   emptyStateLabel?: string;
+  /** The raw search query, when this list is the /search results page — reapplies the same
+   * title-match boost the initial page got on every "Load more" fetch (see
+   * src/lib/search/title-boost.ts and src/lib/actions.ts's loadMoreProducts). */
+  titleBoostQuery?: string;
 }) {
   const [products, setProducts] = useState(initialProducts);
   const [hasNextPage, setHasNextPage] = useState(initialHasNextPage);
@@ -143,7 +148,7 @@ export function ProductList({
   function handleLoadMore() {
     if (!endCursor) return;
     startTransition(async () => {
-      const page = await loadMoreProducts(endCursor, searchTerm, sort);
+      const page = await loadMoreProducts(endCursor, searchTerm, sort, titleBoostQuery);
       setProducts((prev) => [...prev, ...page.products]);
       setHasNextPage(page.hasNextPage);
       setEndCursor(page.endCursor);
@@ -202,7 +207,12 @@ export function ProductList({
             Clear filters
           </button>
         </div>
-      ) : products.length === 0 ? (
+      ) : products.length === 0 && emptyStateLabel ? (
+        // Only shown when a caller identifies itself as a category/collection listing (passes
+        // emptyStateLabel) — the search page renders ProductList with zero results too, but
+        // already has its own "Nothing matched" messaging (see search/page.tsx's
+        // showBrowseInstead section), and showing both stacked was a contradictory pair of
+        // empty-state messages on the same zero-result search.
         <EmptyCategoryState label={emptyStateLabel} />
       ) : (
         <ProductGrid products={visibleProducts} quickAdd={quickAdd} />

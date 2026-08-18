@@ -19,10 +19,13 @@ export function Footer() {
 
   return (
     <footer className="border-t border-border-subtle">
-      <div className="mx-auto w-full max-w-6xl px-4 py-8 md:hidden" aria-hidden={isDesktop}>
+      <div className="mx-auto w-full max-w-6xl px-4 py-8 md:hidden" aria-hidden={isDesktop === undefined ? undefined : isDesktop}>
         <FooterLinks />
       </div>
-      <div className="mx-auto hidden w-full max-w-6xl px-4 py-12 md:block" aria-hidden={!isDesktop}>
+      <div
+        className="mx-auto hidden w-full max-w-6xl px-4 py-12 md:block"
+        aria-hidden={isDesktop === undefined ? undefined : !isDesktop}
+      >
         <div className="grid grid-cols-1 gap-8 sm:grid-cols-3">
           <div>
             <p className="text-lg font-semibold tracking-tight">NURU</p>

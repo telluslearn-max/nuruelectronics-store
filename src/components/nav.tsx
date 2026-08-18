@@ -104,7 +104,7 @@ export function Nav({
           <Link href="/" className="shrink-0 text-lg font-semibold tracking-tight">
             NURU
           </Link>
-          <div className="hidden min-w-0 flex-1 md:block" aria-hidden={!isDesktop}>
+          <div className="hidden min-w-0 flex-1 md:block" aria-hidden={isDesktop === undefined ? undefined : !isDesktop}>
             <SearchBox />
           </div>
           <div className="ml-auto hidden shrink-0 items-center gap-2 md:ml-0 md:flex md:gap-4">
@@ -142,7 +142,7 @@ export function Nav({
             </button>
           </div>
         </div>
-        <div className="mt-3 md:hidden" aria-hidden={isDesktop}>
+        <div className="mt-3 md:hidden" aria-hidden={isDesktop === undefined ? undefined : isDesktop}>
           <SearchBox />
         </div>
       </div>
