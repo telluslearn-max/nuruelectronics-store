@@ -15,32 +15,38 @@ export function WhatsAppOrderButton({
   price,
   productHandle,
   compact = false,
+  variant = "outline",
 }: {
   productTitle: string;
   variantLabel?: string;
   price: string;
   productHandle: string;
   compact?: boolean;
+  /** "solid" is a bold filled-black pill for the Ex-UK dark shell's primary CTA — "outline" (the
+   * default) is the bordered style used on the regular light-theme PDP. */
+  variant?: "outline" | "solid";
 }) {
   const message = `Hi! I'd like to order ${productTitle}${variantLabel ? ` (${variantLabel})` : ""} - ${price}. ${productUrl(productHandle)}`;
   const href = buildWhatsAppUrl(message);
 
   if (!href) return null;
 
+  const solidClass =
+    "flex w-full items-center justify-center gap-2 rounded-control bg-white px-6 py-3.5 text-sm font-bold text-black transition hover:opacity-90";
+  const outlineClass = compact
+    ? "flex h-11 w-11 shrink-0 items-center justify-center rounded-control border border-border-subtle text-whatsapp transition hover:border-foreground"
+    : "flex w-full items-center justify-center gap-2 rounded-control border border-border-subtle px-6 py-3.5 text-sm font-medium transition hover:border-foreground";
+
   return (
     <a
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      className={
-        compact
-          ? "flex h-11 w-11 shrink-0 items-center justify-center rounded-control border border-border-subtle text-whatsapp transition hover:border-foreground"
-          : "flex w-full items-center justify-center gap-2 rounded-control border border-border-subtle px-6 py-3.5 text-sm font-medium transition hover:border-foreground"
-      }
+      className={variant === "solid" ? solidClass : outlineClass}
       aria-label="Order via WhatsApp"
     >
       <WhatsAppIcon className="h-5 w-5 shrink-0 text-whatsapp" />
-      {!compact && "Order via WhatsApp"}
+      {!compact && (variant === "solid" ? "Message on WhatsApp" : "Order via WhatsApp")}
     </a>
   );
 }

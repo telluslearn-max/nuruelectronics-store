@@ -7,10 +7,11 @@ import { formatPrice } from "@/lib/format";
 import type { Savings } from "@/lib/product-match";
 import type { Product } from "@/lib/shopify/types";
 import { WHATSAPP_NUMBER } from "@/lib/whatsapp";
-import { HeartIcon, PassIcon } from "./action-icons";
+import { PassIcon } from "./action-icons";
 import { ExUkProductCard } from "./ex-uk-product-card";
 import { ExUkProductDetail } from "./ex-uk-product-detail";
 import { SwipeCard, type SwipeCardHandle } from "./swipe-card";
+import { useExUkBookmark } from "./use-ex-uk-bookmark";
 import { useExUkMatches } from "./use-ex-uk-matches";
 import { useExUkSeen } from "./use-ex-uk-seen";
 
@@ -46,6 +47,7 @@ export function SwipeDeck({
   const [justMatched, setJustMatched] = useState<Product | null>(null);
   const [announcement, setAnnouncement] = useState("");
   const { addMatch, removeMatch } = useExUkMatches();
+  const { isBookmarked, toggleBookmark } = useExUkBookmark();
   const { seen, markSeen, unmarkSeen, clearSeen } = useExUkSeen();
   const topCardRef = useRef<SwipeCardHandle>(null);
 
@@ -135,8 +137,10 @@ export function SwipeDeck({
               aria-hidden="true"
               className="absolute inset-0"
               style={{
-                transform: `translateY(${(peekCards.length - i) * 10}px) scale(${1 - (peekCards.length - i) * 0.04})`,
-                opacity: 0.6,
+                // Slight alternating rotation (not just a vertical stack) — reads as a fanned
+                // hand of cards peeking out from behind the top one.
+                transform: `translateY(${(peekCards.length - i) * 10}px) scale(${1 - (peekCards.length - i) * 0.04}) rotate(${(peekCards.length - i) * (i % 2 === 0 ? 1.5 : -1.5)}deg)`,
+                opacity: 0.7,
               }}
             >
               <ExUkProductCard product={product} savings={savingsByHandle[product.handle]} />
@@ -151,6 +155,8 @@ export function SwipeDeck({
             savings={savingsByHandle[current.handle]}
             onSwiped={handleSwiped}
             onTap={() => setDetailProduct(current)}
+            bookmarked={isBookmarked(current.handle)}
+            onBookmark={() => toggleBookmark(current)}
           />
         ) : products.length === 0 && isFiltered ? (
           <div className="flex h-full flex-col items-center justify-center gap-2 rounded-card border border-dashed border-border-subtle p-8 text-center">
@@ -194,13 +200,15 @@ export function SwipeDeck({
       </div>
 
       {current && (
-        <div className="flex shrink-0 items-center justify-center gap-4 py-3">
+        // Two-element bar (circular pass + one full-width primary action) — "love" now lives on
+        // the card's own bookmark badge (tap) or a right swipe, not a third button here.
+        <div className="flex shrink-0 items-center gap-3 py-3">
           <button
             type="button"
             aria-label="Undo last swipe"
             onClick={handleUndo}
             disabled={!lastAction}
-            className="flex h-11 w-11 items-center justify-center rounded-control border border-border-subtle text-neutral-500 transition hover:border-neutral-400 disabled:opacity-30"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-control border border-border-subtle text-neutral-500 transition hover:border-neutral-400 disabled:opacity-30"
           >
             <UndoIcon className="h-5 w-5" />
           </button>
@@ -208,7 +216,7 @@ export function SwipeDeck({
             type="button"
             aria-label={`Pass on ${current.title}`}
             onClick={() => topCardRef.current?.swipe("left")}
-            className="flex h-14 w-14 items-center justify-center rounded-control border border-border-subtle text-neutral-500 shadow-sm transition hover:border-neutral-400 hover:text-neutral-700"
+            className="flex h-14 w-14 shrink-0 items-center justify-center rounded-control border border-border-subtle text-neutral-500 shadow-sm transition hover:border-neutral-400 hover:text-neutral-700"
           >
             <PassIcon className="h-6 w-6" />
           </button>
@@ -217,25 +225,17 @@ export function SwipeDeck({
               productTitle={current.title}
               price={formatPrice(current.priceRange.minVariantPrice.amount, current.priceRange.minVariantPrice.currencyCode)}
               productHandle={current.handle}
-              compact
+              variant="solid"
             />
           ) : (
             <span
               aria-hidden="true"
               title="WhatsApp ordering isn't set up yet"
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-control border border-dashed border-border-subtle text-neutral-300"
+              className="flex h-14 flex-1 items-center justify-center gap-2 rounded-control border border-dashed border-border-subtle text-neutral-300"
             >
               <WhatsAppIcon className="h-5 w-5" />
             </span>
           )}
-          <button
-            type="button"
-            aria-label={`Love ${current.title}`}
-            onClick={() => topCardRef.current?.swipe("right")}
-            className="flex h-14 w-14 items-center justify-center rounded-control bg-accent text-accent-foreground shadow-md transition hover:opacity-90"
-          >
-            <HeartIcon className="h-7 w-7 drop-shadow-sm" />
-          </button>
         </div>
       )}
 
@@ -244,7 +244,6 @@ export function SwipeDeck({
           product={detailProduct}
           savings={savingsByHandle[detailProduct.handle]}
           onClose={() => setDetailProduct(null)}
-          onSwipe={handleSwiped}
         />
       )}
     </div>

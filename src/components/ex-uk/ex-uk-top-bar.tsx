@@ -13,14 +13,14 @@ export function ExUkTopBar({
   backLabel?: string;
 }) {
   return (
-    <header className="flex shrink-0 items-center justify-between border-b border-border-subtle px-4 py-3">
-      <Link href={backHref} aria-label={`Back to ${backLabel}`} className="flex items-center gap-1 text-sm font-medium">
+    <header className="flex shrink-0 items-center justify-between border-b border-border-subtle px-4 py-3.5">
+      <Link href={backHref} aria-label={`Back to ${backLabel}`} className="flex items-center gap-1 text-sm font-medium text-neutral-400 hover:text-foreground">
         <svg viewBox="0 0 12 12" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
           <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 2 3 6l4.5 4" />
         </svg>
         {backLabel}
       </Link>
-      <span className="text-sm font-semibold">{title}</span>
+      <span className="text-lg font-bold tracking-tight">{title}</span>
       <div className="flex w-10 justify-end">{rightSlot}</div>
     </header>
   );
