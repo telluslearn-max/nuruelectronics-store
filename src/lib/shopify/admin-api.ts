@@ -153,6 +153,87 @@ export async function getShopifyPaidOrderTotals(
   }));
 }
 
+const MIN_DESCRIPTION_LENGTH = 50;
+
+type ProductReadinessNode = {
+  id: string;
+  title: string;
+  handle: string;
+  descriptionHtml: string;
+  featuredImage: { id: string } | null;
+  seo: { title: string | null; description: string | null };
+  variants: Connection<{ price: string }>;
+};
+
+const productReadinessQuery = `
+  query ProductReadinessCheck($after: String, $query: String) {
+    products(first: 50, after: $after, query: $query) {
+      edges {
+        node {
+          id
+          title
+          handle
+          descriptionHtml
+          featuredImage { id }
+          seo { title description }
+          variants(first: 5) { edges { node { price } } }
+        }
+      }
+      pageInfo { hasNextPage endCursor }
+    }
+  }
+`;
+
+function stripHtml(html: string): string {
+  return html.replace(/<[^>]*>/g, "").trim();
+}
+
+export type ProductReadinessViolation = { handle: string; title: string; reasons: string[] };
+
+/**
+ * Flags products missing an image, a real price, a substantial description, or SEO
+ * fields — the "would go live half-empty" checks from the PDP audit (#59). Shopify's
+ * Admin API has no hook to block a status transition from outside code (that needs a
+ * Shopify Flow, defined in the Shopify admin itself), so this is a checker meant to run
+ * on a schedule and report violations, not a hard gate on the Activate button.
+ */
+export async function getProductReadinessViolations(
+  options: { includeDrafts?: boolean } = {},
+): Promise<{ checked: number; violations: ProductReadinessViolation[] }> {
+  if (!isShopifyAdminConfigured) return { checked: 0, violations: [] };
+
+  const statusQuery = options.includeDrafts ? "status:active OR status:draft" : "status:active";
+  const products: ProductReadinessNode[] = [];
+  let after: string | undefined;
+  // Defensive page cap, same as getAllShopifyOrdersMatching — a small store's catalog
+  // won't approach 2,000 products.
+  for (let page = 0; page < 40; page++) {
+    const data = await shopifyAdminFetch<{ products: PaginatedConnection<ProductReadinessNode> }>(
+      productReadinessQuery,
+      { after, query: statusQuery },
+    );
+    products.push(...data.products.edges.map((edge) => edge.node));
+    if (!data.products.pageInfo.hasNextPage || !data.products.pageInfo.endCursor) break;
+    after = data.products.pageInfo.endCursor;
+  }
+
+  const violations = products
+    .map((p): ProductReadinessViolation | null => {
+      const reasons: string[] = [];
+      if (!p.featuredImage) reasons.push("no featured image");
+      const prices = p.variants.edges.map((e) => Number(e.node.price));
+      if (prices.length === 0 || prices.every((price) => price === 0)) reasons.push("price is 0.00");
+      if (stripHtml(p.descriptionHtml).length < MIN_DESCRIPTION_LENGTH) {
+        reasons.push(`description under ${MIN_DESCRIPTION_LENGTH} characters`);
+      }
+      if (!p.seo.title || !p.seo.description) reasons.push("missing SEO title/description");
+      return reasons.length > 0 ? { handle: p.handle, title: p.title, reasons } : null;
+    })
+    .filter((v): v is ProductReadinessViolation => v !== null);
+
+  return { checked: products.length, violations };
+}
+
 /**
  * Decrements a Shopify variant's tracked inventory by `quantity` at its first
  * tracked location — used only for the optional manual-sale inventory sync
