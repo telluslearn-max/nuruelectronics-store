@@ -21,7 +21,9 @@ export function ProductCard({ product, quickAdd = false }: { product: Product; q
   // Only the formula tier (Apple) gets a numeric teaser here — no variant is selected on a card,
   // so the lookup tier (Android) has no single correct figure to show without one.
   const bnplPlan =
-    getBnplTier(product.tags) === "formula" ? calculateFormulaBnplPlan(Number(price.amount), "weekly") : null;
+    getBnplTier(product.tags, product.productType) === "formula"
+      ? calculateFormulaBnplPlan(Number(price.amount), "weekly")
+      : null;
   const colorOption = product.options.find((o) => o.name === "Color");
 
   return (

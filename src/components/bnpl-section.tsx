@@ -46,7 +46,7 @@ export function BnplSection({
   variant: ProductVariant | undefined;
   price: Money;
 }) {
-  const tier = getBnplTier(product.tags);
+  const tier = getBnplTier(product.tags, product.productType);
   const [planId, setPlanId] = useState<BnplPlanId>(tier === "formula" ? "weekly" : "3-month");
 
   if (tier === "coming-soon") {
