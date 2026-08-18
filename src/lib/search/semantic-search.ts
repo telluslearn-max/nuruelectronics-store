@@ -59,11 +59,30 @@ export async function syncProductEmbeddings(): Promise<{ productsEmbedded: numbe
 const MIN_RELEVANT_SCORE = 0.5;
 
 /**
- * Ranks `products` by semantic similarity to `query` using stored embeddings, drops anything below
- * MIN_RELEVANT_SCORE (or with no stored embedding yet), and returns at most `limit` — a search result
- * page, not just a re-sort of everything passed in.
+ * Pure embedding similarity ranks a short, title-only accessory listing (e.g. "iPhone 15 Case")
+ * about as close to a bare query like "iphone" as the actual iPhone product lines, whose longer
+ * spec-heavy embedding text dilutes the match — so a shopper searching a product family's name can
+ * see accessories crowd out the product itself (audit finding H1). A literal title match is the
+ * strongest relevance signal there is, so it's added as a flat boost on top of the semantic score
+ * rather than trusted to emerge from cosine similarity alone.
  */
-export async function searchProductsSemantic(query: string, products: Product[], limit = 24): Promise<Product[]> {
+function titleMatchBoost(title: string, query: string): number {
+  const normalizedTitle = title.toLowerCase();
+  const normalizedQuery = query.trim().toLowerCase();
+  if (!normalizedQuery) return 0;
+  if (normalizedTitle === normalizedQuery) return 2;
+  if (normalizedTitle.startsWith(normalizedQuery)) return 1.5;
+  if (normalizedTitle.includes(normalizedQuery)) return 1;
+  return 0;
+}
+
+/**
+ * Ranks `products` by semantic similarity to `query` (boosted by literal title matches — see
+ * titleMatchBoost) using stored embeddings, drops anything below MIN_RELEVANT_SCORE (or with no
+ * stored embedding yet), and returns at most `limit` — a search result page, not just a re-sort of
+ * everything passed in.
+ */
+export async function searchProductsSemantic(query: string, products: Product[], limit = 40): Promise<Product[]> {
   if (products.length === 0) return products;
 
   const stored = await prisma.productEmbedding.findMany({
@@ -78,9 +97,10 @@ export async function searchProductsSemantic(query: string, products: Product[],
   return products
     .map((product) => {
       const embedding = embeddingByHandle.get(product.handle);
-      return { product, score: embedding ? cosineSimilarity(queryEmbedding, embedding) : -1 };
+      const semanticScore = embedding ? cosineSimilarity(queryEmbedding, embedding) : -1;
+      return { product, semanticScore, score: semanticScore + titleMatchBoost(product.title, query) };
     })
-    .filter((entry) => entry.score >= MIN_RELEVANT_SCORE)
+    .filter((entry) => entry.semanticScore >= MIN_RELEVANT_SCORE)
     .sort((a, b) => b.score - a.score)
     .slice(0, limit)
     .map((entry) => entry.product);

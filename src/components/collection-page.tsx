@@ -170,6 +170,7 @@ export function CollectionPage({
           initialEndCursor={endCursor}
           searchTerm={query}
           sort={sort}
+          emptyStateLabel={title}
         />
       </div>
 

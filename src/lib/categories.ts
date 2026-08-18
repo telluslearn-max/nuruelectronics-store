@@ -27,6 +27,19 @@ function productTypeQuery(types: string[]): string {
   return types.map((t) => `product_type:${JSON.stringify(t)}`).join(" OR ");
 }
 
+/**
+ * Full category membership (every type in `category.types`) as a query — distinct from
+ * `category.query`, which some categories narrow to a curated subset for their default browse
+ * view (e.g. Cameras excludes Streaming Devices/Media Players from its default listing, see the
+ * comment on that entry below, while still routing those product types here via `types`). Use
+ * this, not `category.query`, for "does this product belong to this category" purposes — e.g. a
+ * "similar products" rail or a brand's category tile — where the answer should follow full
+ * membership, not the curated default-view subset.
+ */
+export function categoryMembershipQuery(category: Category): string {
+  return productTypeQuery(category.types);
+}
+
 export const categories: Category[] = [
   {
     slug: "phones",
@@ -267,9 +280,13 @@ export const categories: Category[] = [
   {
     slug: "cameras",
     label: "Cameras",
-    // Streaming Devices / Media Players live here rather than under
-    // Appliances — closer to content-creation/small-electronics than
-    // whitegoods.
+    // Streaming Devices / Media Players are filed under this category slug
+    // (closer to content-creation/small-electronics than whitegoods) but
+    // stay out of the default `query` — a shopper browsing "Cameras" with no
+    // filter applied shouldn't see a set-top box as if it were a camera.
+    // They're still reachable via the explicit "Streaming & Media" chip
+    // below, and `types` still lists them so categoryForProductType() keeps
+    // routing those products here for breadcrumbs/related-category logic.
     types: [
       "Cameras",
       "Camera Accessories",
@@ -279,15 +296,7 @@ export const categories: Category[] = [
       "Streaming Devices",
       "Media Players",
     ],
-    query: productTypeQuery([
-      "Cameras",
-      "Camera Accessories",
-      "Instant Cameras",
-      "Photo Accessories",
-      "Gimbals",
-      "Streaming Devices",
-      "Media Players",
-    ]),
+    query: productTypeQuery(["Cameras", "Camera Accessories", "Instant Cameras", "Photo Accessories", "Gimbals"]),
     blurb: "Cameras, gimbals, and gear for creators.",
     art: "camera",
     groups: [

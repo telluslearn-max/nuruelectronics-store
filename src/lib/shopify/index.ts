@@ -23,15 +23,32 @@ import {
   recalculateMockCart,
 } from "./mock-data";
 
+/** A field clause's value may be wrapped in `*` wildcards (e.g. `title:*iphone*`, from
+    buildFreeTextQuery in catalog-tools.ts) — strip them and substring-match instead of
+    exact-matching the literal asterisks, which would never match a real field value. */
+function matchesFieldValue(fieldValue: string, rawValue: string): boolean {
+  const isWildcard = rawValue.startsWith("*") && rawValue.endsWith("*") && rawValue.length > 1;
+  const value = (isWildcard ? rawValue.slice(1, -1) : rawValue).toLowerCase();
+  return isWildcard ? fieldValue.toLowerCase().includes(value) : fieldValue.toLowerCase() === value;
+}
+
 function matchesClause(product: Product, rawClause: string): boolean {
   const clause = rawClause.trim();
   if (clause.startsWith("product_type:")) {
     const value = clause.slice("product_type:".length).replace(/^"|"$/g, "");
-    return product.productType.toLowerCase() === value.toLowerCase();
+    return matchesFieldValue(product.productType, value);
+  }
+  if (clause.startsWith("vendor:")) {
+    const value = clause.slice("vendor:".length).replace(/^"|"$/g, "");
+    return Boolean(product.vendor) && matchesFieldValue(product.vendor as string, value);
   }
   if (clause.startsWith("tag:")) {
     const value = clause.slice("tag:".length).replace(/^"|"$/g, "");
-    return product.tags.some((tag) => tag.toLowerCase() === value.toLowerCase());
+    return product.tags.some((tag) => matchesFieldValue(tag, value));
+  }
+  if (clause.startsWith("title:")) {
+    const value = clause.slice("title:".length).replace(/^"|"$/g, "");
+    return matchesFieldValue(product.title, value);
   }
   return product.title.toLowerCase().includes(clause.toLowerCase());
 }

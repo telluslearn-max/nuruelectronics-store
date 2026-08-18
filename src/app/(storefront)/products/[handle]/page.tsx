@@ -18,7 +18,7 @@ import { OriginGuide } from "@/components/origin-guide";
 import { RecentlyViewedCarousel } from "@/components/recently-viewed-carousel";
 import { RelatedCategories } from "@/components/related-categories";
 import { SectionHeading } from "@/components/section-heading";
-import { categoryForProductType, getRelatedCategories, type Category } from "@/lib/categories";
+import { categoryForProductType, categoryMembershipQuery, getRelatedCategories, type Category } from "@/lib/categories";
 import { ecosystemTagForProduct } from "@/lib/collections";
 import { getBuyersGuide } from "@/lib/buyers-guides";
 import { getOriginOptionValues, hasEsimOnlyWarranty } from "@/lib/origin-options";
@@ -42,10 +42,17 @@ async function getRelatedProducts(product: Product): Promise<Product[]> {
   return products.filter((p) => p.handle !== product.handle).slice(0, 4);
 }
 
-/** Same-category products for a "Similar products" carousel, excluding the product itself. */
+/** Same-category products for a "Similar products" carousel, excluding the product itself. Uses
+    full category membership (categoryMembershipQuery), not category.query — a category can
+    curate a narrower default *browse* view (e.g. Cameras excludes Streaming Devices from its own
+    listing) while a product of that excluded type still needs "similar products" results. */
 async function getSimilarProducts(product: Product, category: Category | undefined): Promise<Product[]> {
   if (!category) return [];
-  const { products } = await getProducts({ searchTerm: category.query, sortKey: "BEST_SELLING", first: 9 });
+  const { products } = await getProducts({
+    searchTerm: categoryMembershipQuery(category),
+    sortKey: "BEST_SELLING",
+    first: 9,
+  });
   return products.filter((p) => p.handle !== product.handle).slice(0, 8);
 }
 

@@ -13,6 +13,7 @@ import {
   updateCartLine as updateCartLineInShopify,
 } from "./shopify";
 import type { ProductsPage } from "./shopify";
+import { boostTitleMatches } from "./search/title-boost";
 import type { Cart, Product } from "./shopify/types";
 
 const CART_COOKIE = "cartId";
@@ -136,6 +137,12 @@ export async function loadMoreProducts(
   cursor: string,
   searchTerm?: string,
   sort?: { sortKey: "PRICE" | "BEST_SELLING" | "CREATED_AT"; reverse: boolean },
+  /** The raw (unsanitized) search query, when this page is the /search results list — reapplies
+   * the same title-match boost the initial page got (src/lib/search/title-boost.ts), which
+   * otherwise only ordered page 1 and reverted to Shopify's raw ranking on "Load more" (H1). */
+  titleBoostQuery?: string,
 ): Promise<ProductsPage> {
-  return getProducts({ after: cursor, searchTerm, sortKey: sort?.sortKey, reverse: sort?.reverse });
+  const page = await getProducts({ after: cursor, searchTerm, sortKey: sort?.sortKey, reverse: sort?.reverse });
+  if (!titleBoostQuery) return page;
+  return { ...page, products: boostTitleMatches(page.products, titleBoostQuery) };
 }

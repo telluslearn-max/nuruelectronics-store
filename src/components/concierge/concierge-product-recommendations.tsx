@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import type { Product } from "@/lib/shopify/types";
+import { useHorizontalWheelPassthrough } from "../use-horizontal-wheel-passthrough";
 import { ConciergeCarouselCard } from "./concierge-carousel-card";
 import { ConciergeProductCard } from "./concierge-product-card";
 
@@ -37,6 +38,8 @@ export function ConciergeProductRecommendations({ products }: { products: Produc
     track.scrollTo({ left: index * width, behavior: reduceMotion ? "auto" : "smooth" });
   }
 
+  const handleWheel = useHorizontalWheelPassthrough<HTMLDivElement>();
+
   return (
     <div className="mt-3 rounded-card border border-border-subtle p-3">
       <p className="mb-2 text-sm font-semibold">Product Recommendations</p>
@@ -44,7 +47,8 @@ export function ConciergeProductRecommendations({ products }: { products: Produc
       <div
         ref={trackRef}
         onScroll={handleScroll}
-        className="scrollbar-none flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-smooth pb-1"
+        onWheel={handleWheel}
+        className="scrollbar-none flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain scroll-smooth pb-1"
       >
         {visible.map((product) => (
           <div key={product.handle} className="w-40 shrink-0 snap-start sm:w-48">

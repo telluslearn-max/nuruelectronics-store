@@ -75,6 +75,7 @@ export function ConciergeDock({ store }: { store: ConciergeMessageStore }) {
             recordingState={recordingState}
             onStartRecording={startRecording}
             onStopRecording={stopRecording}
+            isStreaming={isStreaming}
           />
         </ConciergeSheet>
       ) : (

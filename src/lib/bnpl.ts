@@ -42,7 +42,17 @@ export type BnplPlan = {
   itemPrice: number;
   deposit: number;
   balance: number;
+  /** The installment-plan portion only — deposit is NOT included (formula tier) or IS included
+   * (lookup tier, where the rate card's own installment3mo/6mo figures are deposit-inclusive by
+   * construction). That inconsistency is exactly what made the PDP panel's "Total payable" label
+   * read as the full cost when it wasn't (audit finding H4) — use `totalCost` for anything shown
+   * to a shopper as "what you'll actually pay in total," and keep this field only for the
+   * itemized installment-plan math. */
   totalPayable: number;
+  /** The real all-in cost: deposit + every installment, regardless of tier. This is what should
+   * be labeled "total cost" or "total payable" anywhere a shopper is deciding whether they can
+   * afford the plan. */
+  totalCost: number;
   installment: number;
   termCount: number;
   termUnit: "week" | "month";
@@ -68,6 +78,7 @@ export function calculateFormulaBnplPlan(itemPrice: number, planId: "weekly" | "
     deposit,
     balance,
     totalPayable,
+    totalCost: deposit + totalPayable,
     installment,
     termCount: config.termCount,
     termUnit: config.termUnit,
@@ -94,6 +105,7 @@ export function lookupAndroidBnplPlan(
     deposit: row.depositKes,
     balance: totalPayable - row.depositKes,
     totalPayable,
+    totalCost: totalPayable,
     installment,
     termCount: config.termCount,
     termUnit: config.termUnit,
@@ -158,7 +170,7 @@ export function buildBnplApplicationMessage(
   const termLabel = `${plan.termCount} ${plan.termUnit}${plan.termCount === 1 ? "" : "s"}`;
   const installmentLabel = plan.termUnit === "week" ? "Weekly payment" : "Monthly payment";
   const requirements = BNPL_ELIGIBILITY_REQUIREMENTS[plan.tier].join(", ");
-  return `Hi! I'd like to apply for BNPL on ${product.title} - ${fmt(plan.itemPrice)}.\nPlan: ${plan.label}, ${termLabel}\nDeposit: ${fmt(plan.deposit)}\n${installmentLabel}: ${fmt(plan.installment)}\n\nI understand I need to provide: ${requirements}.\n${productUrl(product.handle)}`;
+  return `Hi! I'd like to apply for BNPL on ${product.title} - ${fmt(plan.itemPrice)}.\nPlan: ${plan.label}, ${termLabel}\nDeposit: ${fmt(plan.deposit)}\n${installmentLabel}: ${fmt(plan.installment)}\nTotal cost (deposit + all installments): ${fmt(plan.totalCost)}\n\nI understand I need to provide: ${requirements}.\n${productUrl(product.handle)}`;
 }
 
 /** Mirrors buildBnplApplicationMessage's waitlist copy in BnplSection, for a brand/model BNPL isn't live on yet. */

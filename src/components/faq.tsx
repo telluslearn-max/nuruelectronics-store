@@ -27,7 +27,7 @@ function ChevronIcon() {
   return (
     <svg
       viewBox="0 0 12 8"
-      className="h-3 w-3 shrink-0 text-neutral-400 transition group-open:rotate-180"
+      className="h-3 w-3 shrink-0 rotate-0 text-neutral-400 transition-transform duration-200 ease-out group-open:rotate-180"
       fill="none"
       stroke="currentColor"
       strokeWidth="1.5"
