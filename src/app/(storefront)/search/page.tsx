@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { CategoryTiles } from "@/components/category-tiles";
 import { ProductList } from "@/components/product-list";
 import { isSemanticSearchReady, searchProductsSemantic } from "@/lib/search/semantic-search";
+import { boostTitleMatches } from "@/lib/search/title-boost";
 import { getProducts, sanitizeFreeTextSearchTerm } from "@/lib/shopify";
 
 type SearchPageProps = {
@@ -29,7 +30,7 @@ async function findMatchingProducts(query: string) {
     return { products: ranked, hasNextPage: false, endCursor: null, isSemantic: true };
   }
   const page = await getProducts({ searchTerm: sanitizeFreeTextSearchTerm(query) });
-  return { ...page, isSemantic: false };
+  return { ...page, products: boostTitleMatches(page.products, query), isSemantic: false };
 }
 
 export default async function SearchPage({ searchParams }: SearchPageProps) {
@@ -68,6 +69,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
             initialHasNextPage={hasNextPage}
             initialEndCursor={endCursor}
             searchTerm={sanitizeFreeTextSearchTerm(query)}
+            titleBoostQuery={isSemantic ? undefined : query}
           />
         </>
       )}

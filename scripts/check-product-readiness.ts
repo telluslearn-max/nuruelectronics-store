@@ -1,7 +1,7 @@
 // Manual/local runner for the same check the /api/cron/product-readiness route runs
-// on a schedule (see that route for the GCP Cloud Scheduler / Vercel Cron setup).
-// Catches products that would go live half-empty — no image, no real price, a stub
-// description, or missing SEO fields.
+// on a schedule via GCP Cloud Scheduler (deliberately not vercel.json — this job is
+// GCP-only, unlike the app's other cron routes). Catches products that would go live
+// half-empty — no image, no real price, a stub description, or missing SEO fields.
 //
 // Kept self-contained (own fetch, not importing src/lib/shopify/admin-api.ts) because
 // that module imports the "server-only" package, which unconditionally throws outside

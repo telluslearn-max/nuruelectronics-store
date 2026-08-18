@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { requireAdminSession } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
 import { formatPrice } from "@/lib/format";
-import { createExpense } from "@/lib/expense-actions";
+import { createExpense, importXprizePlExpenses } from "@/lib/expense-actions";
 import { parsePage, type PageSearchParams } from "@/lib/pagination";
 import { PaginationControls } from "@/components/admin/pagination-controls";
 import { FeedbackBanner } from "@/components/admin/feedback-banner";
@@ -87,6 +87,22 @@ export default async function AdminExpensesPage({
               Save
             </button>
           </div>
+        </form>
+      </details>
+
+      <details className="mt-3">
+        <summary className="cursor-pointer text-sm font-medium text-neutral-500">
+          Import XPRIZE P&amp;L data (one-time)
+        </summary>
+        <form action={importXprizePlExpenses} className="mt-3">
+          <p className="text-xs text-neutral-500">
+            Loads the 26 expense lines from the Build with Gemini XPRIZE P&amp;L statement
+            (M-Pesa acct 254745864474, 2 Jul – 14 Aug 2026). Safe to run more than once — already-recorded
+            entries are skipped.
+          </p>
+          <button type="submit" className={`${primaryButtonClass} mt-3`}>
+            Import
+          </button>
         </form>
       </details>
 

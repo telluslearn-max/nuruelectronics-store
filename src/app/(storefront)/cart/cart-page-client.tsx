@@ -4,7 +4,10 @@ import Link from "next/link";
 import { useTransition } from "react";
 import { removeItem, updateItemQuantity } from "@/lib/actions";
 import { trackEvent } from "@/lib/analytics/track-event";
+import { isCheckoutUsable } from "@/lib/checkout";
+import { buildWhatsAppHandoffMessage } from "@/lib/concierge/whatsapp-tool";
 import { formatPrice } from "@/lib/format";
+import { buildWhatsAppUrl } from "@/lib/whatsapp";
 import { ProductMedia } from "@/components/product-media";
 import { useCart } from "@/components/cart/cart-context";
 
@@ -28,6 +31,11 @@ export function CartPageClient() {
       </div>
     );
   }
+
+  const checkoutUsable = isCheckoutUsable(cart.checkoutUrl);
+  const whatsappCheckoutHref = buildWhatsAppUrl(
+    buildWhatsAppHandoffMessage({ summary: "I'd like to check out.", cart }),
+  );
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -110,18 +118,39 @@ export function CartPageClient() {
             </span>
           </span>
         </div>
-        <a
-          href={cart.checkoutUrl}
-          onClick={() =>
-            trackEvent("begin_checkout", {
-              currency: cart.cost.totalAmount.currencyCode,
-              value: Number(cart.cost.totalAmount.amount),
-            })
-          }
-          className="mt-4 block w-full rounded-control bg-accent px-6 py-3 text-center text-sm font-medium text-accent-foreground transition hover:opacity-90"
-        >
-          Checkout
-        </a>
+        {checkoutUsable ? (
+          <a
+            href={cart.checkoutUrl}
+            onClick={() =>
+              trackEvent("begin_checkout", {
+                currency: cart.cost.totalAmount.currencyCode,
+                value: Number(cart.cost.totalAmount.amount),
+              })
+            }
+            className="mt-4 block w-full rounded-control bg-accent px-6 py-3 text-center text-sm font-medium text-accent-foreground transition hover:opacity-90"
+          >
+            Checkout
+          </a>
+        ) : whatsappCheckoutHref ? (
+          <a
+            href={whatsappCheckoutHref}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() =>
+              trackEvent("begin_checkout", {
+                currency: cart.cost.totalAmount.currencyCode,
+                value: Number(cart.cost.totalAmount.amount),
+              })
+            }
+            className="mt-4 block w-full rounded-control bg-accent px-6 py-3 text-center text-sm font-medium text-accent-foreground transition hover:opacity-90"
+          >
+            Order via WhatsApp
+          </a>
+        ) : (
+          <p className="mt-4 text-center text-sm text-red-600" role="alert">
+            Checkout is temporarily unavailable — please contact support.
+          </p>
+        )}
         <Link
           href="/shop"
           className="mt-3 block text-center text-sm text-neutral-500 underline hover:text-foreground"

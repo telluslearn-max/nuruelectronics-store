@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef } from "react";
+import { useHorizontalWheelPassthrough } from "./use-horizontal-wheel-passthrough";
 
 function ChevronLeftIcon() {
   return (
@@ -30,11 +31,14 @@ export function CarouselShell({ children }: { children: React.ReactNode }) {
     trackRef.current?.scrollBy({ left: direction * 320, behavior: "smooth" });
   }
 
+  const handleWheel = useHorizontalWheelPassthrough<HTMLDivElement>();
+
   return (
     <div className="relative">
       <div
         ref={trackRef}
-        className="scrollbar-none -mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-smooth px-4 pb-1 sm:mx-0 sm:px-0"
+        onWheel={handleWheel}
+        className="scrollbar-none -mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto overscroll-x-contain scroll-smooth px-4 pb-1 sm:mx-0 sm:px-0"
       >
         {children}
       </div>

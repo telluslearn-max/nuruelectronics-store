@@ -7,7 +7,7 @@ import { IconStrip } from "@/components/icon-strip";
 import { ProductList } from "@/components/product-list";
 import { SectionHeading } from "@/components/section-heading";
 import { TrustBadges } from "@/components/trust-badges";
-import { categories, categoryForProductType, type Category } from "@/lib/categories";
+import { categories, categoryForProductType, categoryMembershipQuery, type Category } from "@/lib/categories";
 import { getEcosystem } from "@/lib/collections";
 import { getProducts } from "@/lib/shopify";
 
@@ -63,7 +63,13 @@ export default async function EcosystemPage({ params, searchParams }: EcosystemP
     }
   }
 
-  const query = activeCategory ? `(${ecosystem.query}) AND (${activeCategory.query})` : ecosystem.query;
+  // Full category membership (categoryMembershipQuery), not activeCategory.query — the tile
+  // above was added to brandCategories because a product's *type* routes to this category
+  // (categoryForProductType, based on full membership), so filtering here on a narrower
+  // curated-view query could show a populated tile that then filters down to nothing.
+  const query = activeCategory
+    ? `(${ecosystem.query}) AND (${categoryMembershipQuery(activeCategory)})`
+    : ecosystem.query;
 
   const breadcrumb = (
     <Breadcrumb

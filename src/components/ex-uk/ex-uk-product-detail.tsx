@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ProductMedia } from "@/components/product-media";
 import { useFocusTrap } from "@/components/use-focus-trap";
+import { useHorizontalWheelPassthrough } from "@/components/use-horizontal-wheel-passthrough";
 import { WhatsAppIcon, WhatsAppOrderButton } from "@/components/whatsapp-order-button";
 import { formatPrice } from "@/lib/format";
 import type { Savings } from "@/lib/product-match";
@@ -34,6 +35,7 @@ export function ExUkProductDetail({
   const [photoIndex, setPhotoIndex] = useState(0);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const trapRef = useFocusTrap<HTMLDivElement>(true);
+  const handleThumbnailWheel = useHorizontalWheelPassthrough<HTMLDivElement>();
   const image = product.images[photoIndex] ?? product.images[0];
   const price = product.priceRange.minVariantPrice;
   const specs = sortSpecs(product.specs);
@@ -73,7 +75,7 @@ export function ExUkProductDetail({
         </div>
 
         {product.images.length > 1 && (
-          <div className="flex gap-2 overflow-x-auto p-3">
+          <div className="flex gap-2 overflow-x-auto overscroll-x-contain p-3" onWheel={handleThumbnailWheel}>
             {product.images.map((img, i) => (
               <button
                 key={img.url + i}

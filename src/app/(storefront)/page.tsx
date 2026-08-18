@@ -114,8 +114,12 @@ export default async function HomePage() {
 
   return (
     <div>
+      {/* No entrance fade on the hero (unlike most sections below): this is the LCP element and
+          its image loads with `priority`, so animating opacity 0→1 on top of an in-flight image
+          decode is what produced the washed-out flash on load (audit finding L4) — showing it at
+          full contrast from first paint avoids the double-transition. */}
       {hero && (
-        <section className="animate-fade-up overflow-hidden rounded-card bg-surface-dark text-surface-dark-foreground">
+        <section className="overflow-hidden rounded-card bg-surface-dark text-surface-dark-foreground">
           <div className="grid grid-cols-1 items-center gap-8 p-8 sm:p-12 md:grid-cols-2">
             <div>
               <p className="text-sm font-medium uppercase tracking-wide text-accent">
@@ -171,16 +175,26 @@ export default async function HomePage() {
             className="group flex flex-col gap-6 overflow-hidden rounded-card bg-accent px-8 py-10 text-accent-foreground transition hover:opacity-95 sm:flex-row sm:items-center sm:justify-between"
           >
             <div>
-              <p className="text-sm font-medium uppercase tracking-wide text-accent-foreground/80">Swipe. Save. Repeat.</p>
+              {/* /ex-uk only renders an actual swipe deck below the sm breakpoint (see
+                  ex-uk-discover-screen.tsx) — a browsable grid on tablet/desktop — so this teaser's
+                  copy has to match whichever one the visitor's viewport will actually get
+                  (audit finding M4), rather than always promising "swipe" to desktop visitors too. */}
+              <p className="text-sm font-medium uppercase tracking-wide text-accent-foreground/80">
+                <span className="sm:hidden">Swipe. Save. Repeat.</span>
+                <span className="hidden sm:inline">Browse. Save. Repeat.</span>
+              </p>
               <h2 className="mt-2 text-xl font-semibold sm:text-2xl">Ex-UK: unboxed units, still under warranty</h2>
               <p className="mt-2 max-w-md text-sm text-accent-foreground/80">
                 Genuine imported phones at a lower price, from{" "}
-                {formatPrice(cheapestExUk.priceRange.minVariantPrice.amount, cheapestExUk.priceRange.minVariantPrice.currencyCode)}{" "}
-                — swipe through the deck and pick yours.
+                {formatPrice(cheapestExUk.priceRange.minVariantPrice.amount, cheapestExUk.priceRange.minVariantPrice.currencyCode)}
+                {" — "}
+                <span className="sm:hidden">swipe through the deck and pick yours.</span>
+                <span className="hidden sm:inline">browse the lineup and pick yours.</span>
               </p>
             </div>
             <span className="shrink-0 rounded-control bg-accent-foreground px-6 py-3 text-sm font-medium text-accent transition group-hover:opacity-90">
-              Start swiping →
+              <span className="sm:hidden">Start swiping →</span>
+              <span className="hidden sm:inline">Browse Ex-UK deals →</span>
             </span>
           </Link>
         </section>

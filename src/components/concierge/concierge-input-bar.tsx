@@ -21,6 +21,7 @@ export function ConciergeInputBar({
   recordingState,
   onStartRecording,
   onStopRecording,
+  isStreaming = false,
 }: {
   input: string;
   onInputChange: (value: string) => void;
@@ -30,11 +31,16 @@ export function ConciergeInputBar({
   recordingState: ConciergeRecordingState;
   onStartRecording: () => void;
   onStopRecording: () => void;
+  /** While the concierge is still replying, block sending another message — without this a
+   * shopper who couldn't tell their first message had gone through (audit finding M1, caused by
+   * the scroll trap this now-fixed CSS bug produced) could fire a second one on top of it. */
+  isStreaming?: boolean;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
 
   function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
+    if (isStreaming) return;
     const text = input;
     onInputChange("");
     onSubmit(text);
@@ -78,14 +84,20 @@ export function ConciergeInputBar({
           onChange={(e) => onInputChange(e.target.value)}
           onFocus={onFocus}
           disabled={isVoiceBusy}
-          placeholder="Ask anything…"
+          placeholder={isStreaming ? "Concierge is replying…" : "Ask anything…"}
           className="flex-1 rounded-control border border-border-subtle px-3.5 py-2.5 text-sm outline-none focus:border-foreground disabled:opacity-50"
         />
         {isVoiceSupported && (
           <button
             type="button"
             onClick={recordingState === "recording" ? onStopRecording : onStartRecording}
-            disabled={recordingState === "processing"}
+            // Blocks starting a NEW recording while a text reply is still streaming — voice and
+            // text turns use separate abort controllers (use-concierge-voice.ts /
+            // use-concierge-chat.ts) with no cross-awareness, so without this a shopper could
+            // fire a second, concurrent turn via voice, the same race isStreaming was added to
+            // close for text (audit finding M1). Doesn't block stopping an already-in-progress
+            // recording, which can only happen if it started before the text turn did.
+            disabled={recordingState === "processing" || (recordingState === "idle" && isStreaming)}
             aria-label={micLabel}
             aria-pressed={recordingState === "recording"}
             className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full border transition disabled:opacity-40 ${
@@ -99,10 +111,10 @@ export function ConciergeInputBar({
         )}
         <button
           type="submit"
-          disabled={!input.trim() || isVoiceBusy}
+          disabled={!input.trim() || isVoiceBusy || isStreaming}
           className="rounded-control bg-foreground px-4 py-2.5 text-sm font-medium text-background transition disabled:opacity-40"
         >
-          Send
+          {isStreaming ? "Sending…" : "Send"}
         </button>
       </form>
     </div>

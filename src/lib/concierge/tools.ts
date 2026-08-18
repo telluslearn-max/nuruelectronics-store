@@ -4,6 +4,7 @@ import type { ReturnCaseReason } from "@prisma/client";
 import { getCart, markCartConciergeAssisted } from "@/lib/actions";
 import { logAdminAction } from "@/lib/audit-log";
 import type { BnplPlanId } from "@/lib/bnpl";
+import { isCheckoutUsable } from "@/lib/checkout";
 import type { Cart, Product } from "@/lib/shopify/types";
 import { BNPL_PLAN_IDS, explainBnplPlan } from "./bnpl-tool";
 import { addToCartTool, removeCartItem, updateCartItemQuantity } from "./cart-tools";
@@ -161,7 +162,7 @@ const getExUkSavingsDeclaration: FunctionDeclaration = {
 const explainBnplPlanDeclaration: FunctionDeclaration = {
   name: "explain_bnpl_plan",
   description:
-    "Look up the real Buy Now, Pay Later terms for a product by its handle — deposit, installment amount, and eligibility requirements. Never state BNPL numbers or eligibility without calling this first. BNPL is live for Apple (weekly/monthly plans) and for Samsung/Google/OnePlus/Nothing (3-month/6-month plans, exact model+storage/RAM specific) — other brands are coming soon. If the result says needsVariantSelection, ask the shopper which storage/RAM they want and call again with variantId.",
+    "Look up the real Buy Now, Pay Later terms for a product by its handle — deposit, installment amount, and eligibility requirements. Never state BNPL numbers or eligibility without calling this first. The result has both totalPayable (the installment-plan subtotal only — for Apple's formula-tier plans this excludes the deposit) and totalCost (the true all-in figure: deposit + every installment) — when the shopper asks what they'll pay in total or whether they can afford it, quote totalCost, not totalPayable. BNPL is live for Apple (weekly/monthly plans) and for Samsung/Google/OnePlus/Nothing (3-month/6-month plans, exact model+storage/RAM specific) — other brands are coming soon. If the result says needsVariantSelection, ask the shopper which storage/RAM they want and call again with variantId.",
   parametersJsonSchema: {
     type: "object",
     properties: {
@@ -404,6 +405,7 @@ export async function dispatchTool(
               termCount: result.termCount,
               termUnit: result.termUnit,
               totalPayable: result.totalPayable,
+              totalCost: result.totalCost,
               currencyCode: result.currencyCode,
             },
             requirements: result.requirements,
@@ -480,6 +482,13 @@ export async function dispatchTool(
         entityId: cart.id,
         summary: "AI concierge surfaced the checkout link",
       }).catch((error) => console.error("logAdminAction failed", error));
+      // Same mock-checkout-URL guard the storefront cart/PDP use (src/lib/checkout.ts) — without
+      // it, a shopper in an environment where Shopify checkout isn't configured would get handed
+      // a dead link through the concierge, the one surface the storefront-side C3 fix didn't reach.
+      if (!isCheckoutUsable(cart.checkoutUrl)) {
+        const message = buildWhatsAppHandoffMessage({ summary: "I'd like to check out.", cart });
+        return { resultForModel: { ok: true, checkoutUnavailable: true }, events: [{ type: "whatsapp", message }] };
+      }
       return { resultForModel: { ok: true, url: cart.checkoutUrl }, events: [{ type: "checkout", url: cart.checkoutUrl }] };
     }
 

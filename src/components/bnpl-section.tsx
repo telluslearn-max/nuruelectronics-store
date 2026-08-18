@@ -95,10 +95,15 @@ export function BnplSection({
         </span>
       </p>
       <p className="mt-1 text-xs text-neutral-500">
-        Total payable: {fmt(plan.totalPayable)}
+        Installment plan total: {fmt(plan.totalPayable)}
         {plan.effectiveRatePercent !== undefined &&
           ` (includes ${plan.effectiveRatePercent.toFixed(0)}% interest on the balance after deposit)`}
       </p>
+      {plan.totalCost !== plan.totalPayable && (
+        <p className="mt-1 text-sm font-medium text-neutral-800">
+          Total cost (deposit + all installments): {fmt(plan.totalCost)}
+        </p>
+      )}
 
       <ul className="mt-3 space-y-1 text-xs text-neutral-500">
         {BNPL_ELIGIBILITY_REQUIREMENTS[plan.tier].map((requirement) => (

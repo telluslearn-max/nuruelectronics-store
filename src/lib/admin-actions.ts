@@ -569,6 +569,138 @@ export async function recordPayment(invoiceId: string, formData: FormData): Prom
   redirectWithSuccess(`/admin/orders/${invoice.orderId}`, "Payment recorded.");
 }
 
+// One-time import of the "Build with Gemini XPRIZE" P&L statement's revenue
+// lines (M-Pesa acct 254745864474, 2 Jul - 14 Aug 2026): 28 "Independent
+// Sales" payments. Each becomes a real Customer + manual Order + issued,
+// fully-paid Invoice + Receipt — the same chain createManualOrder /
+// createInvoice / recordPayment build by hand — so computePnl() picks the
+// revenue up the normal way. Idempotent on the M-Pesa receipt number, so
+// it's safe to run more than once. The statement only has customer display
+// names, not emails/phones, so each distinct name gets a deterministic
+// synthetic email (`<slug>@mpesa-import.local`) purely to satisfy Customer's
+// unique-email constraint and to consolidate repeat names onto one customer.
+const XPRIZE_PL_REVENUE: { date: string; receipt: string; customerName: string; amount: number }[] = [
+  { date: "2026-07-04", receipt: "UG47EA0JCE", customerName: "Mercy Njogu", amount: 2800.00 },
+  { date: "2026-07-06", receipt: "UG6NMA56F0", customerName: "Mark Kimani", amount: 4000.00 },
+  { date: "2026-07-06", receipt: "UG67YA4MJ2", customerName: "Hudson Lubabali", amount: 34100.00 },
+  { date: "2026-07-11", receipt: "UGBNMAPRA7", customerName: "Mark Kimani", amount: 6000.00 },
+  { date: "2026-07-13", receipt: "UGDNMAY38W", customerName: "Mark Kimani", amount: 5500.00 },
+  { date: "2026-07-14", receipt: "UGEPJB60UD", customerName: "Prescott Matendechero", amount: 6000.00 },
+  { date: "2026-07-17", receipt: "UGHGWBMN1I", customerName: "Ongwae Zachary", amount: 2500.00 },
+  { date: "2026-07-18", receipt: "UGI4302GFK", customerName: "Veronica Kamera", amount: 37000.00 },
+  { date: "2026-07-18", receipt: "UGI4302JI4", customerName: "Veronica Kamera", amount: 5000.00 },
+  { date: "2026-07-18", receipt: "UGI1V008TH", customerName: "David Gachago", amount: 1310.00 },
+  { date: "2026-07-19", receipt: "UGJ0G07J2J", customerName: "KCB 1", amount: 1000.00 },
+  { date: "2026-07-22", receipt: "UGM9H069JS", customerName: "Samwel Opande", amount: 500.00 },
+  { date: "2026-07-22", receipt: "UGMMH0D5FW", customerName: "Sarran Otieno", amount: 20000.00 },
+  { date: "2026-07-28", receipt: "UGSMH120ND", customerName: "Sarran Otieno", amount: 29500.00 },
+  { date: "2026-08-01", receipt: "UH1FG1AQNU", customerName: "Vincent Kanana", amount: 6500.00 },
+  { date: "2026-08-03", receipt: "UH3OG1K7P0", customerName: "Gillesvidaljunior Nguetti", amount: 2000.00 },
+  { date: "2026-08-03", receipt: "UH30G1UVD5", customerName: "NCBA Bank - Salary", amount: 7600.00 },
+  { date: "2026-08-03", receipt: "UH3G31BCLR", customerName: "Callary Ongare", amount: 43000.00 },
+  { date: "2026-08-04", receipt: "UH40G1YHSM", customerName: "IM Bank Limited", amount: 500.00 },
+  { date: "2026-08-05", receipt: "UH57Y1JRWJ", customerName: "Hudson Lubabali", amount: 7500.00 },
+  { date: "2026-08-05", receipt: "UH5R418896", customerName: "Mark Muindi", amount: 3800.00 },
+  { date: "2026-08-07", receipt: "UH7OG206GQ", customerName: "Gillesvidaljunior Nguetti", amount: 1800.00 },
+  { date: "2026-08-07", receipt: "UH7HD2A61U", customerName: "Kelly Wachira", amount: 7500.00 },
+  { date: "2026-08-08", receipt: "UH80G2FYG3", customerName: "KCB 1", amount: 1000.00 },
+  { date: "2026-08-08", receipt: "UH80G2IR2H", customerName: "Absa Bank Kenya PLC", amount: 6000.00 },
+  { date: "2026-08-11", receipt: "UHBRG2M58N", customerName: "Ejidiah Muthoni", amount: 4400.00 },
+  { date: "2026-08-11", receipt: "UHB6P2EGOY", customerName: "Erick Otieno", amount: 2950.00 },
+  { date: "2026-08-12", receipt: "UHC1S2JD6G", customerName: "Naomi Warutere", amount: 30000.00 },
+];
+
+function xprizeCustomerEmail(name: string): string {
+  const slug = name
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return `${slug}@mpesa-import.local`;
+}
+
+export async function importXprizePlRevenue(): Promise<void> {
+  await requireAdminSession();
+
+  let imported = 0;
+  for (const entry of XPRIZE_PL_REVENUE) {
+    const existing = await prisma.receipt.findFirst({ where: { reference: entry.receipt } });
+    if (existing) continue;
+
+    const date = new Date(entry.date);
+    const amount = entry.amount.toFixed(2);
+    const email = xprizeCustomerEmail(entry.customerName);
+
+    await prisma.$transaction(async (tx) => {
+      const customer = await tx.customer.upsert({
+        where: { email },
+        create: { email, name: entry.customerName },
+        update: { name: entry.customerName },
+      });
+
+      const order = await tx.order.create({
+        data: {
+          source: "manual",
+          note: `XPRIZE P&L import — M-Pesa receipt ${entry.receipt}`,
+          customerId: customer.id,
+          items: {
+            create: [{ title: "Independent Sale (XPRIZE P&L import)", quantity: 1, unitPrice: amount, lineTotal: amount }],
+          },
+        },
+      });
+
+      const invoiceNumber = await mintDocumentNumber(tx, "invoice");
+      const invoice = await tx.invoice.create({
+        data: { number: invoiceNumber, orderId: order.id, subtotal: amount, total: amount, issuedAt: date },
+      });
+      await postJournalEntry(tx, {
+        date,
+        description: `Invoice ${invoice.number} issued`,
+        sourceType: "invoice",
+        sourceId: invoice.id,
+        lines: [
+          { accountCode: ACCOUNTS.ACCOUNTS_RECEIVABLE, debit: entry.amount },
+          { accountCode: ACCOUNTS.SALES_REVENUE, credit: entry.amount },
+        ],
+      });
+
+      const receiptNumber = await mintDocumentNumber(tx, "receipt");
+      const receipt = await tx.receipt.create({
+        data: { number: receiptNumber, invoiceId: invoice.id, amount, method: "mpesa", reference: entry.receipt, paidAt: date },
+      });
+      await tx.invoice.update({ where: { id: invoice.id }, data: { amountPaid: amount, status: "paid" } });
+      await postJournalEntry(tx, {
+        date,
+        description: `Receipt ${receipt.number} against invoice`,
+        sourceType: "receipt",
+        sourceId: receipt.id,
+        lines: [
+          { accountCode: cashAccountForMethod("mpesa"), debit: entry.amount },
+          { accountCode: ACCOUNTS.ACCOUNTS_RECEIVABLE, credit: entry.amount },
+        ],
+      });
+      await logAdminAction(
+        {
+          action: "invoice.recordPayment",
+          entityType: "invoice",
+          entityId: invoice.id,
+          summary: `Recorded payment of ${amount} against invoice ${invoice.number} (XPRIZE P&L import)`,
+          metadata: { amount: entry.amount, method: "mpesa", reference: entry.receipt, source: "xprize_pl_statement.pdf" },
+        },
+        tx,
+      );
+    }, { timeout: 15000 });
+    imported++;
+  }
+
+  revalidatePath("/admin/receipts");
+  revalidatePath("/admin/orders");
+  redirectWithSuccess(
+    "/admin/receipts",
+    imported > 0 ? `Imported ${imported} XPRIZE P&L revenue transaction(s).` : "XPRIZE P&L revenue already imported.",
+  );
+}
+
 export async function sendReceiptEmail(receiptId: string): Promise<void> {
   await requireAdminSession();
   const receipt = await prisma.receipt.findUniqueOrThrow({
