@@ -72,14 +72,32 @@ export async function dispatchTool(
   switch (name) {
     case "research_polymarket_markets": {
       const limit = typeof args.limit === "number" ? args.limit : undefined;
+      let markets: Awaited<ReturnType<typeof researchPolymarketMarkets>>;
       try {
-        const markets = await researchPolymarketMarkets(limit);
-        // The model's own final summary is the only other record of a "no trade" week — logging
-        // what the tool actually returned means that claim can be checked against real data
-        // afterward, rather than trusted at face value. Caught mattering for real: one cycle
-        // claimed "all available markets had resolution dates far in the future" when a manual
-        // recheck moments later showed real markets 0.6-1.7h away — this log is what would have
-        // settled whether that was a data gap or the model misdescribing what it saw.
+        markets = await researchPolymarketMarkets(limit);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Failed to fetch markets.";
+        // Best-effort — a logging failure here must never mask itself as the real fetch error.
+        await logAdminAction({
+          action: "capital-circle.research.markets-failed",
+          entityType: "capital_circle_research",
+          summary: `research_polymarket_markets failed: ${message}`,
+          metadata: { error: message },
+        }).catch((logError) => console.error("[capital-circle] failed to log research failure:", logError));
+        return { resultForModel: { error: message } };
+      }
+
+      // The model's own final summary is the only other record of a "no trade" week — logging
+      // what the tool actually returned means that claim can be checked against real data
+      // afterward, rather than trusted at face value. Caught mattering for real: one cycle
+      // claimed "all available markets had resolution dates far in the future" when a manual
+      // recheck moments later showed real markets 0.6-1.7h away — this log is what would have
+      // settled whether that was a data gap or the model misdescribing what it saw.
+      //
+      // Deliberately outside the fetch's own try/catch and never propagates: markets were
+      // already fetched successfully by this point, and a DB blip while recording them for
+      // later verification must never get reported back to the model as a research failure.
+      try {
         await logAdminAction({
           action: "capital-circle.research.markets-returned",
           entityType: "capital_circle_research",
@@ -97,17 +115,11 @@ export async function dispatchTool(
             })),
           },
         });
-        return { resultForModel: markets };
-      } catch (error) {
-        const message = error instanceof Error ? error.message : "Failed to fetch markets.";
-        await logAdminAction({
-          action: "capital-circle.research.markets-failed",
-          entityType: "capital_circle_research",
-          summary: `research_polymarket_markets failed: ${message}`,
-          metadata: { error: message },
-        });
-        return { resultForModel: { error: message } };
+      } catch (logError) {
+        console.error("[capital-circle] failed to log research results:", logError);
       }
+
+      return { resultForModel: markets };
     }
 
     case "size_position": {

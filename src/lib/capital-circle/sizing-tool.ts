@@ -18,10 +18,17 @@ function monthStartOf(date: Date): Date {
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1));
 }
 
-/** Real capital already committed since `since` — simulated/rejected positions never moved funds, so they don't count against a velocity cap. */
-async function executedUsdSince(since: Date): Promise<number> {
+/**
+ * Real capital already committed since `since`, scoped to one wallet — simulated/rejected
+ * positions never moved funds, so they don't count against a velocity cap. Scoping by walletId
+ * matters: without it, a rotated-out wallet's historical spend would still count against a
+ * newly-registered wallet's fresh caps, since Postgres has no concept of "this wallet's cap
+ * period starts now." `walletId: null` (no wallet registered at all) intentionally sums
+ * unscoped positions rather than matching nothing, so caps still bind before any wallet exists.
+ */
+async function executedUsdSince(since: Date, walletId: string | null): Promise<number> {
   const result = await prisma.capitalCirclePosition.aggregate({
-    where: { status: "executed", createdAt: { gte: since } },
+    where: { status: "executed", createdAt: { gte: since }, walletId },
     _sum: { sizeUsd: true },
   });
   return Number(result._sum.sizeUsd ?? 0);
@@ -66,7 +73,7 @@ export async function sizePosition(requestedUsd: number): Promise<SizingResult> 
 
   for (const window of velocityWindows) {
     if (window.capUsd == null) continue;
-    const spentSoFar = await executedUsdSince(window.since);
+    const spentSoFar = await executedUsdSince(window.since, wallet?.id ?? null);
     const headroom = Math.max(0, window.capUsd - spentSoFar);
     if (approvedUsd > headroom) {
       approvedUsd = headroom;

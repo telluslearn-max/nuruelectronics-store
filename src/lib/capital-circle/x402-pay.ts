@@ -37,11 +37,30 @@ const CHAIN_ID_BY_NETWORK: Record<string, number> = {
 
 const USDC_DECIMALS = 6;
 
-/** Comma-separated hostnames this app is allowed to pay via x402. Empty (default) means nothing is allowed — fail closed, same as every other guardrail this session. */
-const ALLOWED_HOSTS = (process.env.X402_ALLOWED_HOSTS ?? "")
+/**
+ * Comma-separated hostnames this app is allowed to pay via x402. Empty (default) means nothing is
+ * allowed — fail closed, same as every other guardrail this session. Each entry may optionally
+ * pin the expected payee address as `host=0xAddress` (e.g. `api.example.com=0xabc...`) — x402 has
+ * no protocol-level way to pin a destination the way a plain wallet transfer does (the requesting
+ * server always names its own payTo in the 402 response, and paying it is the entire point of the
+ * protocol), so this is the strongest guarantee available: an operator who trusts a specific host
+ * to always pay itself can catch that host suddenly naming a different payTo. Hosts listed without
+ * `=address` get the allowlist check only, same as before.
+ */
+const ALLOWED_HOSTS_RAW = (process.env.X402_ALLOWED_HOSTS ?? "")
   .split(",")
-  .map((h) => h.trim().toLowerCase())
+  .map((h) => h.trim())
   .filter(Boolean);
+
+const PINNED_PAY_TO_BY_HOST = new Map<string, string>(
+  ALLOWED_HOSTS_RAW.filter((entry) => entry.includes("="))
+    .map((entry) => {
+      const [host, address] = entry.split("=");
+      return [host.trim().toLowerCase(), address.trim().toLowerCase()] as const;
+    }),
+);
+
+const ALLOWED_HOSTS = ALLOWED_HOSTS_RAW.map((entry) => entry.split("=")[0].trim().toLowerCase());
 
 /** Hard ceiling on any single x402 payment — independent of whatever the resource server asks for, checked against its own stated price before any signature is produced. */
 export const X402_PAYMENT_CAP_USDC = Number(process.env.X402_PAYMENT_CAP_USDC ?? 0.5);
@@ -74,12 +93,16 @@ function base64EncodeJson(value: unknown): string {
 
 /**
  * Fetches an x402-protected resource, paying for it from the Capital Circle wallet if the server
- * responds 402. Two independent guardrails run before any signature is produced, both checked
- * against the server's own stated price — never a caller-supplied amount:
+ * responds 402. Guardrails run before any signature is produced, checked against the server's own
+ * stated requirements — never a caller-supplied amount:
  *   1. The URL's host must be on X402_ALLOWED_HOSTS (fails closed if unset).
  *   2. The price must be at or under X402_PAYMENT_CAP_USDC.
- * Every attempt is audit-logged before signing and again after the paid request resolves, mirroring
- * the Binance/Circle-withdraw guardrail pattern used elsewhere in Capital Circle.
+ *   3. If that host has a pinned payTo configured, the requirement's payTo must match it.
+ * Unlike the Binance/Circle-withdraw guardrails elsewhere in Capital Circle, this is NOT
+ * destination-pinning by default — the resource server always names its own payTo in the 402
+ * response, and paying whoever it names is the protocol working as intended, not a gap. Guardrail
+ * #3 above is the opt-in way to get a pinning guarantee for a specific trusted host.
+ * Every attempt is audit-logged before signing and again after the paid request resolves.
  */
 export async function payForResource(url: string, init?: RequestInit): Promise<Response> {
   if (!isHostAllowed(url)) {
@@ -112,6 +135,11 @@ export async function payForResource(url: string, init?: RequestInit): Promise<R
   }
 
   const host = new URL(url).hostname;
+  const pinnedPayTo = PINNED_PAY_TO_BY_HOST.get(host.toLowerCase());
+  if (pinnedPayTo && requirement.payTo.toLowerCase() !== pinnedPayTo) {
+    throw new Error(`Payment requirements named payTo ${requirement.payTo}, which doesn't match the pinned address configured for ${host}.`);
+  }
+
   const now = Math.floor(Date.now() / 1000);
   const authorization = {
     to: requirement.payTo,
@@ -129,46 +157,49 @@ export async function payForResource(url: string, init?: RequestInit): Promise<R
     metadata: { url, amountUsdc, payTo: requirement.payTo, network: requirement.network },
   });
 
-  let signature: string;
+  // Signing and the paid request share one try/catch: a network-level throw from the paid fetch
+  // is just as much a "payment attempt fell through" as a signing error, and both need the same
+  // logged "failed" outcome — otherwise a fetch throw here would escape past the "attempt" log
+  // already written above with no matching success/failed entry ever recorded.
   try {
-    signature = await signTransferAuthorization(authorization, {
+    const signature = await signTransferAuthorization(authorization, {
       name: requirement.extra.name,
       version: requirement.extra.version,
       chainId: chainIdForNetwork(requirement.network),
       verifyingContract: requirement.asset,
     });
+
+    const paymentPayload = {
+      x402Version: paymentRequired.x402Version ?? 1,
+      accepted: requirement,
+      payload: { authorization: { from: circleWalletAddress, ...authorization }, signature },
+    };
+
+    const paidResponse = await fetch(url, {
+      ...init,
+      headers: { ...(init?.headers ?? {}), "X-PAYMENT": base64EncodeJson(paymentPayload) },
+    });
+
+    await logAdminAction({
+      action: paidResponse.ok ? "x402.payment.success" : "x402.payment.failed",
+      entityType: "x402_payment",
+      entityId: host,
+      summary: paidResponse.ok
+        ? `x402 payment of $${amountUsdc.toFixed(4)} USDC to ${url} succeeded (HTTP ${paidResponse.status}).`
+        : `x402 payment of $${amountUsdc.toFixed(4)} USDC to ${url} was rejected (HTTP ${paidResponse.status}).`,
+      metadata: { url, amountUsdc, status: paidResponse.status },
+    });
+
+    return paidResponse;
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error.";
     await logAdminAction({
       action: "x402.payment.failed",
       entityType: "x402_payment",
       entityId: host,
-      summary: `x402 payment signing failed for ${url}: ${message}`,
+      summary: `x402 payment to ${url} failed: ${message}`,
       metadata: { url, amountUsdc, error: message },
     });
     throw error;
   }
-
-  const paymentPayload = {
-    x402Version: paymentRequired.x402Version ?? 1,
-    accepted: requirement,
-    payload: { authorization: { from: circleWalletAddress, ...authorization }, signature },
-  };
-
-  const paidResponse = await fetch(url, {
-    ...init,
-    headers: { ...(init?.headers ?? {}), "X-PAYMENT": base64EncodeJson(paymentPayload) },
-  });
-
-  await logAdminAction({
-    action: paidResponse.ok ? "x402.payment.success" : "x402.payment.failed",
-    entityType: "x402_payment",
-    entityId: host,
-    summary: paidResponse.ok
-      ? `x402 payment of $${amountUsdc.toFixed(4)} USDC to ${url} succeeded (HTTP ${paidResponse.status}).`
-      : `x402 payment of $${amountUsdc.toFixed(4)} USDC to ${url} was rejected (HTTP ${paidResponse.status}).`,
-    metadata: { url, amountUsdc, status: paidResponse.status },
-  });
-
-  return paidResponse;
 }

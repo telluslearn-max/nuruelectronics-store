@@ -1,11 +1,9 @@
 import "server-only";
 import QRCode from "qrcode";
+import { USDC_POLYGON_CONTRACT } from "./circle-wallet-client";
 
 /** Polygon mainnet chain id, per EIP-681's `@<chainId>` segment. */
 const POLYGON_CHAIN_ID = 137;
-
-/** Circle's own USDC contract address on Polygon — from `circle contract address usdc --chain MATIC`. */
-export const USDC_POLYGON_CONTRACT = "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359";
 
 /**
  * EIP-681 token-transfer URI — the same convention Circle's own CLI uses for `wallet fund

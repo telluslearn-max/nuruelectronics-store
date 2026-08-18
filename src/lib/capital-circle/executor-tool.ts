@@ -3,7 +3,8 @@ import { Chain, ClobClient, OrderType, Side } from "@polymarket/clob-client-v2";
 import { prisma } from "../prisma";
 import { logAdminAction } from "../audit-log";
 import { CAPITAL_CIRCLE_LIVE } from "./config";
-import { isCircleWalletConfigured, getClobSigner } from "./circle-wallet-client";
+import { isCircleWalletConfigured, isCircleWalletTestnet, getClobSigner } from "./circle-wallet-client";
+import { sizePosition } from "./sizing-tool";
 
 const CLOB_HOST = "https://clob.polymarket.com";
 
@@ -23,26 +24,60 @@ export type RecordPositionResult = {
 };
 
 /**
- * The only tool with wallet-signing authority — everything upstream
- * (research-tool, sizing-tool) only ever produces a thesis and a bounded
- * size. When CAPITAL_CIRCLE_LIVE is false (the only possible value today —
- * see config.ts), or the Circle wallet isn't configured, this always writes
- * a "simulated" position instead of touching a real order. It never
- * silently escalates the other way: a live flag with no wallet configured
- * still simulates.
+ * The only tool with wallet-signing authority — everything upstream (research-tool,
+ * sizing-tool) only ever produces a thesis and a bounded size. Callers are instructed to call
+ * size_position first and pass its approved amount here, but that's an English instruction, not
+ * an enforced contract — this function re-derives the real approved size itself via
+ * sizePosition(), so a model that skips, misreads, or is prompt-injected into ignoring
+ * size_position's response can never record or execute more than the wallet's own caps allow.
+ * The size actually used is always sizePosition()'s output, never the caller's raw sizeUsd.
  */
 export async function recordPosition(input: RecordPositionInput): Promise<RecordPositionResult> {
-  const canGoLive = CAPITAL_CIRCLE_LIVE && isCircleWalletConfigured;
+  const wallet = await prisma.capitalCircleWallet.findFirst({
+    where: { status: "active" },
+    orderBy: { createdAt: "desc" },
+  });
 
-  if (!canGoLive) {
+  const sizing = await sizePosition(input.sizeUsd);
+  const sizeUsd = sizing.approvedUsd;
+
+  if (sizeUsd <= 0) {
     const position = await prisma.capitalCirclePosition.create({
       data: {
+        walletId: wallet?.id,
         venue: "polymarket",
         marketId: input.conditionId,
         tokenId: input.tokenId,
         question: input.question,
         thesis: input.thesis,
-        sizeUsd: input.sizeUsd,
+        sizeUsd: 0,
+        status: "rejected",
+      },
+    });
+    await logAdminAction({
+      action: "capital-circle.position.reject",
+      entityType: "capital_circle_position",
+      entityId: position.id,
+      summary: `Capital Circle rejected a $${input.sizeUsd.toFixed(2)} request into "${input.question}": ${sizing.reason}`,
+      metadata: { conditionId: input.conditionId, tokenId: input.tokenId, requestedUsd: input.sizeUsd, thesis: input.thesis },
+    });
+    return { positionId: position.id, status: "rejected", txHash: null, note: sizing.reason };
+  }
+
+  // Live mode requires the flag, a configured wallet, AND that wallet not being a testnet one —
+  // a testnet signer must never be allowed to sign for the real mainnet Polymarket CLOB.
+  const canGoLive = CAPITAL_CIRCLE_LIVE && isCircleWalletConfigured && !isCircleWalletTestnet;
+
+  if (!canGoLive) {
+    const position = await prisma.capitalCirclePosition.create({
+      data: {
+        walletId: wallet?.id,
+        venue: "polymarket",
+        marketId: input.conditionId,
+        tokenId: input.tokenId,
+        question: input.question,
+        thesis: input.thesis,
+        sizeUsd,
         status: "simulated",
       },
     });
@@ -50,8 +85,8 @@ export async function recordPosition(input: RecordPositionInput): Promise<Record
       action: "capital-circle.position.simulate",
       entityType: "capital_circle_position",
       entityId: position.id,
-      summary: `Capital Circle would size $${input.sizeUsd.toFixed(2)} into "${input.question}" — simulated (${CAPITAL_CIRCLE_LIVE ? "no Circle wallet configured yet" : "CAPITAL_CIRCLE_LIVE is false"}).`,
-      metadata: { conditionId: input.conditionId, tokenId: input.tokenId, sizeUsd: input.sizeUsd, thesis: input.thesis },
+      summary: `Capital Circle would size $${sizeUsd.toFixed(2)} into "${input.question}" — simulated (${CAPITAL_CIRCLE_LIVE ? "no live-eligible Circle wallet configured yet" : "CAPITAL_CIRCLE_LIVE is false"}).`,
+      metadata: { conditionId: input.conditionId, tokenId: input.tokenId, sizeUsd, thesis: input.thesis },
     });
     return {
       positionId: position.id,
@@ -70,7 +105,7 @@ export async function recordPosition(input: RecordPositionInput): Promise<Record
     const tradingClient = new ClobClient({ host: CLOB_HOST, chain: Chain.POLYGON, signer, creds, throwOnError: true });
 
     const response = await tradingClient.createAndPostMarketOrder(
-      { tokenID: input.tokenId, amount: input.sizeUsd, side: Side.BUY },
+      { tokenID: input.tokenId, amount: sizeUsd, side: Side.BUY },
       undefined,
       OrderType.FOK,
     );
@@ -82,12 +117,13 @@ export async function recordPosition(input: RecordPositionInput): Promise<Record
 
     const position = await prisma.capitalCirclePosition.create({
       data: {
+        walletId: wallet?.id,
         venue: "polymarket",
         marketId: input.conditionId,
         tokenId: input.tokenId,
         question: input.question,
         thesis: input.thesis,
-        sizeUsd: input.sizeUsd,
+        sizeUsd,
         status: "executed",
         txHash,
       },
@@ -96,19 +132,20 @@ export async function recordPosition(input: RecordPositionInput): Promise<Record
       action: "capital-circle.position.execute",
       entityType: "capital_circle_position",
       entityId: position.id,
-      summary: `Capital Circle executed $${input.sizeUsd.toFixed(2)} into "${input.question}" — tx ${txHash}.`,
-      metadata: { conditionId: input.conditionId, tokenId: input.tokenId, sizeUsd: input.sizeUsd, thesis: input.thesis, txHash },
+      summary: `Capital Circle executed $${sizeUsd.toFixed(2)} into "${input.question}" — tx ${txHash}.`,
+      metadata: { conditionId: input.conditionId, tokenId: input.tokenId, sizeUsd, thesis: input.thesis, txHash },
     });
     return { positionId: position.id, status: "executed", txHash, note: "Executed for real." };
   } catch (error) {
     const position = await prisma.capitalCirclePosition.create({
       data: {
+        walletId: wallet?.id,
         venue: "polymarket",
         marketId: input.conditionId,
         tokenId: input.tokenId,
         question: input.question,
         thesis: input.thesis,
-        sizeUsd: input.sizeUsd,
+        sizeUsd,
         status: "rejected",
       },
     });
@@ -117,7 +154,7 @@ export async function recordPosition(input: RecordPositionInput): Promise<Record
       entityType: "capital_circle_position",
       entityId: position.id,
       summary: `Capital Circle execution failed for "${input.question}": ${error instanceof Error ? error.message : "unknown error"}.`,
-      metadata: { conditionId: input.conditionId, tokenId: input.tokenId, sizeUsd: input.sizeUsd },
+      metadata: { conditionId: input.conditionId, tokenId: input.tokenId, sizeUsd },
     });
     return {
       positionId: position.id,

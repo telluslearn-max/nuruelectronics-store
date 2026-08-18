@@ -61,7 +61,12 @@ async function resolveUsdcPolygonNetwork(): Promise<string> {
     throw new Error("USDC isn't listed in this Binance account's coin config — is it enabled?");
   }
   const networkList: BinanceNetworkEntry[] = usdc.networkList ?? [];
-  const polygon = networkList.find((n) => n.name?.toLowerCase().includes("polygon"));
+  const polygonMatches = networkList.filter((n) => n.name?.toLowerCase().includes("polygon"));
+  // Prefer the entry Binance itself flags as default for this coin — some coins list more than
+  // one polygon-named network (e.g. a legacy bridged variant alongside the current one), and
+  // picking the first name match rather than the default one has silently withdrawn on the
+  // wrong network before.
+  const polygon = polygonMatches.find((n) => n.isDefault) ?? polygonMatches[0];
   if (!polygon) {
     throw new Error(
       `No Polygon network found in USDC's networkList — available: ${networkList.map((n) => n.name).join(", ") || "none"}.`,
