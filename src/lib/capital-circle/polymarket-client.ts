@@ -94,13 +94,13 @@ function parseMarket(raw: unknown): PolymarketMarketSummary | null {
 
 /**
  * Live, real markets — no auth needed. Returns active, unclosed markets resolving within
- * `maxHoursUntilResolution` hours from now (default 2) — short-horizon by design, so a real
- * win/loss track record builds up in hours, not years. The date-range filtering happens
+ * `maxHoursUntilResolution` hours from now (default 24) — short-horizon by design, so a real
+ * win/loss track record builds up in a day, not years. The date-range filtering happens
  * server-side via Gamma's end_date_min/end_date_max, not a client-side filter over a fixed
  * sample — otherwise the CLOB's own sampling endpoint (see parseMarket's comment) would just
  * return zero results every time.
  */
-export async function listActivePolymarketMarkets(limit = 20, maxHoursUntilResolution = 2): Promise<PolymarketMarketSummary[]> {
+export async function listActivePolymarketMarkets(limit = 20, maxHoursUntilResolution = 24): Promise<PolymarketMarketSummary[]> {
   const now = new Date();
   const horizonEnd = new Date(now.getTime() + maxHoursUntilResolution * 60 * 60 * 1000);
   const params = new URLSearchParams({
@@ -117,6 +117,25 @@ export async function listActivePolymarketMarkets(limit = 20, maxHoursUntilResol
   const body = await response.json();
   const raw = Array.isArray(body) ? body : [];
   return raw.map(parseMarket).filter((m): m is PolymarketMarketSummary => Boolean(m));
+}
+
+/**
+ * A single market by its condition id, resolved or not — used by the settlement job to check
+ * whether an open position's market has closed yet and, if so, what each outcome's final price
+ * settled at (a resolved market's winning outcome converges to 1, the losing one to 0). Unlike
+ * listActivePolymarketMarkets, this deliberately has no active/closed filter — a closed market is
+ * exactly the case this needs to see.
+ */
+export async function getPolymarketMarketByConditionId(conditionId: string): Promise<PolymarketMarketSummary | null> {
+  const params = new URLSearchParams({ condition_ids: conditionId });
+  const response = await fetch(`${GAMMA_API_BASE}/markets?${params.toString()}`);
+  if (!response.ok) {
+    throw new Error(`Polymarket Gamma API request failed (HTTP ${response.status}).`);
+  }
+  const body = await response.json();
+  const raw = Array.isArray(body) ? body : [];
+  const markets = raw.map(parseMarket).filter((m): m is PolymarketMarketSummary => Boolean(m));
+  return markets[0] ?? null;
 }
 
 export async function getPolymarketMidpoint(tokenId: string): Promise<number | null> {

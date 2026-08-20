@@ -607,6 +607,15 @@ model CapitalCirclePosition {
   question   String
   thesis     String
   sizeUsd    Decimal                     @db.Decimal(10, 2)
+  /// The bought outcome token's implied price (0-1) at decision time — the settlement job
+  /// divides sizeUsd by this to get an implied share count, so a resolved market's win/loss
+  /// can be computed as shares * finalPrice - sizeUsd instead of a flat win/lose guess.
+  entryPrice Decimal?                    @db.Decimal(6, 4)
+  /// The model's own stated conviction in its thesis, 0-100 — distinct from entryPrice (the
+  /// market's implied probability): entryPrice is what the crowd thinks, confidencePct is what
+  /// the model thinks. A model betting against a skewed market should often show low entryPrice
+  /// alongside high confidencePct, or vice versa — the gap between them is the whole thesis.
+  confidencePct Int?
   status     CapitalCirclePositionStatus @default(simulated)
   txHash     String?
   resultUsd  Decimal?                    @db.Decimal(10, 2)
@@ -615,6 +624,19 @@ model CapitalCirclePosition {
 
   @@index([status, createdAt])
   @@index([walletId])
+}
+
+/// A subscribed browser/PWA endpoint for Web Push — the admin dashboard is already an
+/// installable PWA (see public/admin-manifest.webmanifest), so this lets it receive a real
+/// push notification (e.g. "Capital Circle took a position") without any third-party
+/// messaging account. Single-owner site, so there's no userId — any subscription here is the
+/// admin's.
+model PushSubscription {
+  id        String   @id @default(cuid())
+  endpoint  String   @unique
+  p256dh    String
+  authKey   String
+  createdAt DateTime @default(now())
 }
 
 // The weekly "take 40% of real profit, stage it for conversion" step. This

@@ -8,7 +8,7 @@ import { logAdminAction } from "../audit-log";
 
 const researchPolymarketMarketsDeclaration: FunctionDeclaration = {
   name: "research_polymarket_markets",
-  description: "List real, live, active Polymarket prediction markets resolving within the next 2 hours — question, condition id, and each outcome's token id, label (e.g. Yes/No), and current implied price. Never invent a market, outcome, or price — always call this before referencing one.",
+  description: "List real, live, active Polymarket prediction markets resolving within the next 24 hours — question, condition id, and each outcome's token id, label (e.g. Yes/No), and current implied price. Never invent a market, outcome, or price — always call this before referencing one.",
   parametersJsonSchema: {
     type: "object",
     properties: {
@@ -40,8 +40,10 @@ const recordPositionDeclaration: FunctionDeclaration = {
       question: { type: "string", description: "The market's exact question text." },
       thesis: { type: "string", description: "Your written thesis: what, why, and what would invalidate it." },
       sizeUsd: { type: "number", description: "The approved size from size_position's response — not your original request." },
+      entryPrice: { type: "number", description: "The chosen outcome token's current price (0-1) from the research_polymarket_markets result — used later to score this position as a win or loss once the market resolves." },
+      confidencePct: { type: "integer", description: "Your own conviction in this specific thesis, 0-100 — not the market's implied probability (that's entryPrice), your independent estimate of how likely you think you are right. A thesis betting against a skewed market often has a confidence far from the market's own price; say so plainly rather than echoing entryPrice back." },
     },
-    required: ["conditionId", "tokenId", "question", "thesis", "sizeUsd"],
+    required: ["conditionId", "tokenId", "question", "thesis", "sizeUsd", "entryPrice", "confidencePct"],
   },
 };
 
@@ -137,10 +139,12 @@ export async function dispatchTool(
       const question = typeof args.question === "string" ? args.question : "";
       const thesis = typeof args.thesis === "string" ? args.thesis : "";
       const sizeUsd = typeof args.sizeUsd === "number" ? args.sizeUsd : NaN;
-      if (!conditionId || !tokenId || !question || !thesis || Number.isNaN(sizeUsd)) {
-        return { resultForModel: { error: "Missing conditionId, tokenId, question, thesis, or sizeUsd." } };
+      const entryPrice = typeof args.entryPrice === "number" ? args.entryPrice : NaN;
+      const confidencePct = typeof args.confidencePct === "number" ? args.confidencePct : NaN;
+      if (!conditionId || !tokenId || !question || !thesis || Number.isNaN(sizeUsd) || Number.isNaN(entryPrice) || Number.isNaN(confidencePct)) {
+        return { resultForModel: { error: "Missing conditionId, tokenId, question, thesis, sizeUsd, entryPrice, or confidencePct." } };
       }
-      const result = await recordPosition({ conditionId, tokenId, question, thesis, sizeUsd });
+      const result = await recordPosition({ conditionId, tokenId, question, thesis, sizeUsd, entryPrice, confidencePct });
       return { resultForModel: result };
     }
 
