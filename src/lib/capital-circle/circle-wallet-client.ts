@@ -1,6 +1,6 @@
 import "server-only";
 import { initiateDeveloperControlledWalletsClient } from "@circle-fin/developer-controlled-wallets";
-import { Chain, getContractConfig } from "@polymarket/clob-client-v2";
+import { CAPITAL_CIRCLE_NETWORK } from "./chain";
 
 /**
  * Testnet mode is opt-in and separate from CAPITAL_CIRCLE_LIVE: it lets Phase A prove Circle's
@@ -9,7 +9,7 @@ import { Chain, getContractConfig } from "@polymarket/clob-client-v2";
  * be combined with CAPITAL_CIRCLE_LIVE=true — recordPosition's Polymarket CLOB calls only work
  * against a real funded mainnet wallet.
  */
-const isTestnet = process.env.CAPITAL_CIRCLE_WALLET_NETWORK === "testnet";
+const isTestnet = CAPITAL_CIRCLE_NETWORK.isTestnet;
 
 const apiKey = isTestnet ? process.env.CIRCLE_TESTNET_API_KEY : process.env.CIRCLE_API_KEY;
 const entitySecret = isTestnet ? process.env.CIRCLE_TESTNET_ENTITY_SECRET : process.env.CIRCLE_ENTITY_SECRET;
@@ -126,13 +126,14 @@ export const circleWalletAddress = walletAddress ?? null;
  * nothing the exchange will accept as collateral without going through Polymarket's separate
  * CollateralOnramp `wrap()` step, which nothing in this codebase calls.
  *
- * Sourced from the CLOB SDK's own `getContractConfig()` — the same lookup `createOrder`/
- * `createMarketOrder` use internally to pick an exchange contract — rather than a hardcoded
- * literal, specifically so a future collateral migration doesn't require hunting down every
- * copy of the address by hand again. Chain-aware: testnet (Amoy) and mainnet (Polygon) have
- * historically been given different collateral addresses even when they happen to coincide today.
+ * Sourced from chain.ts, which itself reads the CLOB SDK's own `getContractConfig()` — the same
+ * lookup `createOrder`/`createMarketOrder` use internally to pick an exchange contract — rather
+ * than a hardcoded literal, specifically so a future collateral migration doesn't require hunting
+ * down every copy of the address by hand again. Chain-aware: testnet (Amoy) and mainnet (Polygon)
+ * have historically been given different collateral addresses even when they happen to coincide
+ * today.
  */
-export const COLLATERAL_TOKEN_ADDRESS = getContractConfig(isTestnet ? Chain.AMOY : Chain.POLYGON).collateral;
+export const COLLATERAL_TOKEN_ADDRESS = CAPITAL_CIRCLE_NETWORK.collateralTokenAddress;
 
 export type WalletTransferResult = { id: string };
 
