@@ -223,7 +223,11 @@ export type CapitalCircleWalletSummary = {
   dailyCapUsd: number | null;
   weeklyCapUsd: number | null;
   monthlyCapUsd: number | null;
+  pausedAt: Date | null;
+  pausedReason: string | null;
   createdAt: Date;
+  /** For evaluateIdentityChange's optimistic-concurrency check — must reach the identity form as a plain number. */
+  updatedAtMs: number;
 };
 
 /** All registered wallet rows, newest first — usually 0 or 1, but kept as a list to survive wallet rotation. */
@@ -239,7 +243,10 @@ export async function getCapitalCircleWallets(): Promise<CapitalCircleWalletSumm
     dailyCapUsd: w.dailyCapUsd != null ? Number(w.dailyCapUsd) : null,
     weeklyCapUsd: w.weeklyCapUsd != null ? Number(w.weeklyCapUsd) : null,
     monthlyCapUsd: w.monthlyCapUsd != null ? Number(w.monthlyCapUsd) : null,
+    pausedAt: w.pausedAt,
+    pausedReason: w.pausedReason,
     createdAt: w.createdAt,
+    updatedAtMs: w.updatedAt.getTime(),
   }));
 }
 

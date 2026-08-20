@@ -8,15 +8,23 @@ import {
   type CapitalCircleIntelligenceReport,
 } from "@/lib/reports/capital-circle";
 import { confirmSweep } from "@/lib/capital-circle/sweep-actions";
-import { clearCapitalCirclePause, saveCapitalCircleWallet } from "@/lib/capital-circle/wallet-actions";
+import {
+  clearCapitalCirclePause,
+  registerCapitalCircleWallet,
+  saveCapitalCircleWalletCaps,
+  updateCapitalCircleWalletIdentity,
+} from "@/lib/capital-circle/wallet-actions";
 import { depositFromBinance } from "@/lib/capital-circle/binance-actions";
 import { isBinanceConfigured, BINANCE_WITHDRAW_CAP_USDC } from "@/lib/capital-circle/binance-client";
 import { withdrawFromCircleWallet } from "@/lib/capital-circle/circle-withdraw-actions";
 import { isCircleWalletWithdrawConfigured, CIRCLE_WALLET_WITHDRAW_CAP_USDC } from "@/lib/capital-circle/circle-wallet-withdraw";
 import { walletDepositQrSvg } from "@/lib/capital-circle/wallet-qr";
+import { truncateAddress } from "@/lib/capital-circle/wallet-identity";
 import { formatPrice } from "@/lib/format";
 import { FeedbackBanner } from "@/components/admin/feedback-banner";
 import { PushSubscribeButton } from "@/components/admin/push-subscribe-button";
+import { SubmitButton } from "@/components/admin/submit-button";
+import { ConfirmSubmitButton } from "@/components/admin/confirm-submit-button";
 
 export const metadata: Metadata = { title: "Capital Circle" };
 
@@ -411,7 +419,7 @@ export default async function CapitalCirclePage({
 
       <IntelligenceSection
         report={intelligence}
-        pausedWalletId={wallets.find((wallet) => wallet.status === "active")?.id ?? null}
+        pausedWalletId={wallets.find((wallet) => wallet.pausedAt)?.id ?? null}
       />
 
       <div className="mt-8">
@@ -501,21 +509,9 @@ export default async function CapitalCirclePage({
                     </div>
                   </div>
                 )}
-                <form action={saveCapitalCircleWallet} className="mt-3 space-y-3">
+                <form action={saveCapitalCircleWalletCaps} className="mt-3 space-y-3">
                   <input type="hidden" name="walletId" value={wallet.id} />
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <div>
-                      <label className="block text-xs text-neutral-500">Circle wallet id</label>
-                      <input type="text" name="circleWalletId" defaultValue={wallet.circleWalletId ?? ""} className={inputClass} />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-neutral-500">Address</label>
-                      <input type="text" name="address" defaultValue={wallet.address ?? ""} className={inputClass} />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-neutral-500">Chain</label>
-                      <input type="text" name="chain" defaultValue={wallet.chain} className={inputClass} />
-                    </div>
                     <div>
                       <label className="block text-xs text-neutral-500">Status</label>
                       <select name="status" defaultValue={wallet.status} className={inputClass}>
@@ -531,13 +527,53 @@ export default async function CapitalCirclePage({
                     <WalletCapField name="weeklyCapUsd" label="Weekly cap (USD)" defaultValue={wallet.weeklyCapUsd?.toFixed(2) ?? ""} />
                     <WalletCapField name="monthlyCapUsd" label="Monthly cap (USD)" defaultValue={wallet.monthlyCapUsd?.toFixed(2) ?? ""} />
                   </div>
-                  <button
-                    type="submit"
+                  <SubmitButton
                     className="rounded-control border border-border-subtle px-4 py-2 text-sm font-medium hover:border-foreground"
+                    pendingText="Saving…"
                   >
                     Save
-                  </button>
+                  </SubmitButton>
                 </form>
+
+                <details className="mt-3 rounded-control border border-amber-200 bg-amber-50 p-3">
+                  <summary className="cursor-pointer text-xs font-medium text-amber-800">Change wallet identity</summary>
+                  <p className="mt-2 text-xs text-amber-800">
+                    This is how the pool receives money — changing it points every future deposit instruction and
+                    on-chain withdrawal at a different address. Blanking a field that already has a value is refused;
+                    to replace it you must enter a real new value and confirm below.
+                  </p>
+                  <form action={updateCapitalCircleWalletIdentity} className="mt-3 space-y-3">
+                    <input type="hidden" name="walletId" value={wallet.id} />
+                    <input type="hidden" name="seenUpdatedAt" value={wallet.updatedAtMs} />
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <div>
+                        <label className="block text-xs text-neutral-500">Circle wallet id</label>
+                        <input type="text" name="circleWalletId" defaultValue={wallet.circleWalletId ?? ""} className={inputClass} />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-neutral-500">Address</label>
+                        <input type="text" name="address" defaultValue={wallet.address ?? ""} className={inputClass} />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-neutral-500">Chain</label>
+                        <input type="text" name="chain" defaultValue={wallet.chain} className={inputClass} />
+                      </div>
+                    </div>
+                    <label className="flex items-center gap-2 text-xs text-amber-800">
+                      <input type="checkbox" name="confirmReplace" />I mean to replace the current identity, not just fix a typo
+                      elsewhere.
+                    </label>
+                    <ConfirmSubmitButton
+                      confirmMessage={`Change this wallet's identity? It currently points at ${
+                        wallet.address ? truncateAddress(wallet.address) : "no address"
+                      } / ${wallet.circleWalletId ?? "no Circle id"} — whatever you've entered above will replace it.`}
+                      className="rounded-control border border-amber-300 bg-white px-4 py-2 text-sm font-medium text-amber-800 hover:border-amber-400"
+                      pendingText="Updating…"
+                    >
+                      Update identity
+                    </ConfirmSubmitButton>
+                  </form>
+                </details>
               </li>
             ))}
           </ul>
@@ -626,7 +662,7 @@ export default async function CapitalCirclePage({
 
         <details className="mt-3 rounded-card border border-border-subtle p-4">
           <summary className="cursor-pointer text-sm font-medium">Register a wallet</summary>
-          <form action={saveCapitalCircleWallet} className="mt-4 space-y-3">
+          <form action={registerCapitalCircleWallet} className="mt-4 space-y-3">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
                 <label className="block text-xs text-neutral-500">Circle wallet id</label>
@@ -655,12 +691,12 @@ export default async function CapitalCirclePage({
               <WalletCapField name="weeklyCapUsd" label="Weekly cap (USD)" defaultValue="" />
               <WalletCapField name="monthlyCapUsd" label="Monthly cap (USD)" defaultValue="" />
             </div>
-            <button
-              type="submit"
+            <SubmitButton
               className="rounded-control bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:opacity-90"
+              pendingText="Registering…"
             >
               Register wallet
-            </button>
+            </SubmitButton>
           </form>
         </details>
       </div>
