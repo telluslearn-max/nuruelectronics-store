@@ -1,15 +1,6 @@
 import "server-only";
 import QRCode from "qrcode";
-import { Chain } from "@polymarket/clob-client-v2";
-import { COLLATERAL_TOKEN_ADDRESS, isCircleWalletTestnet } from "./circle-wallet-client";
-
-/**
- * EIP-681 chain id, per its `@<chainId>` segment — must track which network the wallet is
- * actually on. Was hardcoded to Polygon mainnet regardless of isCircleWalletTestnet, which is
- * dormant today (mainnet is configured) but would have handed a mainnet-chain QR for a
- * testnet-only collateral token to anyone who flipped CAPITAL_CIRCLE_WALLET_NETWORK=testnet.
- */
-const CHAIN_ID = isCircleWalletTestnet ? Chain.AMOY : Chain.POLYGON;
+import { CAPITAL_CIRCLE_NETWORK, type CapitalCircleNetwork } from "./chain";
 
 /**
  * EIP-681 token-transfer URI — the same convention Circle's own CLI uses for `wallet fund
@@ -17,9 +8,17 @@ const CHAIN_ID = isCircleWalletTestnet ? Chain.AMOY : Chain.POLYGON;
  * pre-fill both the collateral token and the recipient address; wallets that don't just see an
  * address to scan and fall back to manual token/network selection. Amount is deliberately
  * omitted — deposit sizes vary, so this only ever pre-fills who and what, never how much.
+ *
+ * Pure and network-parameterized specifically so both mainnet and testnet output are directly
+ * testable — the env-bound singleton this used to read straight from can only ever reflect
+ * whichever network this process actually booted with.
  */
+export function buildUsdcDepositUri(walletAddress: string, network: CapitalCircleNetwork): string {
+  return `ethereum:${network.collateralTokenAddress}@${network.chainId}/transfer?address=${walletAddress}`;
+}
+
 export function usdcDepositUri(walletAddress: string): string {
-  return `ethereum:${COLLATERAL_TOKEN_ADDRESS}@${CHAIN_ID}/transfer?address=${walletAddress}`;
+  return buildUsdcDepositUri(walletAddress, CAPITAL_CIRCLE_NETWORK);
 }
 
 /** Server-rendered inline SVG — no client JS, no external request, safe to drop straight into a server component. */
