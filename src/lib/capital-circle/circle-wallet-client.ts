@@ -1,5 +1,6 @@
 import "server-only";
 import { initiateDeveloperControlledWalletsClient } from "@circle-fin/developer-controlled-wallets";
+import { Chain, getContractConfig } from "@polymarket/clob-client-v2";
 
 /**
  * Testnet mode is opt-in and separate from CAPITAL_CIRCLE_LIVE: it lets Phase A prove Circle's
@@ -102,6 +103,14 @@ export function getClobSigner(): PolymarketCompatibleSigner {
   };
 }
 
+/**
+ * UNVERIFIED RISK: matches on Circle's own `token.symbol === "USDC"`, not on
+ * COLLATERAL_TOKEN_ADDRESS. If the wallet's real balance is now in pUSD (see that constant's
+ * comment) and Circle's indexer reports it under a different symbol — or doesn't recognize it
+ * at all, being a token that's only ~4 months old — this silently returns 0 for a wallet that
+ * actually holds tradeable collateral. Needs checking against a live Circle API response for a
+ * wallet actually holding pUSD; cannot be confirmed by reading code alone.
+ */
 export async function getBalanceUsdc(): Promise<number> {
   const response = await getClient().getWalletTokenBalance({ id: walletId! });
   const usdcBalance = response.data?.tokenBalances?.find((b) => b.token.symbol === "USDC");
@@ -110,8 +119,20 @@ export async function getBalanceUsdc(): Promise<number> {
 
 export const circleWalletAddress = walletAddress ?? null;
 
-/** USDC's contract address on Polygon mainnet — from `circle contract address usdc --chain MATIC`, same constant used by wallet-qr.ts. */
-export const USDC_POLYGON_CONTRACT = "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359";
+/**
+ * The ERC-20 the Polymarket exchange actually settles orders in on the given chain — NOT
+ * necessarily USDC. Polymarket migrated their collateral from bridged USDC.e to their own pUSD
+ * token on April 28, 2026 (docs.polymarket.com/concepts/pusd); a wallet holding plain USDC has
+ * nothing the exchange will accept as collateral without going through Polymarket's separate
+ * CollateralOnramp `wrap()` step, which nothing in this codebase calls.
+ *
+ * Sourced from the CLOB SDK's own `getContractConfig()` — the same lookup `createOrder`/
+ * `createMarketOrder` use internally to pick an exchange contract — rather than a hardcoded
+ * literal, specifically so a future collateral migration doesn't require hunting down every
+ * copy of the address by hand again. Chain-aware: testnet (Amoy) and mainnet (Polygon) have
+ * historically been given different collateral addresses even when they happen to coincide today.
+ */
+export const COLLATERAL_TOKEN_ADDRESS = getContractConfig(isTestnet ? Chain.AMOY : Chain.POLYGON).collateral;
 
 export type WalletTransferResult = { id: string };
 
@@ -127,7 +148,7 @@ export async function transferUsdc(destinationAddress: string, amountUsdc: numbe
   // ("Cannot be used with walletId") — the chain is already fixed by which wallet walletId names.
   const response = await getClient().createTransaction({
     walletId: walletId!,
-    tokenAddress: USDC_POLYGON_CONTRACT,
+    tokenAddress: COLLATERAL_TOKEN_ADDRESS,
     amount: [amountUsdc.toString()],
     destinationAddress,
     fee: { type: "level", config: { feeLevel: "MEDIUM" } },
