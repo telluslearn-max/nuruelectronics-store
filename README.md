@@ -27,6 +27,7 @@ Built for the **Build with Gemini XPRIZE**.
 - [Getting started](#getting-started)
 - [Environment variables](#environment-variables)
 - [Deployment](#deployment)
+- [Operational pitfalls — read before debugging Capital Circle](#operational-pitfalls--read-before-debugging-capital-circle)
 - [Known limitations](#known-limitations)
 
 ## Why this shape
@@ -286,11 +287,49 @@ Open [http://localhost:3000](http://localhost:3000). Admin back office is at `/a
     --headers="Authorization=Bearer <CRON_SECRET>"
   ```
 
+## Operational pitfalls — read before debugging Capital Circle
+
+Every item below cost real time to diagnose once. Each is a case where the honest-looking evidence pointed the wrong way. Read this before concluding "the cron isn't running" or "the migration didn't apply."
+
+### You are probably not looking at Production's database
+
+Vercel's Neon integration provisions a **separate database branch per environment**. The `DATABASE_URL` in a local `.env.local` — even one that was `vercel env pull`'d — can point at a preview/dev branch, not Production, even though it has real-looking business data (Neon branches are created as a copy of the parent at branch time, so old orders and positions carry over and then diverge silently).
+
+This is *not* obvious from inspection: the wrong branch can have the right hostname pattern, real rows, and even receive schema migrations that appear to succeed — while Production, on its own branch, quietly does something else entirely. Symptoms that should make you suspect this rather than "the feature is broken":
+
+- A cron route returns a real, well-formed success response (e.g. a fresh `cycleId`), but querying for that exact ID in "your" database returns nothing.
+- The admin dashboard (served by the real app, against the real database) shows activity that never shows up no matter how you query the database you have credentials for.
+
+**The reliable check**: trigger the route in question and take the ID it returns (e.g. `cycleId` from `capital-circle-cycle`). Look that *exact* ID up in the database you're about to trust. If it's not there, stop — you are not looking at Production, and no migration, seed, or fix applied there is real until you find the right one. Comparing just the Neon endpoint id (the `ep-xxxxxxx` segment of the host, not the full credentialed URL) between your local file and Vercel's Production environment variable is enough to confirm a match or a mismatch without needing the password.
+
+### A GCP Cloud Scheduler job can report healthy while doing nothing
+
+If a job's `--uri` points at a host that redirects (e.g. the apex domain when the site canonicalizes to `www`), the job can fire on schedule, "succeed," and the target application never runs — Cloud Scheduler does not reliably follow redirects for HTTP targets. `gcloud scheduler jobs describe` is not sufficient to catch this: its cached `status` field can show empty (which reads as healthy) even when every execution has been a no-op for days.
+
+The only trustworthy check is the actual per-execution log, which records the real HTTP outcome:
+
+```bash
+gcloud logging read 'resource.type="cloud_scheduler_job" AND resource.labels.job_id="capital-circle-cycle"' \
+  --project=<project> --limit=5 --format=json
+```
+
+Look at `httpRequest.status` and `jsonPayload.debugInfo` (e.g. `"URL_CRAWLED. Original HTTP response code number = 200"`) for what the target actually returned — not just whether Scheduler considers the attempt complete. Before wiring a job to a URI, confirm it isn't a redirect: `curl -I <uri>` should return `200`, not `3xx`.
+
+Relatedly: `gcloud scheduler jobs create` fails safely with `ALREADY_EXISTS` if the job is already there — it will never silently overwrite a working config. To change an existing job's target (e.g. fixing a bad domain), use `gcloud scheduler jobs update http <name> --uri=...` instead. Don't copy-paste an old `create` snippet with a stale URI and switch it to `update` without checking the URI first.
+
+### Never let `CRON_SECRET` (or any bearer token) appear in a command you might paste or share
+
+`CRON_SECRET` authorizes every `/api/cron/*` route, including the ones that place trades. Any command that puts it inline — `--headers="Authorization=Bearer <secret>"`, a `curl -H` you're about to share for debugging — leaves it in shell history and in anything that reads that output. Prefer commands that describe config without dumping headers, e.g. `gcloud scheduler jobs describe <name> --format="value(httpTarget.uri, state)"`. **If it's ever displayed in a shared terminal or chat, treat it as compromised**: rotate it in Vercel's environment variables, then update the header on every scheduler job that uses it.
+
+### Migration history can diverge from what a given database branch actually has
+
+`prisma migrate status` reporting drift on a database with real data is not a green light for `prisma migrate dev` — that command's fix for drift is to offer a **reset**, which is destructive. If migrations are missing from history but their columns/tables/indexes already exist (checkable via `information_schema.columns`/`.tables`), the safe repair is `prisma migrate resolve --applied <migration_name>` for each one, confirmed individually against `information_schema` first — never assumed. Only after history is reconciled should `prisma migrate deploy` run for the genuinely new migration. This is exactly the sequence used to apply `20260820120000_add_capital_circle_intelligence` safely to a branch with pre-existing divergence.
+
 ## Known limitations
 
 Documented deliberately rather than glossed over:
 
-- **No automated test suite.** There's no Jest/Vitest/Playwright configured and no test files in the repo, despite several pieces of business-critical logic (the return/refund policy, position sizing) being written as pure, easily-testable functions specifically to make that gap cheap to close.
+- **Test coverage is partial.** Vitest covers the pure decision logic in `src/lib/capital-circle/` (edge gating, Kelly sizing, settlement math, calibration) — business-critical and specifically written as pure functions to make this cheap. Nothing else in the app has test coverage yet: no integration tests against the database, no route tests, no coverage for the return/refund policy or other ERP logic.
 - **One scheduled cron entry currently has no implementation.** `vercel.json` schedules `/api/cron/whatsapp-review-followup` daily, but no route file exists at that path — that entry 404s on every fire until either the route is built or the schedule entry is removed.
 - **Capital Circle's webhook path is unverified against a real payload.** Circle can't deliver webhooks to a localhost endpoint, so the signature-verification and pre-fill logic have been reviewed and unit-reasoned through but not exercised against a live notification.
 - **The concierge's per-IP rate limiter is approximate under concurrency** — it does a count-then-insert without row locking, which is an accepted tradeoff for a cost guardrail on an unauthenticated endpoint, not a guarantee.
