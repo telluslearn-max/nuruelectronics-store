@@ -170,6 +170,7 @@ Postgres via Prisma, 31 models across seven groups (`prisma/schema.prisma`):
 | `/api/cron/profit-sweep` | Mondays 05:00 UTC | Vercel Cron | Computes last week's Capital Circle profit sweep, emails it for confirmation |
 | `/api/cron/product-readiness` | daily 08:00 UTC | GCP Cloud Scheduler | Flags active Shopify products missing an image, real price, real description, or SEO fields |
 | `/api/cron/capital-circle-cycle` | hourly | GCP Cloud Scheduler (redundant with Vercel Cron on some deployments) | Runs the research → sizing → execution trading cycle, guarded by a Postgres advisory lock |
+| `/api/cron/capital-circle-settle` | every minute | GCP Cloud Scheduler | Settlement only (no Gemini call) — checks open positions against Polymarket and scores win/loss as soon as a market closes, instead of waiting for the next hourly cycle |
 
 Every cron route shares one auth pattern: a `CRON_SECRET` bearer token, compared in constant time, 401 on mismatch. See [Known limitations](#known-limitations) for one scheduled entry that currently has no implementation behind it.
 
@@ -249,13 +250,24 @@ Open [http://localhost:3000](http://localhost:3000). Admin back office is at `/a
 
 - **Vercel** builds and hosts the app. `npm run build` runs `prisma migrate deploy && prisma db seed && next build` — every deploy applies pending migrations and re-seeds fixed reference data (chart of accounts, etc.) before building.
 - **Vercel Cron** (`vercel.json`) drives `sync-pnl`, `invoice-reminders`, `sync-product-embeddings`, and `profit-sweep` automatically — no setup beyond having `CRON_SECRET` set.
-- **GCP Cloud Scheduler** drives `product-readiness` and (redundantly, alongside Vercel Cron on some deployments) `capital-circle-cycle`, since these were deliberately kept off `vercel.json`. Creating a job needs the Cloud Scheduler API enabled on the target project and a job pointed at the route with the same `CRON_SECRET` as an `Authorization: Bearer` header, e.g.:
+- **GCP Cloud Scheduler** drives `product-readiness`, `capital-circle-cycle` (redundantly, alongside Vercel Cron on some deployments), and `capital-circle-settle`, since these were deliberately kept off `vercel.json`. Creating a job needs the Cloud Scheduler API enabled on the target project and a job pointed at the route with the same `CRON_SECRET` as an `Authorization: Bearer` header, e.g.:
 
   ```bash
   gcloud scheduler jobs create http product-readiness \
     --location=us-central1 \
     --schedule="0 8 * * *" \
     --uri="https://<your-domain>/api/cron/product-readiness" \
+    --http-method=GET \
+    --headers="Authorization=Bearer <CRON_SECRET>"
+  ```
+
+  `capital-circle-settle` is the same shape but on a 1-minute schedule (Cloud Scheduler's finest cron granularity) — it's cheap since it never calls Gemini, just Polymarket's public API and a DB write per resolved position:
+
+  ```bash
+  gcloud scheduler jobs create http capital-circle-settle \
+    --location=us-central1 \
+    --schedule="* * * * *" \
+    --uri="https://<your-domain>/api/cron/capital-circle-settle" \
     --http-method=GET \
     --headers="Authorization=Bearer <CRON_SECRET>"
   ```
