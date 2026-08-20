@@ -12,6 +12,10 @@ export type CapitalCircleReportPosition = {
   status: string;
   txHash: string | null;
   createdAt: Date;
+  entryPrice: number | null;
+  confidencePct: number | null;
+  resultUsd: number | null;
+  resolvedAt: Date | null;
 };
 
 export type CapitalCircleReport = {
@@ -19,6 +23,18 @@ export type CapitalCircleReport = {
   positions: CapitalCircleReportPosition[];
   totalSimulatedUsd: number;
   totalExecutedUsd: number;
+  /** Sum of resultUsd across every settled position in this page — the top-line "did the desk
+   * actually make money" number, distinct from totalSimulatedUsd/totalExecutedUsd (which are
+   * capital staked, not profit). Positive is net winning, negative is net losing. */
+  totalRealizedPnlUsd: number;
+  resolvedCount: number;
+  /** Same realized P&L, split by status — simulated P&L is still real (real markets, real prices,
+   * just no real money), so it's shown alongside the simulated total the same way executed P&L is
+   * shown alongside the executed total, rather than only appearing in the blended figure above. */
+  simulatedPnlUsd: number;
+  simulatedResolvedCount: number;
+  executedPnlUsd: number;
+  executedResolvedCount: number;
 };
 
 /** The week's decisions — this is the report /admin/reports/capital-circle renders. */
@@ -30,14 +46,39 @@ export async function getCapitalCircleReport(limit = 50): Promise<CapitalCircleR
 
   let totalSimulatedUsd = 0;
   let totalExecutedUsd = 0;
+  let totalRealizedPnlUsd = 0;
+  let resolvedCount = 0;
+  let simulatedPnlUsd = 0;
+  let simulatedResolvedCount = 0;
+  let executedPnlUsd = 0;
+  let executedResolvedCount = 0;
   for (const p of positions) {
     const size = Number(p.sizeUsd);
     if (p.status === "simulated") totalSimulatedUsd += size;
     if (p.status === "executed") totalExecutedUsd += size;
+    if (p.resolvedAt && p.resultUsd != null) {
+      const resultUsd = Number(p.resultUsd);
+      totalRealizedPnlUsd += resultUsd;
+      resolvedCount++;
+      if (p.status === "simulated") {
+        simulatedPnlUsd += resultUsd;
+        simulatedResolvedCount++;
+      }
+      if (p.status === "executed") {
+        executedPnlUsd += resultUsd;
+        executedResolvedCount++;
+      }
+    }
   }
 
   return {
     live: CAPITAL_CIRCLE_LIVE && isCircleWalletConfigured,
+    totalRealizedPnlUsd,
+    resolvedCount,
+    simulatedPnlUsd,
+    simulatedResolvedCount,
+    executedPnlUsd,
+    executedResolvedCount,
     positions: positions.map((p) => ({
       id: p.id,
       question: p.question,
@@ -46,6 +87,10 @@ export async function getCapitalCircleReport(limit = 50): Promise<CapitalCircleR
       status: p.status,
       txHash: p.txHash,
       createdAt: p.createdAt,
+      entryPrice: p.entryPrice != null ? Number(p.entryPrice) : null,
+      confidencePct: p.confidencePct,
+      resultUsd: p.resultUsd != null ? Number(p.resultUsd) : null,
+      resolvedAt: p.resolvedAt,
     })),
     totalSimulatedUsd,
     totalExecutedUsd,

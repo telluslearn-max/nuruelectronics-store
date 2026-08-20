@@ -10,6 +10,7 @@ import { isCircleWalletWithdrawConfigured, CIRCLE_WALLET_WITHDRAW_CAP_USDC } fro
 import { walletDepositQrSvg } from "@/lib/capital-circle/wallet-qr";
 import { formatPrice } from "@/lib/format";
 import { FeedbackBanner } from "@/components/admin/feedback-banner";
+import { PushSubscribeButton } from "@/components/admin/push-subscribe-button";
 
 export const metadata: Metadata = { title: "Capital Circle" };
 
@@ -34,6 +35,64 @@ function StatusPill({ status }: { status: string }) {
     <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_STYLES[status] ?? "bg-neutral-100 text-neutral-600"}`}>
       {status}
     </span>
+  );
+}
+
+/** Won (green) / lost (red) once a position has settled — resultUsd's sign is the source of
+ * truth, matching the settlement math in settlement.ts (shares * finalPrice - sizeUsd). */
+function ResultBadge({ resultUsd }: { resultUsd: number }) {
+  const won = resultUsd >= 0;
+  return (
+    <span
+      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium tabular-nums ${
+        won ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"
+      }`}
+    >
+      {won ? "+" : "-"}
+      {formatPrice(Math.abs(resultUsd).toFixed(2), "USD")}
+    </span>
+  );
+}
+
+/** The small "+$25.00 realized (2 settled)" line under a stat-card total — omitted entirely when
+ * nothing in that bucket has settled yet, since "+$0.00" would misleadingly read as "broke even"
+ * rather than "nothing to report." */
+function PnlLine({ pnlUsd, resolvedCount }: { pnlUsd: number; resolvedCount: number }) {
+  if (resolvedCount === 0) return null;
+  return (
+    <div className={`mt-1 text-sm font-medium tabular-nums ${pnlUsd >= 0 ? "text-green-700" : "text-red-700"}`}>
+      {pnlUsd >= 0 ? "+" : "-"}
+      {formatPrice(Math.abs(pnlUsd).toFixed(2), "USD")} realized ({resolvedCount} settled)
+    </div>
+  );
+}
+
+/** Ongoing/unresolved position — not yet a win or a loss, distinct from both. */
+function LiveBadge() {
+  return (
+    <span className="inline-flex items-center rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-700">
+      live
+    </span>
+  );
+}
+
+/** Left-edge accent color for a position card — green/red/amber mirror the badges, so the whole
+ * card reads as won/lost/live at a glance while scanning a long list, not just its small badge. */
+function positionAccentClass(p: { status: string; resolvedAt: Date | null; resultUsd: number | null }): string {
+  if (p.status === "rejected") return "border-l-neutral-200";
+  if (p.resolvedAt && p.resultUsd != null) return p.resultUsd >= 0 ? "border-l-green-400" : "border-l-red-400";
+  return "border-l-amber-400";
+}
+
+/** One cell of a position's Wagered/Odds/To win/Confidence mini-grid — label-over-value instead
+ * of the inline "Label value" pairs this used to be, which stopped scanning well once a fourth
+ * field (Confidence) got added to what was already a wrapping row of small text. */
+function PositionStat({ label, value, valueClassName }: { label: string; value: string; valueClassName?: string }) {
+  return (
+    <div>
+      <div className="text-[11px] uppercase tracking-wide text-neutral-400">{label}</div>
+      <div className={`mt-0.5 text-sm font-medium tabular-nums ${valueClassName ?? "text-neutral-700"}`}>{value}</div>
+    </div>
   );
 }
 
@@ -80,7 +139,7 @@ export default async function CapitalCirclePage({
       <FeedbackBanner success={success} error={error} />
       <p className="mt-2 max-w-2xl text-neutral-500">
         The firewalled, USDC-funded pool that hunts for profit outside electronics retail — a Researcher / Risk-Sizing /
-        Executor desk running hourly against real, live Polymarket markets resolving in the next 2 hours. Every decision
+        Executor desk running hourly against real, live Polymarket markets resolving in the next 24 hours. Every decision
         here is logged to the audit log before anything (real or simulated) is recorded.
       </p>
 
@@ -95,15 +154,83 @@ export default async function CapitalCirclePage({
           : "Simulation mode — no Circle wallet configured yet. Real markets, real reasoning, no real funds."}
       </div>
 
-      <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <PushSubscribeButton />
+
+      <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className="rounded-card border border-border-subtle p-4">
-          <div className="text-xs text-neutral-500">Simulated (would-execute) total</div>
+          <div className="text-xs text-neutral-500">Simulated bets — wagered</div>
           <div className="mt-1 text-2xl font-medium tabular-nums">{formatPrice(report.totalSimulatedUsd.toFixed(2), "USD")}</div>
+          <p className="mt-1 text-xs text-neutral-400">Play money — no wallet involved</p>
+          <PnlLine pnlUsd={report.simulatedPnlUsd} resolvedCount={report.simulatedResolvedCount} />
         </div>
         <div className="rounded-card border border-border-subtle p-4">
-          <div className="text-xs text-neutral-500">Executed (real) total</div>
+          <div className="text-xs text-neutral-500">Real account — wagered</div>
           <div className="mt-1 text-2xl font-medium tabular-nums">{formatPrice(report.totalExecutedUsd.toFixed(2), "USD")}</div>
+          <p className="mt-1 text-xs text-neutral-400">Actual USDC from the Circle wallet</p>
+          <PnlLine pnlUsd={report.executedPnlUsd} resolvedCount={report.executedResolvedCount} />
         </div>
+        <div className="rounded-card border border-border-subtle p-4">
+          <div className="text-xs text-neutral-500">Combined P&amp;L ({report.resolvedCount} settled)</div>
+          <div
+            className={`mt-1 text-2xl font-medium tabular-nums ${
+              report.resolvedCount === 0 ? "" : report.totalRealizedPnlUsd >= 0 ? "text-green-700" : "text-red-700"
+            }`}
+          >
+            {report.resolvedCount > 0 && (report.totalRealizedPnlUsd >= 0 ? "+" : "-")}
+            {formatPrice(Math.abs(report.totalRealizedPnlUsd).toFixed(2), "USD")}
+          </div>
+          <p className="mt-1 text-xs text-neutral-400">Simulated + real together — see the two cards above to split them</p>
+        </div>
+      </div>
+
+      <div className="mt-8">
+        <h3 className="text-xs font-medium uppercase tracking-wide text-neutral-400">Positions</h3>
+        {report.positions.length === 0 ? (
+          <p className="mt-3 text-sm text-neutral-500">
+            No cycles have run yet. The cron hits <code className="rounded bg-neutral-100 px-1 py-0.5">/api/cron/capital-circle-cycle</code>{" "}
+            every hour — trigger it manually with the <code className="rounded bg-neutral-100 px-1 py-0.5">CRON_SECRET</code> bearer token to see one now.
+          </p>
+        ) : (
+          <ul className="mt-3 space-y-3">
+            {report.positions.map((p) => (
+              <li
+                key={p.id}
+                className={`rounded-card border border-l-4 border-border-subtle p-4 ${positionAccentClass(p)}`}
+              >
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="font-medium">{p.question}</div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <StatusPill status={p.status} />
+                    {p.status !== "rejected" &&
+                      (p.resolvedAt && p.resultUsd != null ? <ResultBadge resultUsd={p.resultUsd} /> : <LiveBadge />)}
+                  </div>
+                </div>
+                <p className="mt-2 text-sm text-neutral-600">{p.thesis}</p>
+
+                <div className="mt-4 grid grid-cols-2 gap-3 border-t border-border-subtle pt-3 sm:grid-cols-4">
+                  <PositionStat label="Wagered" value={formatPrice(p.sizeUsd.toFixed(2), "USD")} />
+                  {p.entryPrice != null && <PositionStat label="Odds" value={`${Math.round(p.entryPrice * 100)}%`} />}
+                  {p.entryPrice != null && !p.resolvedAt && (
+                    <PositionStat
+                      label="To win"
+                      value={formatPrice(((p.sizeUsd * (1 - p.entryPrice)) / p.entryPrice).toFixed(2), "USD")}
+                      valueClassName="text-green-700"
+                    />
+                  )}
+                  {p.confidencePct != null && <PositionStat label="Confidence" value={`${p.confidencePct}%`} />}
+                </div>
+
+                <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-neutral-400">
+                  <span>{p.createdAt.toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })}</span>
+                  {p.resolvedAt && (
+                    <span>resolved {p.resolvedAt.toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })}</span>
+                  )}
+                  {p.txHash && <span className="font-mono">{p.txHash}</span>}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
 
       <div className="mt-8">
@@ -359,33 +486,6 @@ export default async function CapitalCirclePage({
                     Confirm sweep
                   </button>
                 </form>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-
-      <div className="mt-8">
-        <h3 className="text-xs font-medium uppercase tracking-wide text-neutral-400">Positions</h3>
-        {report.positions.length === 0 ? (
-          <p className="mt-3 text-sm text-neutral-500">
-            No cycles have run yet. The cron hits <code className="rounded bg-neutral-100 px-1 py-0.5">/api/cron/capital-circle-cycle</code>{" "}
-            every hour — trigger it manually with the <code className="rounded bg-neutral-100 px-1 py-0.5">CRON_SECRET</code> bearer token to see one now.
-          </p>
-        ) : (
-          <ul className="mt-3 space-y-3">
-            {report.positions.map((p) => (
-              <li key={p.id} className="rounded-card border border-border-subtle p-4">
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div className="font-medium">{p.question}</div>
-                  <StatusPill status={p.status} />
-                </div>
-                <p className="mt-2 text-sm text-neutral-600">{p.thesis}</p>
-                <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-neutral-500">
-                  <span className="tabular-nums">{formatPrice(p.sizeUsd.toFixed(2), "USD")}</span>
-                  <span>{p.createdAt.toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })}</span>
-                  {p.txHash && <span className="font-mono">{p.txHash}</span>}
-                </div>
               </li>
             ))}
           </ul>

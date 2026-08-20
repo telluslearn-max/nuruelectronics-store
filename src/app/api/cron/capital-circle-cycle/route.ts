@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { runCapitalCircleCycle } from "@/lib/capital-circle/agent-loop";
+import { settleResolvedPositions } from "@/lib/capital-circle/settlement";
 import { sendCapitalCircleCycleEmail } from "@/lib/email";
 import { constantTimeEqual } from "@/lib/admin-session-token";
 import { prisma } from "@/lib/prisma";
@@ -46,6 +47,18 @@ async function runCycleWithLock(): Promise<Awaited<ReturnType<typeof runCapitalC
 
 export async function GET(request: Request) {
   if (!isAuthorized(request)) return new Response("Unauthorized", { status: 401 });
+
+  // Independent of the research/trading cycle below — a settlement lookup failure (a flaky
+  // Gamma API call, say) must never block this hour's trade, and vice versa. No advisory lock:
+  // each row only ever moves from resolvedAt=null to set once, so an overlapping run is at worst
+  // redundant, never corrupting.
+  try {
+    const settlement = await settleResolvedPositions();
+    console.log("[cron:capital-circle-cycle] settlement", settlement);
+  } catch (error) {
+    console.error("[cron:capital-circle-cycle] settlement failed:", error);
+  }
+
   try {
     const result = await runCycleWithLock();
     console.log("[cron:capital-circle-cycle]", result);
