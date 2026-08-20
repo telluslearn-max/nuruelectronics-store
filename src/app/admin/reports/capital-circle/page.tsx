@@ -8,23 +8,11 @@ import {
   type CapitalCircleIntelligenceReport,
 } from "@/lib/reports/capital-circle";
 import { confirmSweep } from "@/lib/capital-circle/sweep-actions";
-import {
-  clearCapitalCirclePause,
-  registerCapitalCircleWallet,
-  saveCapitalCircleWalletCaps,
-  updateCapitalCircleWalletIdentity,
-} from "@/lib/capital-circle/wallet-actions";
-import { depositFromBinance } from "@/lib/capital-circle/binance-actions";
-import { isBinanceConfigured, BINANCE_WITHDRAW_CAP_USDC } from "@/lib/capital-circle/binance-client";
-import { withdrawFromCircleWallet } from "@/lib/capital-circle/circle-withdraw-actions";
-import { isCircleWalletWithdrawConfigured, CIRCLE_WALLET_WITHDRAW_CAP_USDC } from "@/lib/capital-circle/circle-wallet-withdraw";
-import { walletDepositQrSvg } from "@/lib/capital-circle/wallet-qr";
-import { truncateAddress } from "@/lib/capital-circle/wallet-identity";
+import { clearCapitalCirclePause } from "@/lib/capital-circle/wallet-actions";
 import { formatPrice } from "@/lib/format";
 import { FeedbackBanner } from "@/components/admin/feedback-banner";
 import { PushSubscribeButton } from "@/components/admin/push-subscribe-button";
-import { SubmitButton } from "@/components/admin/submit-button";
-import { ConfirmSubmitButton } from "@/components/admin/confirm-submit-button";
+import { WalletSection } from "./wallet-section";
 
 export const metadata: Metadata = { title: "Capital Circle" };
 
@@ -37,15 +25,6 @@ const STATUS_STYLES: Record<string, string> = {
   edge_rejected: "bg-amber-50 text-amber-700",
   exited: "bg-blue-50 text-blue-700",
 };
-
-const WALLET_STATUS_STYLES: Record<string, string> = {
-  pending: "bg-neutral-100 text-neutral-600",
-  active: "bg-green-50 text-green-700",
-  frozen: "bg-red-50 text-red-700",
-};
-
-const inputClass =
-  "w-full rounded-control border border-border-subtle px-3 py-2 text-sm outline-none focus:border-foreground";
 
 function StatusPill({ status }: { status: string }) {
   return (
@@ -327,23 +306,6 @@ function IntelligenceSection({ report, pausedWalletId }: { report: CapitalCircle
   );
 }
 
-function WalletStatusPill({ status }: { status: string }) {
-  return (
-    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${WALLET_STATUS_STYLES[status] ?? "bg-neutral-100 text-neutral-600"}`}>
-      {status}
-    </span>
-  );
-}
-
-function WalletCapField({ name, label, defaultValue }: { name: string; label: string; defaultValue: string }) {
-  return (
-    <div>
-      <label className="block text-xs text-neutral-500">{label}</label>
-      <input type="number" name={name} step="0.01" min="0" defaultValue={defaultValue} className={inputClass} />
-    </div>
-  );
-}
-
 export default async function CapitalCirclePage({
   searchParams,
 }: {
@@ -357,13 +319,6 @@ export default async function CapitalCirclePage({
     getCapitalCircleIntelligenceReport(),
   ]);
   const { success, error } = await searchParams;
-  const depositQrByWalletId = Object.fromEntries(
-    await Promise.all(
-      wallets
-        .filter((wallet) => wallet.address)
-        .map(async (wallet) => [wallet.id, await walletDepositQrSvg(wallet.address!)] as const),
-    ),
-  );
 
   return (
     <div>
@@ -472,239 +427,12 @@ export default async function CapitalCirclePage({
         )}
       </div>
 
-      <div className="mt-8">
-        <h3 className="text-xs font-medium uppercase tracking-wide text-neutral-400">Wallet</h3>
-        <p className="mt-2 max-w-2xl text-sm text-neutral-500">
-          This never sets anything on Circle's side — it only records what's already true there. Provision the real
-          wallet with <code className="rounded bg-neutral-100 px-1 py-0.5">scripts/circle-wallet-setup.mjs</code>{" "}
-          and set its spending-policy caps directly on Circle (mainnet-only, requires their email OTP to change),
-          then mirror those same numbers here so sizing agrees with the real wallet limit instead of falling back to
-          the code-level default.
-        </p>
-
-        {wallets.length > 0 && (
-          <ul className="mt-3 space-y-3">
-            {wallets.map((wallet) => (
-              <li key={wallet.id} className="rounded-card border border-border-subtle p-4">
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div className="font-mono text-sm">{wallet.circleWalletId ?? wallet.id}</div>
-                  <WalletStatusPill status={wallet.status} />
-                </div>
-                {wallet.address && (
-                  <div className="mt-3 flex flex-wrap items-start gap-4">
-                    <div
-                      className="shrink-0 rounded-control border border-border-subtle bg-white p-2"
-                      dangerouslySetInnerHTML={{ __html: depositQrByWalletId[wallet.id] }}
-                    />
-                    <div className="min-w-0">
-                      <div className="text-xs font-medium text-neutral-500">Scan to deposit (Polygon)</div>
-                      <p className="mt-1 max-w-xs text-xs text-neutral-500">
-                        Pre-fills Polymarket&apos;s current collateral token and this address in wallets that support
-                        EIP-681 (MetaMask, Trust Wallet). This is <strong>not always plain USDC</strong> — Polymarket
-                        changed collateral tokens once already (to pUSD, April 2026) and can again; trust what the QR
-                        pre-fills over the word &quot;USDC&quot; anywhere else on this page. Always double-check the
-                        network is Polygon before sending.
-                      </p>
-                      <p className="mt-2 break-all font-mono text-xs text-neutral-500">{wallet.address}</p>
-                    </div>
-                  </div>
-                )}
-                <form action={saveCapitalCircleWalletCaps} className="mt-3 space-y-3">
-                  <input type="hidden" name="walletId" value={wallet.id} />
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <div>
-                      <label className="block text-xs text-neutral-500">Status</label>
-                      <select name="status" defaultValue={wallet.status} className={inputClass}>
-                        <option value="pending">pending</option>
-                        <option value="active">active</option>
-                        <option value="frozen">frozen</option>
-                      </select>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                    <WalletCapField name="perTxCapUsd" label="Per-tx cap (USD)" defaultValue={wallet.perTxCapUsd?.toFixed(2) ?? ""} />
-                    <WalletCapField name="dailyCapUsd" label="Daily cap (USD)" defaultValue={wallet.dailyCapUsd?.toFixed(2) ?? ""} />
-                    <WalletCapField name="weeklyCapUsd" label="Weekly cap (USD)" defaultValue={wallet.weeklyCapUsd?.toFixed(2) ?? ""} />
-                    <WalletCapField name="monthlyCapUsd" label="Monthly cap (USD)" defaultValue={wallet.monthlyCapUsd?.toFixed(2) ?? ""} />
-                  </div>
-                  <SubmitButton
-                    className="rounded-control border border-border-subtle px-4 py-2 text-sm font-medium hover:border-foreground"
-                    pendingText="Saving…"
-                  >
-                    Save
-                  </SubmitButton>
-                </form>
-
-                <details className="mt-3 rounded-control border border-amber-200 bg-amber-50 p-3">
-                  <summary className="cursor-pointer text-xs font-medium text-amber-800">Change wallet identity</summary>
-                  <p className="mt-2 text-xs text-amber-800">
-                    This is how the pool receives money — changing it points every future deposit instruction and
-                    on-chain withdrawal at a different address. Blanking a field that already has a value is refused;
-                    to replace it you must enter a real new value and confirm below.
-                  </p>
-                  <form action={updateCapitalCircleWalletIdentity} className="mt-3 space-y-3">
-                    <input type="hidden" name="walletId" value={wallet.id} />
-                    <input type="hidden" name="seenUpdatedAt" value={wallet.updatedAtMs} />
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                      <div>
-                        <label className="block text-xs text-neutral-500">Circle wallet id</label>
-                        <input type="text" name="circleWalletId" defaultValue={wallet.circleWalletId ?? ""} className={inputClass} />
-                      </div>
-                      <div>
-                        <label className="block text-xs text-neutral-500">Address</label>
-                        <input type="text" name="address" defaultValue={wallet.address ?? ""} className={inputClass} />
-                      </div>
-                      <div>
-                        <label className="block text-xs text-neutral-500">Chain</label>
-                        <input type="text" name="chain" defaultValue={wallet.chain} className={inputClass} />
-                      </div>
-                    </div>
-                    <label className="flex items-center gap-2 text-xs text-amber-800">
-                      <input type="checkbox" name="confirmReplace" />I mean to replace the current identity, not just fix a typo
-                      elsewhere.
-                    </label>
-                    <ConfirmSubmitButton
-                      confirmMessage={`Change this wallet's identity? It currently points at ${
-                        wallet.address ? truncateAddress(wallet.address) : "no address"
-                      } / ${wallet.circleWalletId ?? "no Circle id"} — whatever you've entered above will replace it.`}
-                      className="rounded-control border border-amber-300 bg-white px-4 py-2 text-sm font-medium text-amber-800 hover:border-amber-400"
-                      pendingText="Updating…"
-                    >
-                      Update identity
-                    </ConfirmSubmitButton>
-                  </form>
-                </details>
-              </li>
-            ))}
-          </ul>
-        )}
-
-        <div className="mt-3 rounded-card border border-border-subtle p-4">
-          <h4 className="text-sm font-medium">Deposit from Binance</h4>
-          {isBinanceConfigured ? (
-            <>
-              <p className="mt-2 max-w-2xl text-sm text-neutral-500">
-                Pulls USDC from Binance straight to the wallet address above. Capped at{" "}
-                <span className="font-medium">{formatPrice(BINANCE_WITHDRAW_CAP_USDC.toFixed(2), "USD")}</span> per
-                request regardless of what the Binance API key itself allows — pair this with an
-                address-whitelisted, IP-restricted key on Binance's side.
-              </p>
-              <form action={depositFromBinance} className="mt-3 flex flex-wrap items-end gap-3">
-                <div>
-                  <label className="block text-xs text-neutral-500">Amount (USDC)</label>
-                  <input
-                    type="number"
-                    name="amountUsdc"
-                    step="0.01"
-                    min="0.01"
-                    max={BINANCE_WITHDRAW_CAP_USDC}
-                    required
-                    className="w-40 rounded-control border border-border-subtle px-3 py-2 text-sm outline-none focus:border-foreground"
-                  />
-                </div>
-                <button
-                  type="submit"
-                  className="rounded-control bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:opacity-90"
-                >
-                  Deposit
-                </button>
-              </form>
-            </>
-          ) : (
-            <p className="mt-2 max-w-2xl text-sm text-neutral-500">
-              Not configured — set <code className="rounded bg-neutral-100 px-1 py-0.5">BINANCE_API_KEY</code> and{" "}
-              <code className="rounded bg-neutral-100 px-1 py-0.5">BINANCE_API_SECRET</code> to enable. Generate the
-              key in Binance's own dashboard with withdrawals restricted to this wallet's address and this server's
-              IP — never paste the secret anywhere but <code className="rounded bg-neutral-100 px-1 py-0.5">.env.local</code>.
-            </p>
-          )}
-        </div>
-
-        <div className="mt-3 rounded-card border border-border-subtle p-4">
-          <h4 className="text-sm font-medium">Withdraw to Binance</h4>
-          {isCircleWalletWithdrawConfigured ? (
-            <>
-              <p className="mt-2 max-w-2xl text-sm text-neutral-500">
-                Pushes USDC from the Capital Circle wallet to your Binance deposit address. Capped at{" "}
-                <span className="font-medium">{formatPrice(CIRCLE_WALLET_WITHDRAW_CAP_USDC.toFixed(2), "USD")}</span>{" "}
-                per request, and checked against the wallet's actual balance before submitting — this is the only
-                way funds leave the wallet outside of live Polymarket trading.
-              </p>
-              <form action={withdrawFromCircleWallet} className="mt-3 flex flex-wrap items-end gap-3">
-                <div>
-                  <label className="block text-xs text-neutral-500">Amount (USDC)</label>
-                  <input
-                    type="number"
-                    name="amountUsdc"
-                    step="0.01"
-                    min="0.01"
-                    max={CIRCLE_WALLET_WITHDRAW_CAP_USDC}
-                    required
-                    className="w-40 rounded-control border border-border-subtle px-3 py-2 text-sm outline-none focus:border-foreground"
-                  />
-                </div>
-                <button
-                  type="submit"
-                  className="rounded-control bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:opacity-90"
-                >
-                  Withdraw
-                </button>
-              </form>
-            </>
-          ) : (
-            <p className="mt-2 max-w-2xl text-sm text-neutral-500">
-              Not configured — set <code className="rounded bg-neutral-100 px-1 py-0.5">BINANCE_DEPOSIT_ADDRESS</code>{" "}
-              to your Binance USDC-on-Polygon deposit address to enable. This is the only destination this
-              withdrawal path will ever send to.
-            </p>
-          )}
-        </div>
-
-        <details className="mt-3 rounded-card border border-border-subtle p-4">
-          <summary className="cursor-pointer text-sm font-medium">Register a wallet</summary>
-          <form action={registerCapitalCircleWallet} className="mt-4 space-y-3">
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <div>
-                <label className="block text-xs text-neutral-500">Circle wallet id</label>
-                <input type="text" name="circleWalletId" placeholder="from circle-wallet-setup.mjs" className={inputClass} />
-              </div>
-              <div>
-                <label className="block text-xs text-neutral-500">Address</label>
-                <input type="text" name="address" placeholder="0x…" className={inputClass} />
-              </div>
-              <div>
-                <label className="block text-xs text-neutral-500">Chain</label>
-                <input type="text" name="chain" defaultValue="polygon" className={inputClass} />
-              </div>
-              <div>
-                <label className="block text-xs text-neutral-500">Status</label>
-                <select name="status" defaultValue="pending" className={inputClass}>
-                  <option value="pending">pending</option>
-                  <option value="active">active</option>
-                  <option value="frozen">frozen</option>
-                </select>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <WalletCapField name="perTxCapUsd" label="Per-tx cap (USD)" defaultValue="" />
-              <WalletCapField name="dailyCapUsd" label="Daily cap (USD)" defaultValue="" />
-              <WalletCapField name="weeklyCapUsd" label="Weekly cap (USD)" defaultValue="" />
-              <WalletCapField name="monthlyCapUsd" label="Monthly cap (USD)" defaultValue="" />
-            </div>
-            <SubmitButton
-              className="rounded-control bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:opacity-90"
-              pendingText="Registering…"
-            >
-              Register wallet
-            </SubmitButton>
-          </form>
-        </details>
-      </div>
+      <WalletSection wallets={wallets} />
 
       <div className="mt-8">
         <h3 className="text-xs font-medium uppercase tracking-wide text-neutral-400">Pending Sweeps</h3>
         <p className="mt-2 max-w-2xl text-sm text-neutral-500">
-          Each week's proposed 40% profit split. Convert it to USDC yourself (Circle Mint or an exchange), send it to
+          Each week&apos;s proposed 40% profit split. Convert it to USDC yourself (Circle Mint or an exchange), send it to
           the wallet, then confirm the amount actually received below — nothing here moves money automatically.
         </p>
         {pendingSweeps.length === 0 ? (
