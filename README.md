@@ -102,23 +102,37 @@ Shopify is the system of record for the catalog and orders; Postgres (via Prisma
 
 ```mermaid
 flowchart LR
-    R["Researcher<br/>find a falsifiable thesis,<br/>market resolving ≤2h"] -->|proposes size| S["Risk/Sizing<br/>caps against wallet's<br/>per-tx/daily/weekly/monthly limits"]
-    S -->|approved amount only| E["Executor<br/>re-derives size itself —<br/>never trusts the caller"]
-    E -->|only if LIVE + configured + mainnet| W[(Circle USDC Wallet)]
+    A["Screen (code)<br/>liquidity, volume, spread,<br/>price band, horizon mix"] --> B["Ground<br/>one grounded search pass<br/>for recent news"]
+    B --> C["Score (model ×3)<br/>price the WHOLE slate,<br/>take the median"]
+    C --> D["Select (code)<br/>edge vs the ask, shrunk<br/>by measured calibration"]
+    D --> E["Verify (model)<br/>order book + price history;<br/>may veto, cannot add"]
+    E --> F["Execute<br/>re-prices, re-gates,<br/>Kelly-sizes"]
+    F -->|only if LIVE + configured + mainnet| W[(Circle USDC Wallet)]
     W --> P[Polymarket CLOB<br/>Fill-Or-Kill market order]
 ```
 
-One hourly Gemini tool-calling cycle (`src/lib/capital-circle/agent-loop.ts`) plays all three roles against a fixed prompt (no chat history — "there's no shopper on the other end"):
+One hourly pipeline (`src/lib/capital-circle/agent-loop.ts`). The organising principle is that **the model estimates probabilities and code decides what to trade** — the two were fused in an earlier design, and an estimate formed while looking for a reason to trade is not an estimate.
 
-- **Research** (`research-tool.ts` / `polymarket-client.ts`): queries Polymarket's public Gamma API directly (not the CLOB's own market-listing call, which can't filter by resolution time) for markets resolving within a 24-hour window, and must find a falsifiable thesis — inventing markets or prices is explicitly forbidden, and the closing summary must name every market actually returned, including ones passed on, guarding against a documented past incident where the model claimed no eligible markets existed when the log showed otherwise.
-- **Sizing** (`sizing-tool.ts`): caps the requested amount against a $25 default per-position cap (or the wallet's own configured cap), then against daily/weekly/monthly velocity computed from actually-executed positions. Returns an *approved* amount that is never higher than requested, often lower.
-- **Execution** (`executor-tool.ts`): the only tool with wallet-signing authority, and it **re-derives** the approved size by calling the sizing tool itself rather than trusting whatever the model passes in — closing a prompt-injection path where a compromised or confused model could otherwise record more than the wallet's caps allow. Live trading requires all three of `CAPITAL_CIRCLE_LIVE=true`, a fully configured Circle wallet, and *not* being on testnet; anything less and the cycle just records a `simulated` position.
+- **Screening** (`candidate-filter.ts` / `polymarket-client.ts`): queries Polymarket's public Gamma API directly (not the CLOB's own market-listing call, which can't filter by resolution time) for markets resolving within 24 hours, ordered by 24-hour volume, then drops anything failing liquidity, volume, spread or price-band floors. Part of the slate is reserved for markets resolving further out, since a pure volume ranking is dominated by hourly crypto ticks that are close to coin flips. Untradeable markets are made unpickable rather than merely discouraged.
+- **Scoring** (`system-prompt.ts` / `ensemble.ts`): the model prices *every* candidate — not just ones it wants to trade — three times at temperature, and the median is taken. Pricing the whole board is what makes calibration measurable without the model's own selection bias; sampling several times is what stops a single hallucinated 0.95 from becoming a position. Where the samples disagree widely, the estimate is discarded as unstable rather than averaged into false confidence.
+- **Selection** (`trade-policy.ts`): each estimate is shrunk toward the market price (the base rate set by people with money at risk), compared against the *ask* plus modelled costs, and traded only if the resulting edge clears a floor. Positions are deduplicated by market and by event, since two outcomes of one event are one wager.
+- **Sizing** (`sizing-tool.ts`): fractional (quarter) Kelly on the trade's own edge, clamped by the per-position cap, daily/weekly/monthly velocity, total portfolio exposure, a maximum open-position count, and a share of resting book depth. A drawdown circuit breaker pauses trading entirely after a bad enough run, and only a human can lift it.
+- **Execution** (`executor-tool.ts`): the only tool with wallet-signing authority. It **re-derives** everything from ground truth rather than trusting the model — re-pricing against the live order book, re-checking the edge at those real prices, and re-computing the size — closing a prompt-injection path where a confused or compromised model could otherwise record more than the caps allow. Live trading requires all three of `CAPITAL_CIRCLE_LIVE=true`, a fully configured Circle wallet, and *not* being on testnet; anything less records a `simulated` position at the ask-side price a real order would have crossed to.
+- **Learning** (`track-record.ts` / `calibration.ts` / `policy-eval.ts`): every candidate the desk ever priced is stored and labeled with its real outcome once the market closes. That yields a Brier score and per-band calibration measured over markets it *passed on* as well as ones it traded — which feeds back into the next cycle's prompt, and mechanically adjusts how much the sizing code trusts the model. It also supports replaying alternative thresholds over already-resolved markets, so tuning is a table rather than a guess.
+
+**Staying in the market**: the desk targets at least one position a day. Rather than forcing a trade when nothing qualifies, the required edge *slides down* the longer it goes without one — from `MIN_EDGE` after 6 hours to `MIN_EDGE_WHEN_HUNGRY` by 20 — and the deep-dive prompt correspondingly restricts vetoes to hard factual problems rather than mere thinness. The relaxed bar never reaches zero: a trade with no expected value isn't a position, it's a donation, so a genuinely empty day still ends in no trade and says so in the cycle log.
 
 **Hard-coded caps:**
 
 | Cap | Default | Enforced in |
 |---|---|---|
 | Per Polymarket position | $25 (overridable per-wallet) | `sizing-tool.ts` |
+| Positions opened per cycle | 4 | `trade-policy.ts` |
+| Concurrent open positions | 12 | `sizing-tool.ts` |
+| Total open exposure | $300 | `sizing-tool.ts` |
+| Trailing-week drawdown before pausing | $75, or 6 straight losses | `sizing-tool.ts` |
+| Share of resting book depth per order | 10% | `trade-policy.ts` |
+| Kelly fraction | half-Kelly on the shrunk probability | `trade-policy.ts` |
 | Daily / weekly / monthly velocity | unset until a real wallet configures them | `sizing-tool.ts` |
 | Binance → Circle wallet withdrawal | $10 per call | `binance-client.ts` |
 | Circle wallet → Binance withdrawal | $10 per call | `circle-wallet-withdraw.ts` |
@@ -135,7 +149,7 @@ Every fund-moving function pins its destination to a fixed, environment-configur
 
 Both Gemini-driven agents in this codebase follow one principle end to end: **the model proposes, code disposes.**
 
-- **Re-derivation over trust**: the one function with actual money-moving authority in each pipeline (`recordPosition()` for Capital Circle, `decideReturnCase()` for the concierge) never accepts the model's numbers/decisions as final — it recomputes them itself from ground truth (the wallet's live caps; the published refund policy), so a model that's confused, misled, or prompt-injected can't move more money or approve more than a human-written rule allows.
+- **Re-derivation over trust**: the one function with actual money-moving authority in each pipeline (`recordPosition()` for Capital Circle, `decideReturnCase()` for the concierge) never accepts the model's numbers/decisions as final — it recomputes them itself from ground truth (the live order book and the wallet's caps; the published refund policy), so a model that's confused, misled, or prompt-injected can't move more money or approve more than a human-written rule allows. Capital Circle extends this past safety into profitability: the model cannot pick which market to trade, only estimate probabilities and veto trades the code proposed — a trade whose edge doesn't survive re-pricing at the real ask is refused no matter how good the thesis reads.
 - **Fail-closed allowlisting**: x402 payments require an explicit per-host allowlist that is empty by default — nothing is payable until an operator opts a host in.
 - **Destination pinning**: every fund transfer between Binance and the Circle wallet uses a fixed, environment-configured address in both directions, never one supplied at call time.
 - **Independent, layered caps**: every money-moving function enforces its own app-level ceiling regardless of what the underlying API key or wallet policy technically permits — a second, independent layer, not a substitute for provider-side controls.

@@ -1,8 +1,18 @@
 import "server-only";
 import { prisma } from "../prisma";
-import { CAPITAL_CIRCLE_LIVE } from "../capital-circle/config";
+import { BANKROLL_USD, CAPITAL_CIRCLE_LIVE, DAILY_POSITION_TARGET, DEFAULT_PER_POSITION_CAP_USD } from "../capital-circle/config";
+import { getTradingUrgency } from "../capital-circle/track-record";
 import { isCircleWalletConfigured } from "../capital-circle/circle-wallet-client";
 import { computeWeeklySweep, weekStartOf } from "../capital-circle/sweep";
+import {
+  computeCalibration,
+  computeCategoryPerformance,
+  type CalibrationReport,
+  type CalibrationSample,
+  type CategoryPerformance,
+} from "../capital-circle/calibration";
+import { computeAdaptiveShrinkage } from "../capital-circle/trade-policy";
+import { sweepPolicies, type LabeledCandidate, type PolicyOutcome } from "../capital-circle/policy-eval";
 
 export type CapitalCircleReportPosition = {
   id: string;
@@ -16,6 +26,11 @@ export type CapitalCircleReportPosition = {
   confidencePct: number | null;
   resultUsd: number | null;
   resolvedAt: Date | null;
+  /** Expected edge at decision time — comparing this against outcomes is how thresholds get tuned from data. */
+  edgePct: number | null;
+  category: string | null;
+  exitReason: string | null;
+  exitPrice: number | null;
 };
 
 export type CapitalCircleReport = {
@@ -91,9 +106,110 @@ export async function getCapitalCircleReport(limit = 50): Promise<CapitalCircleR
       confidencePct: p.confidencePct,
       resultUsd: p.resultUsd != null ? Number(p.resultUsd) : null,
       resolvedAt: p.resolvedAt,
+      edgePct: p.edgePct != null ? Number(p.edgePct) : null,
+      category: p.category,
+      exitReason: p.exitReason,
+      exitPrice: p.exitPrice != null ? Number(p.exitPrice) : null,
     })),
     totalSimulatedUsd,
     totalExecutedUsd,
+  };
+}
+
+export type CapitalCircleIntelligenceReport = {
+  calibration: CalibrationReport;
+  categories: CategoryPerformance[];
+  /** The shrinkage λ currently derived from that calibration — how much the code trusts the model right now. */
+  shrinkage: { lambda: number; reason: string };
+  /** Counterfactual sweep over resolved candidates: what other thresholds would have earned. */
+  policySweep: PolicyOutcome[];
+  /** How many labeled candidates the sweep had to work with. Below ~50 the table is suggestive, not conclusive. */
+  labeledCandidateCount: number;
+  recentCycles: {
+    id: string;
+    startedAt: Date;
+    action: string;
+    summary: string;
+    candidateCount: number;
+    hadNews: boolean;
+  }[];
+  /** Trades the edge gate refused. A rising share means the model's estimates are drifting from prices without justification. */
+  edgeRejectedCount: number;
+  circuitBreaker: { paused: boolean; reason: string | null; since: Date | null };
+  /** Progress against the daily position target, and the edge bar that follows from it. */
+  urgency: { positionsToday: number; dailyTarget: number; hoursSinceLastPosition: number | null; minEdge: number; hungry: boolean; reason: string };
+};
+
+/**
+ * The measurement layer: is this thing actually any good?
+ *
+ * Realized P&L over a few dozen short-horizon bets is mostly noise, so the
+ * report deliberately leads with calibration (is the model's 70% a real 70%?)
+ * and with the counterfactual sweep (would a different threshold have done
+ * better on the same markets?). Those answer the go-live question far sooner
+ * than the P&L line does, and they're computed over every candidate the agent
+ * priced, not only the ones it chose to trade.
+ */
+export async function getCapitalCircleIntelligenceReport(): Promise<CapitalCircleIntelligenceReport> {
+  const [snapshots, cycles, edgeRejectedCount, wallet, urgency] = await Promise.all([
+    prisma.capitalCircleCandidateSnapshot.findMany({
+      where: { resolvedOutcome: { not: null }, modelProbability: { not: null } },
+      orderBy: { resolvedAt: "desc" },
+      take: 500,
+    }),
+    prisma.capitalCircleCycleLog.findMany({ orderBy: { startedAt: "desc" }, take: 20 }),
+    prisma.capitalCirclePosition.count({ where: { status: "edge_rejected" } }),
+    prisma.capitalCircleWallet.findFirst({ where: { status: "active" }, orderBy: { createdAt: "desc" } }),
+    getTradingUrgency(),
+  ]);
+
+  const samples: CalibrationSample[] = snapshots.map((snapshot) => ({
+    probability: Number(snapshot.modelProbability),
+    outcome: snapshot.resolvedOutcome === 1 ? 1 : 0,
+    category: snapshot.category,
+  }));
+
+  const calibration = computeCalibration(samples);
+  const labeled: LabeledCandidate[] = snapshots.map((snapshot) => ({
+    marketId: snapshot.marketId,
+    tokenId: snapshot.tokenId,
+    category: snapshot.category,
+    modelProbability: Number(snapshot.modelProbability),
+    bestAsk: snapshot.bestAsk != null ? Number(snapshot.bestAsk) : null,
+    // Snapshots record the market price at scoring time; the sweep prices entries from it the
+    // same way the live path does, so its numbers stay comparable to the real P&L series.
+    midpoint: snapshot.bestBid != null && snapshot.bestAsk != null ? (Number(snapshot.bestBid) + Number(snapshot.bestAsk)) / 2 : null,
+    spread: snapshot.spread != null ? Number(snapshot.spread) : null,
+    outcome: snapshot.resolvedOutcome === 1 ? 1 : 0,
+  }));
+
+  return {
+    calibration,
+    categories: computeCategoryPerformance(samples),
+    shrinkage: computeAdaptiveShrinkage({
+      sampleCount: calibration.sampleCount,
+      meanAbsCalibrationError: calibration.meanAbsCalibrationError,
+    }),
+    policySweep: labeled.length > 0 ? sweepPolicies(labeled, { capUsd: DEFAULT_PER_POSITION_CAP_USD, bankrollUsd: BANKROLL_USD }).slice(0, 10) : [],
+    labeledCandidateCount: labeled.length,
+    recentCycles: cycles.map((cycle) => ({
+      id: cycle.id,
+      startedAt: cycle.startedAt,
+      action: cycle.action,
+      summary: cycle.summary,
+      candidateCount: cycle.candidateCount,
+      hadNews: Boolean(cycle.newsContext),
+    })),
+    edgeRejectedCount,
+    circuitBreaker: { paused: Boolean(wallet?.pausedAt), reason: wallet?.pausedReason ?? null, since: wallet?.pausedAt ?? null },
+    urgency: {
+      positionsToday: urgency.positionsToday,
+      dailyTarget: DAILY_POSITION_TARGET,
+      hoursSinceLastPosition: urgency.hoursSinceLastPosition,
+      minEdge: urgency.minEdge,
+      hungry: urgency.hungry,
+      reason: urgency.reason,
+    },
   };
 }
 

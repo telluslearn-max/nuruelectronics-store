@@ -1,8 +1,14 @@
 import type { Metadata } from "next";
 import { requireAdminSession } from "@/lib/admin-auth";
-import { getCapitalCircleReport, getCapitalCircleWallets, getPendingSweeps } from "@/lib/reports/capital-circle";
+import {
+  getCapitalCircleIntelligenceReport,
+  getCapitalCircleReport,
+  getCapitalCircleWallets,
+  getPendingSweeps,
+  type CapitalCircleIntelligenceReport,
+} from "@/lib/reports/capital-circle";
 import { confirmSweep } from "@/lib/capital-circle/sweep-actions";
-import { saveCapitalCircleWallet } from "@/lib/capital-circle/wallet-actions";
+import { clearCapitalCirclePause, saveCapitalCircleWallet } from "@/lib/capital-circle/wallet-actions";
 import { depositFromBinance } from "@/lib/capital-circle/binance-actions";
 import { isBinanceConfigured, BINANCE_WITHDRAW_CAP_USDC } from "@/lib/capital-circle/binance-client";
 import { withdrawFromCircleWallet } from "@/lib/capital-circle/circle-withdraw-actions";
@@ -19,6 +25,9 @@ const STATUS_STYLES: Record<string, string> = {
   approved: "bg-blue-50 text-blue-700",
   executed: "bg-green-50 text-green-700",
   rejected: "bg-red-50 text-red-700",
+  // Refused for lack of expected value — an amber "the desk declined", not a failure.
+  edge_rejected: "bg-amber-50 text-amber-700",
+  exited: "bg-blue-50 text-blue-700",
 };
 
 const WALLET_STATUS_STYLES: Record<string, string> = {
@@ -96,6 +105,220 @@ function PositionStat({ label, value, valueClassName }: { label: string; value: 
   );
 }
 
+/**
+ * The section that answers "is this thing actually any good?".
+ *
+ * Realized P&L over a few dozen short-horizon bets is mostly noise, so the
+ * leading numbers here are calibration and the counterfactual sweep instead:
+ * whether the model's stated 70% is a real 70%, and whether a different edge
+ * threshold would have done better on the same markets. Both are measured over
+ * every candidate the agent priced, including the ones it passed on, so they
+ * aren't filtered by the model's own judgement.
+ */
+function IntelligenceSection({ report, pausedWalletId }: { report: CapitalCircleIntelligenceReport; pausedWalletId: string | null }) {
+  const { calibration } = report;
+
+  return (
+    <div className="mt-8">
+      <h3 className="text-xs font-medium uppercase tracking-wide text-neutral-400">Forecasting quality</h3>
+
+      {report.circuitBreaker.paused && (
+        <div className="mt-3 rounded-card border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+          <div className="font-medium">Trading is paused</div>
+          <p className="mt-1">{report.circuitBreaker.reason}</p>
+          <p className="mt-1 text-xs text-red-700">
+            Since {report.circuitBreaker.since?.toLocaleString() ?? "unknown"}. Look at why the losses happened before resuming —
+            the pause exists because a losing run and a broken thesis generator look identical from the inside.
+          </p>
+          {pausedWalletId && (
+            <form action={clearCapitalCirclePause} className="mt-3">
+              <input type="hidden" name="walletId" value={pausedWalletId} />
+              <button type="submit" className="rounded-control border border-red-300 bg-white px-3 py-1.5 text-sm font-medium text-red-800">
+                Resume trading
+              </button>
+            </form>
+          )}
+        </div>
+      )}
+
+      <div
+        className={`mt-3 rounded-card border p-4 ${
+          report.urgency.positionsToday >= report.urgency.dailyTarget
+            ? "border-green-200 bg-green-50"
+            : report.urgency.hungry
+              ? "border-amber-200 bg-amber-50"
+              : "border-border-subtle"
+        }`}
+      >
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <div className="text-sm font-medium">
+            Today: {report.urgency.positionsToday} of {report.urgency.dailyTarget} target position
+            {report.urgency.dailyTarget === 1 ? "" : "s"} placed
+          </div>
+          <div className="text-xs tabular-nums text-neutral-600">
+            edge bar now {report.urgency.minEdge.toFixed(4)}
+            {report.urgency.hoursSinceLastPosition != null
+              ? ` · last position ${report.urgency.hoursSinceLastPosition.toFixed(1)}h ago`
+              : " · no position ever placed"}
+          </div>
+        </div>
+        <p className="mt-1 text-xs text-neutral-600">{report.urgency.reason}</p>
+      </div>
+
+      {calibration.sampleCount === 0 ? (
+        <p className="mt-3 text-sm text-neutral-500">
+          Nothing has resolved yet. Once markets the desk priced start closing, this section fills in with its Brier score,
+          calibration by confidence band, and a sweep of what other edge thresholds would have earned on the same markets.
+        </p>
+      ) : (
+        <>
+          <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div className="rounded-card border border-border-subtle p-4">
+              <div className="text-xs text-neutral-500">Brier score ({calibration.sampleCount} scored)</div>
+              <div className="mt-1 text-2xl font-medium tabular-nums">{calibration.brierScore?.toFixed(3)}</div>
+              <p className="mt-1 text-xs text-neutral-400">
+                Lower is better. Always guessing the base rate would score {calibration.baseRateBrier?.toFixed(3)}.
+              </p>
+            </div>
+            <div className="rounded-card border border-border-subtle p-4">
+              <div className="text-xs text-neutral-500">Skill vs the base rate</div>
+              <div
+                className={`mt-1 text-2xl font-medium tabular-nums ${
+                  calibration.skillScore == null ? "" : calibration.skillScore > 0 ? "text-green-700" : "text-red-700"
+                }`}
+              >
+                {calibration.skillScore != null ? calibration.skillScore.toFixed(3) : "n/a"}
+              </div>
+              <p className="mt-1 text-xs text-neutral-400">
+                Above zero means the forecasts add information. At or below zero they don&apos;t.
+              </p>
+            </div>
+            <div className="rounded-card border border-border-subtle p-4">
+              <div className="text-xs text-neutral-500">Trust in the model (λ)</div>
+              <div className="mt-1 text-2xl font-medium tabular-nums">{report.shrinkage.lambda.toFixed(2)}</div>
+              <p className="mt-1 text-xs text-neutral-400">{report.shrinkage.reason}</p>
+            </div>
+          </div>
+
+          {calibration.meanBias != null && Math.abs(calibration.meanBias) > 0.03 && (
+            <p className="mt-3 text-sm text-neutral-600">
+              The desk is running{" "}
+              <span className="font-medium">
+                {Math.abs(calibration.meanBias * 100).toFixed(1)} points {calibration.meanBias > 0 ? "overconfident" : "underconfident"}
+              </span>{" "}
+              on average. Sizing already corrects for this via λ above, and the figure is fed back into each cycle&apos;s prompt.
+            </p>
+          )}
+
+          {calibration.buckets.length > 0 && (
+            <div className="mt-4 overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-xs uppercase tracking-wide text-neutral-400">
+                    <th className="py-2 pr-4 font-medium">Said</th>
+                    <th className="py-2 pr-4 font-medium">Actually happened</th>
+                    <th className="py-2 pr-4 font-medium">Gap</th>
+                    <th className="py-2 font-medium">n</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {calibration.buckets.map((bucket) => (
+                    <tr key={bucket.label} className="border-t border-border-subtle">
+                      <td className="py-2 pr-4 tabular-nums">{bucket.label}</td>
+                      <td className="py-2 pr-4 tabular-nums">{(bucket.actualRate * 100).toFixed(0)}%</td>
+                      <td className={`py-2 pr-4 tabular-nums ${Math.abs(bucket.gap) > 0.15 ? "text-red-700" : "text-neutral-600"}`}>
+                        {bucket.gap > 0 ? "+" : ""}
+                        {(bucket.gap * 100).toFixed(0)}
+                      </td>
+                      <td className="py-2 tabular-nums text-neutral-500">{bucket.count}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {report.categories.filter((category) => category.count >= 5).length > 0 && (
+            <p className="mt-4 text-sm text-neutral-600">
+              By topic:{" "}
+              {report.categories
+                .filter((category) => category.count >= 5)
+                .map((category) => `${category.category} ${(category.winRate * 100).toFixed(0)}% of ${category.count}`)
+                .join(" · ")}
+            </p>
+          )}
+        </>
+      )}
+
+      {report.policySweep.length > 0 && (
+        <div className="mt-8">
+          <h3 className="text-xs font-medium uppercase tracking-wide text-neutral-400">
+            What other thresholds would have earned
+          </h3>
+          <p className="mt-2 max-w-2xl text-sm text-neutral-500">
+            Replayed over {report.labeledCandidateCount} resolved candidates the desk priced — including ones it passed on, so
+            this isn&apos;t filtered by its own judgement. Read the trade count alongside the return: a setting that traded twice
+            proves nothing, and a setting that only works at one exact threshold is fitted to noise.
+          </p>
+          <div className="mt-3 overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs uppercase tracking-wide text-neutral-400">
+                  <th className="py-2 pr-4 font-medium">Min edge</th>
+                  <th className="py-2 pr-4 font-medium">λ</th>
+                  <th className="py-2 pr-4 font-medium">Trades</th>
+                  <th className="py-2 pr-4 font-medium">Win rate</th>
+                  <th className="py-2 pr-4 font-medium">Staked</th>
+                  <th className="py-2 font-medium">Return on stake</th>
+                </tr>
+              </thead>
+              <tbody>
+                {report.policySweep.map((outcome) => (
+                  <tr key={`${outcome.params.minEdge}-${outcome.params.lambda}`} className="border-t border-border-subtle">
+                    <td className="py-2 pr-4 tabular-nums">{outcome.params.minEdge}</td>
+                    <td className="py-2 pr-4 tabular-nums">{outcome.params.lambda}</td>
+                    <td className="py-2 pr-4 tabular-nums text-neutral-500">{outcome.tradeCount}</td>
+                    <td className="py-2 pr-4 tabular-nums">{outcome.tradeCount > 0 ? `${(outcome.winRate * 100).toFixed(0)}%` : "—"}</td>
+                    <td className="py-2 pr-4 tabular-nums">{formatPrice(outcome.stakedUsd.toFixed(2), "USD")}</td>
+                    <td
+                      className={`py-2 tabular-nums ${
+                        outcome.returnOnStake == null ? "" : outcome.returnOnStake >= 0 ? "text-green-700" : "text-red-700"
+                      }`}
+                    >
+                      {outcome.returnOnStake != null ? `${(outcome.returnOnStake * 100).toFixed(1)}%` : "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {report.recentCycles.length > 0 && (
+        <div className="mt-8">
+          <h3 className="text-xs font-medium uppercase tracking-wide text-neutral-400">
+            Recent cycles{report.edgeRejectedCount > 0 ? ` — ${report.edgeRejectedCount} trade(s) refused for lack of edge` : ""}
+          </h3>
+          <ul className="mt-3 space-y-2">
+            {report.recentCycles.map((cycle) => (
+              <li key={cycle.id} className="rounded-card border border-border-subtle p-3 text-sm">
+                <div className="flex flex-wrap items-center gap-2 text-xs text-neutral-500">
+                  <span className="tabular-nums">{cycle.startedAt.toLocaleString()}</span>
+                  <StatusPill status={cycle.action} />
+                  <span>{cycle.candidateCount} candidates</span>
+                  {cycle.hadNews && <span className="text-neutral-400">news grounded</span>}
+                </div>
+                <p className="mt-2 text-neutral-600">{cycle.summary}</p>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function WalletStatusPill({ status }: { status: string }) {
   return (
     <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${WALLET_STATUS_STYLES[status] ?? "bg-neutral-100 text-neutral-600"}`}>
@@ -119,10 +342,11 @@ export default async function CapitalCirclePage({
   searchParams: Promise<{ success?: string; error?: string }>;
 }) {
   await requireAdminSession();
-  const [report, pendingSweeps, wallets] = await Promise.all([
+  const [report, pendingSweeps, wallets, intelligence] = await Promise.all([
     getCapitalCircleReport(),
     getPendingSweeps(),
     getCapitalCircleWallets(),
+    getCapitalCircleIntelligenceReport(),
   ]);
   const { success, error } = await searchParams;
   const depositQrByWalletId = Object.fromEntries(
@@ -138,9 +362,11 @@ export default async function CapitalCirclePage({
       <h2 className="text-lg font-medium">Capital Circle</h2>
       <FeedbackBanner success={success} error={error} />
       <p className="mt-2 max-w-2xl text-neutral-500">
-        The firewalled, USDC-funded pool that hunts for profit outside electronics retail — a Researcher / Risk-Sizing /
-        Executor desk running hourly against real, live Polymarket markets resolving in the next 24 hours. Every decision
-        here is logged to the audit log before anything (real or simulated) is recorded.
+        The firewalled, USDC-funded pool that hunts for profit outside electronics retail. Every hour it screens live
+        Polymarket markets for liquidity and spread, has the model price the whole slate several times over, then decides
+        in code which of those forecasts carry real expected value against the order book — and sizes them by fractional
+        Kelly. The model estimates probabilities; it does not decide what to trade. Every decision is logged to the audit
+        log before anything (real or simulated) is recorded.
       </p>
 
       <div
@@ -182,6 +408,11 @@ export default async function CapitalCirclePage({
           <p className="mt-1 text-xs text-neutral-400">Simulated + real together — see the two cards above to split them</p>
         </div>
       </div>
+
+      <IntelligenceSection
+        report={intelligence}
+        pausedWalletId={wallets.find((wallet) => wallet.status === "active")?.id ?? null}
+      />
 
       <div className="mt-8">
         <h3 className="text-xs font-medium uppercase tracking-wide text-neutral-400">Positions</h3>

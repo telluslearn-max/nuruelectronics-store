@@ -83,3 +83,36 @@ export async function saveCapitalCircleWallet(formData: FormData): Promise<void>
   revalidatePath(REPORT_PATH);
   redirectWithSuccess(REPORT_PATH, walletId ? "Wallet updated." : "Wallet registered.");
 }
+
+/**
+ * Lifts the trading pause set by the drawdown circuit breaker (see
+ * sizing-tool.ts). Deliberately a separate, explicit human action rather than
+ * anything the agent can do for itself — the breaker exists precisely because
+ * code cannot tell a run of bad luck from a broken thesis generator, so
+ * resuming has to be someone's decision.
+ */
+export async function clearCapitalCirclePause(formData: FormData): Promise<void> {
+  await requireAdminSession();
+
+  const walletId = String(formData.get("walletId") ?? "").trim();
+  if (!walletId) {
+    redirectWithError(REPORT_PATH, "No wallet specified.");
+  }
+
+  const wallet = await prisma.capitalCircleWallet.findUnique({ where: { id: walletId } });
+  if (!wallet) {
+    redirectWithError(REPORT_PATH, "That wallet no longer exists.");
+  }
+
+  await prisma.capitalCircleWallet.update({ where: { id: walletId }, data: { pausedAt: null, pausedReason: null } });
+  await logAdminAction({
+    action: "capital-circle.wallet.unpause",
+    entityType: "capital_circle_wallet",
+    entityId: walletId,
+    summary: `Capital Circle trading pause cleared by an admin (was: ${wallet?.pausedReason ?? "no reason recorded"}).`,
+    metadata: { previousPausedAt: wallet?.pausedAt, previousReason: wallet?.pausedReason },
+  });
+
+  revalidatePath(REPORT_PATH);
+  redirectWithSuccess(REPORT_PATH, "Trading resumed.");
+}

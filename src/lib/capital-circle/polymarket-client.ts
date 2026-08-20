@@ -1,5 +1,6 @@
 import "server-only";
 import { Chain, ClobClient, OrderType, Side } from "@polymarket/clob-client-v2";
+import { MARKET_FETCH_LIMIT, SEARCH_HORIZON_HOURS } from "./config";
 
 const CLOB_HOST = "https://clob.polymarket.com";
 const GAMMA_API_BASE = "https://gamma-api.polymarket.com";
@@ -36,6 +37,25 @@ export type PolymarketMarketSummary = {
   tokens: PolymarketOutcomeToken[];
   /** When this market resolves — parsed from Polymarket's `end_date_iso`. */
   endDate: Date;
+  /**
+   * Tradability fields. Gamma returns all of these and the original parser
+   * dropped every one, which left the agent structurally unable to reason
+   * about whether a market could actually be entered and exited — it saw only
+   * questions and prices, so a $25 order into a $40 book looked identical to
+   * one into a $40,000 book. Nullable because Gamma omits them on some markets.
+   */
+  volume24hr: number | null;
+  liquidity: number | null;
+  spread: number | null;
+  bestBid: number | null;
+  bestAsk: number | null;
+  slug: string | null;
+  /** Resolution criteria, truncated — the fine print is where "obvious" theses go wrong. */
+  description: string | null;
+  /** Groups correlated markets (e.g. every outcome of one election) so the portfolio can avoid doubling up. */
+  eventId: string | null;
+  /** Coarse bucket from Gamma's tags — the track record is broken down by this, since the model is not equally good at all of them. */
+  category: string | null;
 };
 
 /**
@@ -49,7 +69,50 @@ export type PolymarketMarketSummary = {
  * clobTokenIds are the same global token identifiers the CLOB trading API uses, so these are safe
  * to trade against later, not just for discovery.
  */
-function parseMarket(raw: unknown): PolymarketMarketSummary | null {
+/**
+ * Gamma is inconsistent about numeric types — the same field arrives as a
+ * JSON number on one market and a decimal string on another (volume and
+ * liquidity especially). Coerce defensively and treat anything unparseable as
+ * absent, since a filter that silently reads NaN as 0 would reject every
+ * market whose formatting changed.
+ */
+export function toNum(value: unknown): number | null {
+  if (value == null || value === "") return null;
+  const n = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * Gamma exposes topic tags in a couple of shapes depending on endpoint version;
+ * this collapses them to one coarse bucket used for per-category track records.
+ */
+function parseCategory(raw: Record<string, unknown>): string | null {
+  const tags = raw.tags;
+  const labels: string[] = [];
+  if (Array.isArray(tags)) {
+    for (const tag of tags) {
+      if (typeof tag === "string") labels.push(tag);
+      else if (tag && typeof tag === "object") {
+        const label = (tag as Record<string, unknown>).label ?? (tag as Record<string, unknown>).slug;
+        if (typeof label === "string") labels.push(label);
+      }
+    }
+  }
+  // Slugs are hyphen-separated and tags are space-separated, so both split into words. Word
+  // boundaries are not optional here: a bare substring match reads "inflation" as the NFL and
+  // files a macro market under sports, which then poisons the per-category track record.
+  const haystack = ` ${`${labels.join(" ")} ${typeof raw.slug === "string" ? raw.slug.replace(/-/g, " ") : ""}`.toLowerCase().trim()} `;
+  const has = (...words: string[]) => words.some((word) => new RegExp(`\\b${word}\\b`).test(haystack));
+
+  if (has("crypto", "bitcoin", "ethereum", "btc", "eth", "solana", "sol", "xrp", "doge")) return "crypto";
+  if (has("sports?", "nba", "nfl", "mlb", "nhl", "soccer", "football", "basketball", "tennis", "ufc", "boxing", "golf")) return "sports";
+  if (has("politics?", "political", "election", "president", "presidential", "senate", "congress", "geopolitics?")) return "politics";
+  if (has("economics?", "economy", "fed", "inflation", "cpi", "rates", "gdp", "unemployment", "recession")) return "economics";
+  return labels.length > 0 ? "other" : null;
+}
+
+/** Exported for tests — the parse is the boundary where a Gamma format change becomes a silent trading bug. */
+export function parseMarket(raw: unknown): PolymarketMarketSummary | null {
   if (!raw || typeof raw !== "object") return null;
   const m = raw as Record<string, unknown>;
   const conditionId = typeof m.conditionId === "string" ? m.conditionId : null;
@@ -82,6 +145,11 @@ function parseMarket(raw: unknown): PolymarketMarketSummary | null {
     }
   }
 
+  const events = Array.isArray(m.events) ? m.events : [];
+  const firstEvent = events[0] as Record<string, unknown> | undefined;
+  const eventId = firstEvent && typeof firstEvent.id === "string" ? firstEvent.id : null;
+  const rawDescription = typeof m.description === "string" ? m.description : null;
+
   return {
     conditionId,
     question,
@@ -89,6 +157,17 @@ function parseMarket(raw: unknown): PolymarketMarketSummary | null {
     closed: m.closed === true,
     tokens,
     endDate,
+    volume24hr: toNum(m.volume24hr) ?? toNum(m.volumeNum) ?? toNum(m.volume),
+    liquidity: toNum(m.liquidityNum) ?? toNum(m.liquidity),
+    spread: toNum(m.spread),
+    bestBid: toNum(m.bestBid),
+    bestAsk: toNum(m.bestAsk),
+    slug: typeof m.slug === "string" ? m.slug : null,
+    // Resolution criteria matter but are often thousands of words; the head carries the
+    // actual rule, and the rest is boilerplate that would crowd the model's context.
+    description: rawDescription ? rawDescription.slice(0, 500) : null,
+    eventId,
+    category: parseCategory(m),
   };
 }
 
@@ -99,8 +178,19 @@ function parseMarket(raw: unknown): PolymarketMarketSummary | null {
  * server-side via Gamma's end_date_min/end_date_max, not a client-side filter over a fixed
  * sample — otherwise the CLOB's own sampling endpoint (see parseMarket's comment) would just
  * return zero results every time.
+ *
+ * Ordered by 24-hour volume, descending. Without an explicit `order`, Gamma
+ * returns rows in an arbitrary order and truncating to a handful meant the
+ * candidate set was chosen essentially at random from the window — the single
+ * cheapest quality fix available, since the most-traded markets are also the
+ * ones with books deep enough to enter and exit. The default limit is
+ * deliberately larger than what the model ever sees: candidate-filter.ts
+ * screens this list down in code first.
  */
-export async function listActivePolymarketMarkets(limit = 20, maxHoursUntilResolution = 24): Promise<PolymarketMarketSummary[]> {
+export async function listActivePolymarketMarkets(
+  limit = MARKET_FETCH_LIMIT,
+  maxHoursUntilResolution = SEARCH_HORIZON_HOURS,
+): Promise<PolymarketMarketSummary[]> {
   const now = new Date();
   const horizonEnd = new Date(now.getTime() + maxHoursUntilResolution * 60 * 60 * 1000);
   const params = new URLSearchParams({
@@ -108,6 +198,8 @@ export async function listActivePolymarketMarkets(limit = 20, maxHoursUntilResol
     closed: "false",
     end_date_min: now.toISOString(),
     end_date_max: horizonEnd.toISOString(),
+    order: "volume24hr",
+    ascending: "false",
     limit: String(limit),
   });
   const response = await fetch(`${GAMMA_API_BASE}/markets?${params.toString()}`);
@@ -185,6 +277,170 @@ export async function getPolymarketMidpoint(tokenId: string): Promise<number | n
   } catch {
     return null;
   }
+}
+
+export type OrderBookSummary = {
+  bestBid: number | null;
+  bestAsk: number | null;
+  midpoint: number | null;
+  spread: number | null;
+  /** Resting USD on each side across the top levels — what a taker can actually fill against. */
+  bidDepthUsd: number;
+  askDepthUsd: number;
+};
+
+/** Top levels summed for depth. Beyond a handful, the prices are far enough away to be irrelevant to a $25 order. */
+const DEPTH_LEVELS = 5;
+
+/**
+ * The live book for one outcome token — the difference between what a trade
+ * is assumed to cost and what it costs. Entry pricing used to come from
+ * Gamma's mid/last, so every simulated fill silently got a better price than
+ * any real order could have, and the ask-side depth (whether the order would
+ * move the market at all) was never consulted.
+ *
+ * Returns null on any failure rather than throwing: callers treat an
+ * unavailable book as "price this conservatively", not as a broken cycle.
+ */
+export async function getOrderBookSummary(tokenId: string): Promise<OrderBookSummary | null> {
+  const client = getReadClient();
+  try {
+    const book = await client.getOrderBook(tokenId);
+    if (!book || typeof book !== "object") return null;
+
+    const raw = book as unknown as { bids?: unknown; asks?: unknown };
+    const bids = normalizeLevels(raw.bids);
+    const asks = normalizeLevels(raw.asks);
+
+    // Polymarket returns each side sorted worst-to-best; the top of book is the
+    // highest bid and the lowest ask regardless of the order they arrive in.
+    const bestBid = bids.length > 0 ? Math.max(...bids.map((l) => l.price)) : null;
+    const bestAsk = asks.length > 0 ? Math.min(...asks.map((l) => l.price)) : null;
+
+    const bidDepthUsd = topLevelsDepth(bids, "desc");
+    const askDepthUsd = topLevelsDepth(asks, "asc");
+
+    const midpoint = bestBid != null && bestAsk != null ? (bestBid + bestAsk) / 2 : null;
+    const spread = bestBid != null && bestAsk != null ? bestAsk - bestBid : null;
+
+    return { bestBid, bestAsk, midpoint, spread, bidDepthUsd, askDepthUsd };
+  } catch {
+    return null;
+  }
+}
+
+type BookLevel = { price: number; size: number };
+
+function normalizeLevels(raw: unknown): BookLevel[] {
+  if (!Array.isArray(raw)) return [];
+  const levels: BookLevel[] = [];
+  for (const entry of raw) {
+    if (!entry || typeof entry !== "object") continue;
+    const record = entry as Record<string, unknown>;
+    const price = toNum(record.price);
+    const size = toNum(record.size);
+    if (price != null && size != null && price > 0 && size > 0) levels.push({ price, size });
+  }
+  return levels;
+}
+
+/** Notional USD resting across the levels nearest the touch (price × size, since size is in shares). */
+function topLevelsDepth(levels: BookLevel[], direction: "asc" | "desc"): number {
+  const sorted = [...levels].sort((a, b) => (direction === "asc" ? a.price - b.price : b.price - a.price));
+  return sorted.slice(0, DEPTH_LEVELS).reduce((sum, level) => sum + level.price * level.size, 0);
+}
+
+export type PriceHistoryFeatures = {
+  /** Downsampled series, oldest first — enough shape to see a trend without flooding the context. */
+  series: { t: number; p: number }[];
+  current: number | null;
+  change1h: number | null;
+  change6h: number | null;
+  change24h: number | null;
+  /** Standard deviation of point-to-point moves — how noisy this market has been. */
+  volatility: number | null;
+  high24h: number | null;
+  low24h: number | null;
+};
+
+const MAX_SERIES_POINTS = 50;
+
+/**
+ * Price history for a token, pre-digested into the features that actually
+ * inform a short-horizon thesis (momentum, volatility, distance from the
+ * day's extremes) rather than a wall of raw points for the model to eyeball.
+ * Computing these in code means they're consistent and free; asking a
+ * language model to derive them from a list of numbers is neither.
+ */
+export async function getPricesHistoryForModel(tokenId: string, hours = 24): Promise<PriceHistoryFeatures | null> {
+  const client = getReadClient();
+  const nowTs = Math.floor(Date.now() / 1000);
+  try {
+    const response = await client.getPricesHistory({
+      market: tokenId,
+      startTs: nowTs - hours * 3600,
+      endTs: nowTs,
+      fidelity: 10,
+    });
+    // Same wrapped-vs-bare shape handling as getPolymarketHistoricalPrice — the SDK's
+    // declaration disagrees with the live endpoint, so trust neither blindly.
+    const rawPoints = Array.isArray(response) ? response : (response as unknown as { history?: unknown }).history;
+    if (!Array.isArray(rawPoints) || rawPoints.length === 0) return null;
+
+    const points = rawPoints
+      .map((point) => ({ t: toNum((point as Record<string, unknown>).t), p: toNum((point as Record<string, unknown>).p) }))
+      .filter((point): point is { t: number; p: number } => point.t != null && point.p != null)
+      .sort((a, b) => a.t - b.t);
+    if (points.length === 0) return null;
+
+    const current = points[points.length - 1].p;
+    const priceAgo = (secondsAgo: number): number | null => {
+      const target = nowTs - secondsAgo;
+      const candidates = points.filter((point) => point.t <= target);
+      return candidates.length > 0 ? candidates[candidates.length - 1].p : null;
+    };
+    const changeSince = (secondsAgo: number): number | null => {
+      const past = priceAgo(secondsAgo);
+      return past == null ? null : round4(current - past);
+    };
+
+    const deltas = points.slice(1).map((point, index) => point.p - points[index].p);
+    const volatility = deltas.length > 1 ? round4(standardDeviation(deltas)) : null;
+    const prices = points.map((point) => point.p);
+
+    return {
+      series: downsample(points, MAX_SERIES_POINTS),
+      current,
+      change1h: changeSince(3600),
+      change6h: changeSince(6 * 3600),
+      change24h: changeSince(24 * 3600),
+      volatility,
+      high24h: Math.max(...prices),
+      low24h: Math.min(...prices),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function downsample<T>(points: T[], maxPoints: number): T[] {
+  if (points.length <= maxPoints) return points;
+  const step = points.length / maxPoints;
+  const out: T[] = [];
+  for (let i = 0; i < maxPoints; i++) out.push(points[Math.floor(i * step)]);
+  // Always keep the most recent point — it's the one the thesis is priced against.
+  out[out.length - 1] = points[points.length - 1];
+  return out;
+}
+
+function standardDeviation(values: number[]): number {
+  const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
+  const variance = values.reduce((sum, value) => sum + (value - mean) ** 2, 0) / values.length;
+  return Math.sqrt(variance);
+}
+
+function round4(value: number): number {
+  return Math.round(value * 10_000) / 10_000;
 }
 
 export { OrderType, Side };

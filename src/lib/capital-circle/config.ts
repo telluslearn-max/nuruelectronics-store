@@ -29,4 +29,173 @@ export const CAPITAL_CIRCLE_SWEEP_PERCENT = Number(process.env.CAPITAL_CIRCLE_SW
 /** Pinned explicitly rather than an alias, so a model swap is a deliberate change. */
 export const CAPITAL_CIRCLE_MODEL = "gemini-2.5-flash";
 
-export const MAX_TOOL_ITERATIONS = 5;
+/**
+ * Raised from 5: the cycle's deep-dive stage now screens finalists with
+ * get_price_history / get_order_book before confirming, and 5 iterations
+ * left it hitting the cap mid-verification and returning "inconclusive".
+ */
+export const MAX_TOOL_ITERATIONS = Number(process.env.CAPITAL_CIRCLE_MAX_ITERATIONS ?? 12);
+
+/**
+ * Gemini 2.5 Flash thinking budget (tokens) for the scoring and deep-dive
+ * calls. Probability estimation is the one step where reasoning depth maps
+ * directly to money, and flash's thinking tokens are cheap enough that a
+ * budget here is close to free relative to the size of the positions.
+ */
+export const THINKING_BUDGET = Number(process.env.CAPITAL_CIRCLE_THINKING_BUDGET ?? 2048);
+
+// ---------------------------------------------------------------------------
+// Candidate screening — applied in code (candidate-filter.ts) before the model
+// ever sees a market, so an untradeable market can't be picked no matter how
+// good the thesis sounds.
+// ---------------------------------------------------------------------------
+
+/** Below this, the book is too thin for even a $25 fill to avoid moving the price. */
+export const MIN_LIQUIDITY_USD = Number(process.env.CAPITAL_CIRCLE_MIN_LIQUIDITY_USD ?? 400);
+
+/** A market nobody traded today has a stale, uninformative price — and no exit. */
+export const MIN_VOLUME_24H_USD = Number(process.env.CAPITAL_CIRCLE_MIN_VOLUME_24H_USD ?? 200);
+
+/** Spread is a round-trip cost. Wider than this eats any edge we could plausibly have. */
+export const MAX_SPREAD = Number(process.env.CAPITAL_CIRCLE_MAX_SPREAD ?? 0.08);
+
+/**
+ * Entry-price band. Above MAX: the payoff is a few cents against a full-size
+ * downside, so a single surprise wipes out dozens of wins. Below MIN: a
+ * lottery ticket whose probability we cannot estimate to that precision.
+ */
+export const MAX_ENTRY_PRICE = Number(process.env.CAPITAL_CIRCLE_MAX_ENTRY_PRICE ?? 0.97);
+export const MIN_ENTRY_PRICE = Number(process.env.CAPITAL_CIRCLE_MIN_ENTRY_PRICE ?? 0.03);
+
+/** How many screened markets get priced by the model each cycle. */
+export const CANDIDATE_LIMIT = Number(process.env.CAPITAL_CIRCLE_CANDIDATE_LIMIT ?? 24);
+
+/**
+ * How far out to hunt. A 24-hour horizon was the original short-feedback-loop
+ * choice, but it also caps how many opportunities exist at all — and on a quiet
+ * hour it's the difference between a thin slate and no slate. Three days keeps
+ * feedback fast enough to learn from while widening the field substantially.
+ */
+export const SEARCH_HORIZON_HOURS = Number(process.env.CAPITAL_CIRCLE_SEARCH_HORIZON_HOURS ?? 72);
+
+/** Raw markets pulled from Gamma before code-side screening. Screening is cheap; missing a market isn't. */
+export const MARKET_FETCH_LIMIT = Number(process.env.CAPITAL_CIRCLE_MARKET_FETCH_LIMIT ?? 150);
+
+// ---------------------------------------------------------------------------
+// Edge and sizing — the code-side decision layer. The model estimates
+// probabilities; these constants decide whether an estimate is worth money.
+// ---------------------------------------------------------------------------
+
+/**
+ * Minimum edge (probability minus effective entry price minus costs) before a
+ * trade is allowed on a normal cycle. Above zero because an LLM's probability
+ * estimate carries far more error than a market maker's price, so small
+ * apparent divergences are usually estimation noise rather than opportunity.
+ */
+export const MIN_EDGE = Number(process.env.CAPITAL_CIRCLE_MIN_EDGE ?? 0.03);
+
+/**
+ * The relaxed bar used once a day has gone by without a position — see
+ * computeUrgency in trade-policy.ts. The pool is meant to be *in* the market,
+ * and a desk that waits for perfect setups compounds nothing while it waits;
+ * a thinner edge taken at a smaller size beats no edge at all.
+ *
+ * Deliberately still above zero. This lowers the bar, it does not remove it:
+ * a trade below zero expected value isn't a position, it's a donation, and
+ * forcing one to satisfy a quota would be the single fastest way to lose the
+ * pool. When nothing clears even this, the cycle passes and says so.
+ */
+export const MIN_EDGE_WHEN_HUNGRY = Number(process.env.CAPITAL_CIRCLE_MIN_EDGE_WHEN_HUNGRY ?? 0.012);
+
+/** Positions per day the desk aims to place, provided something clears the (relaxed) bar. */
+export const DAILY_POSITION_TARGET = Number(process.env.CAPITAL_CIRCLE_DAILY_POSITION_TARGET ?? 1);
+
+/**
+ * Hours without a position before the bar starts sliding from MIN_EDGE toward
+ * MIN_EDGE_WHEN_HUNGRY. Ramped rather than switched, so the desk gets steadily
+ * less picky across the day instead of holding out and then lurching.
+ */
+export const HUNGRY_AFTER_HOURS = Number(process.env.CAPITAL_CIRCLE_HUNGRY_AFTER_HOURS ?? 6);
+
+/** Hours by which the bar has fully relaxed — the point where the daily target is clearly at risk. */
+export const STARVING_AFTER_HOURS = Number(process.env.CAPITAL_CIRCLE_STARVING_AFTER_HOURS ?? 20);
+
+/**
+ * Assumed slippage/adverse-selection drag on top of the quoted ask — the ask
+ * is what the top of the book shows, not necessarily what a taker order gets.
+ */
+export const COST_BUFFER = Number(process.env.CAPITAL_CIRCLE_COST_BUFFER ?? 0.01);
+
+/** Polymarket taker fees are 0 on most markets today; kept explicit so cost modelling is visible and tunable. */
+export const FEE_BPS = Number(process.env.CAPITAL_CIRCLE_FEE_BPS ?? 0);
+
+/** Used when neither an order book nor a spread is available for a token. */
+export const DEFAULT_SPREAD_ASSUMPTION = Number(process.env.CAPITAL_CIRCLE_DEFAULT_SPREAD ?? 0.01);
+
+/**
+ * How much of the model's probability estimate to trust versus the market's
+ * own price. p' = λ·model + (1−λ)·market. The market price is the base rate
+ * set by people with money at risk; λ is how much evidence we think one
+ * flash call adds on top of it. Starts pessimistic and becomes adaptive once
+ * enough resolved predictions exist to measure calibration (trade-policy.ts).
+ */
+export const KELLY_SHRINKAGE = Number(process.env.CAPITAL_CIRCLE_KELLY_SHRINKAGE ?? 0.5);
+
+/**
+ * Fraction of full Kelly. Half-Kelly rather than quarter: full Kelly is only
+ * optimal when the probability is known exactly and it drawdowns brutally when
+ * it isn't, but quarter-Kelly on a $25 cap produces stakes so small that the
+ * pool barely compounds. Half is the aggressive-but-not-reckless middle, and
+ * the shrinkage above is doing the real work of correcting for estimate error.
+ */
+export const KELLY_FRACTION = Number(process.env.CAPITAL_CIRCLE_KELLY_FRACTION ?? 0.5);
+
+/** Notional pool size Kelly sizes against, until a funded wallet balance replaces it in Phase B. */
+export const BANKROLL_USD = Number(process.env.CAPITAL_CIRCLE_BANKROLL_USD ?? 500);
+
+/** Never take more than this share of the resting ask-side depth — being the whole book is how you pay the whole spread. */
+export const MAX_BOOK_DEPTH_SHARE = Number(process.env.CAPITAL_CIRCLE_MAX_BOOK_DEPTH_SHARE ?? 0.1);
+
+// ---------------------------------------------------------------------------
+// Portfolio limits — the old code had none: only a per-position cap, which a
+// simulated position bypassed entirely.
+// ---------------------------------------------------------------------------
+
+export const MAX_POSITIONS_PER_CYCLE = Number(process.env.CAPITAL_CIRCLE_MAX_POSITIONS_PER_CYCLE ?? 4);
+export const MAX_OPEN_POSITIONS = Number(process.env.CAPITAL_CIRCLE_MAX_OPEN_POSITIONS ?? 12);
+export const MAX_TOTAL_EXPOSURE_USD = Number(process.env.CAPITAL_CIRCLE_MAX_TOTAL_EXPOSURE_USD ?? 300);
+
+/**
+ * Circuit breaker. A losing streak is either bad luck or a broken thesis
+ * generator, and the code cannot tell which — so it stops and asks a human
+ * rather than compounding the second case.
+ */
+export const MAX_WEEKLY_DRAWDOWN_USD = Number(process.env.CAPITAL_CIRCLE_MAX_WEEKLY_DRAWDOWN_USD ?? 75);
+export const MAX_CONSECUTIVE_LOSSES = Number(process.env.CAPITAL_CIRCLE_MAX_CONSECUTIVE_LOSSES ?? 6);
+
+// ---------------------------------------------------------------------------
+// Exits — previously nonexistent: every position was held to resolution.
+// ---------------------------------------------------------------------------
+
+/** Take profit here rather than carrying resolution risk for the last few cents. */
+export const TAKE_PROFIT_PRICE = Number(process.env.CAPITAL_CIRCLE_TAKE_PROFIT_PRICE ?? 0.95);
+
+/** Cut when the price has fallen this far below entry — the thesis is measurably wrong, recover what's left. */
+export const STOP_LOSS_FRACTION = Number(process.env.CAPITAL_CIRCLE_STOP_LOSS_FRACTION ?? 0.5);
+
+/** A market that never closes would otherwise leave a position open forever, silently understating exposure. */
+export const SETTLEMENT_STALE_HOURS = Number(process.env.CAPITAL_CIRCLE_SETTLEMENT_STALE_HOURS ?? 72);
+
+// ---------------------------------------------------------------------------
+// Ensembling — one sampled probability from a flash model is noisy; the median
+// of a few independent samples is the cheapest available variance reduction.
+// ---------------------------------------------------------------------------
+
+export const ENSEMBLE_SAMPLES = Number(process.env.CAPITAL_CIRCLE_ENSEMBLE_SAMPLES ?? 3);
+export const ENSEMBLE_TEMPERATURE = Number(process.env.CAPITAL_CIRCLE_ENSEMBLE_TEMPERATURE ?? 0.7);
+
+/** Spread between the highest and lowest sample above which the estimate is treated as "the model doesn't know". */
+export const ENSEMBLE_MAX_DISAGREEMENT = Number(process.env.CAPITAL_CIRCLE_ENSEMBLE_MAX_DISAGREEMENT ?? 0.25);
+
+/** Resolved predictions needed before measured calibration replaces the KELLY_SHRINKAGE prior. */
+export const MIN_SAMPLES_FOR_ADAPTIVE_SHRINKAGE = Number(process.env.CAPITAL_CIRCLE_MIN_CALIBRATION_SAMPLES ?? 30);
