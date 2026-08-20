@@ -120,14 +120,16 @@ export async function listActivePolymarketMarkets(limit = 20, maxHoursUntilResol
 }
 
 /**
- * A single market by its condition id, resolved or not — used by the settlement job to check
- * whether an open position's market has closed yet and, if so, what each outcome's final price
- * settled at (a resolved market's winning outcome converges to 1, the losing one to 0). Unlike
- * listActivePolymarketMarkets, this deliberately has no active/closed filter — a closed market is
- * exactly the case this needs to see.
+ * Whether a specific market has closed on Polymarket — used by the settlement job, which only
+ * ever calls this to answer exactly that question, never to inspect an open market's live state
+ * (listActivePolymarketMarkets already covers that). `closed: "true"` is required, confirmed
+ * against a real closed market: Gamma's `condition_ids` filter silently excludes closed markets
+ * when the closed param is omitted entirely — it does not default to "either", it defaults to
+ * effectively closed=false. Without this, settlement could never see a market that had actually
+ * resolved, no matter how long it waited.
  */
 export async function getPolymarketMarketByConditionId(conditionId: string): Promise<PolymarketMarketSummary | null> {
-  const params = new URLSearchParams({ condition_ids: conditionId });
+  const params = new URLSearchParams({ condition_ids: conditionId, closed: "true" });
   const response = await fetch(`${GAMMA_API_BASE}/markets?${params.toString()}`);
   if (!response.ok) {
     throw new Error(`Polymarket Gamma API request failed (HTTP ${response.status}).`);
