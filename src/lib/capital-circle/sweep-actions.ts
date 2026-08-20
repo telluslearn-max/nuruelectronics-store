@@ -1,10 +1,11 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { prisma } from "../prisma";
 import { requireAdminSession } from "../admin-auth";
 import { logAdminAction } from "../audit-log";
 import { redirectWithError, redirectWithSuccess } from "../admin-feedback";
+import { WALLET_ONCHAIN_TAG } from "../reports/capital-circle-wallet";
 
 /**
  * The only write path this feature has: a human, after manually converting
@@ -51,5 +52,8 @@ export async function confirmSweep(sweepId: string, formData: FormData): Promise
   });
 
   revalidatePath("/admin/reports/capital-circle");
+  // updateTag (not revalidateTag) — Server Action, read-your-own-writes: next load shows the
+  // fresh balance rather than serving stale-while-revalidate.
+  updateTag(WALLET_ONCHAIN_TAG);
   redirectWithSuccess("/admin/reports/capital-circle", "Sweep confirmed.");
 }

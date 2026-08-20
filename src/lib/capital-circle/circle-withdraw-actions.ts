@@ -1,10 +1,11 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { requireAdminSession } from "../admin-auth";
 import { logAdminAction } from "../audit-log";
 import { redirectWithError, redirectWithSuccess } from "../admin-feedback";
 import { withdrawUsdcToBinance, CIRCLE_WALLET_WITHDRAW_CAP_USDC } from "./circle-wallet-withdraw";
+import { WALLET_ONCHAIN_TAG } from "../reports/capital-circle-wallet";
 
 const REPORT_PATH = "/admin/reports/capital-circle";
 
@@ -54,5 +55,8 @@ export async function withdrawFromCircleWallet(formData: FormData): Promise<void
   }
 
   revalidatePath(REPORT_PATH);
+  // updateTag (not revalidateTag) — Server Action, read-your-own-writes: next load shows the
+  // fresh balance rather than serving stale-while-revalidate.
+  updateTag(WALLET_ONCHAIN_TAG);
   redirectWithSuccess(REPORT_PATH, `Withdrawal of $${amountUsdc.toFixed(2)} USDC submitted — check transaction status shortly.`);
 }
