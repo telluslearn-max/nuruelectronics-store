@@ -4,6 +4,13 @@ import { prisma } from "../prisma";
 import { circleWalletAddress, getBalanceUsdc, isCircleWalletConfigured } from "../capital-circle/circle-wallet-client";
 import { readCollateralBalance, readNativeBalance, type OnchainResult } from "../capital-circle/onchain";
 import { MAX_TOTAL_EXPOSURE_USD } from "../capital-circle/config";
+import {
+  auditLogToActivityRow,
+  mergeWalletActivity,
+  positionToActivityRow,
+  sweepToActivityRow,
+  type WalletActivityRow,
+} from "../capital-circle/wallet-activity";
 
 export const WALLET_ONCHAIN_TAG = "capital-circle-wallet-onchain";
 
@@ -85,6 +92,52 @@ async function loadWalletBalanceSnapshot(): Promise<WalletBalanceSnapshot> {
  * revalidateTag(WALLET_ONCHAIN_TAG) alongside their existing revalidatePath.
  */
 export const getWalletBalanceSnapshot = unstable_cache(loadWalletBalanceSnapshot, ["capital-circle-wallet-balance-snapshot"], {
+  revalidate: 30,
+  tags: [WALLET_ONCHAIN_TAG],
+});
+
+const ACTIVITY_ROW_LIMIT = 25;
+const ACTIVITY_LOOKBACK_ROWS = 50; // per source, before merge+truncate — generous enough that a quiet source never crowds out a busy one
+
+async function loadWalletActivity(): Promise<WalletActivityRow[]> {
+  const [positions, sweeps, auditRows] = await Promise.all([
+    prisma.capitalCirclePosition.findMany({
+      where: { status: { in: ["executed", "simulated"] } },
+      orderBy: { createdAt: "desc" },
+      take: ACTIVITY_LOOKBACK_ROWS,
+      select: { id: true, question: true, sizeUsd: true, status: true, txHash: true, createdAt: true },
+    }),
+    prisma.capitalCircleSweep.findMany({
+      orderBy: { weekStart: "desc" },
+      take: ACTIVITY_LOOKBACK_ROWS,
+      select: { id: true, weekStart: true, confirmedUsdcAmount: true, confirmedAt: true, detectedUsdcAmount: true, detectedAt: true, detectedTxHash: true },
+    }),
+    // entityType prefix matches the @@index([entityType, entityId]) on AdminAuditLog.
+    prisma.adminAuditLog.findMany({
+      where: { entityType: "capital_circle_wallet", action: { in: ["capital-circle.binance-deposit.success", "capital-circle.wallet-withdraw.success"] } },
+      orderBy: { createdAt: "desc" },
+      take: ACTIVITY_LOOKBACK_ROWS,
+      select: { id: true, action: true, createdAt: true, metadata: true },
+    }),
+  ]);
+
+  const rows = [
+    ...positions.map((p) => positionToActivityRow({ ...p, sizeUsd: Number(p.sizeUsd) })),
+    ...sweeps.map((s) =>
+      sweepToActivityRow({
+        ...s,
+        confirmedUsdcAmount: s.confirmedUsdcAmount != null ? Number(s.confirmedUsdcAmount) : null,
+        detectedUsdcAmount: s.detectedUsdcAmount != null ? Number(s.detectedUsdcAmount) : null,
+      }),
+    ),
+    ...auditRows.map((entry) => auditLogToActivityRow(entry)),
+  ];
+
+  return mergeWalletActivity(rows, ACTIVITY_ROW_LIMIT);
+}
+
+/** Same 30s TTL and invalidation story as getWalletBalanceSnapshot — see its comment. */
+export const getWalletActivity = unstable_cache(loadWalletActivity, ["capital-circle-wallet-activity"], {
   revalidate: 30,
   tags: [WALLET_ONCHAIN_TAG],
 });
