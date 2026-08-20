@@ -138,6 +138,41 @@ export async function getPolymarketMarketByConditionId(conditionId: string): Pro
   return markets[0] ?? null;
 }
 
+/**
+ * Backfills entryPrice for positions recorded before that field existed — settlement.ts calls
+ * this rather than leaving old positions permanently unscored. Pulls the CLOB's own price-history
+ * series for the token in a window around `atDate` and returns whichever point is closest to it,
+ * the same public, unauthenticated endpoint Polymarket's own charts use. `fidelity` is in minutes
+ * (1 = one point per minute) — a 2-hour window at 1-minute fidelity is small and precise enough
+ * for "what was the price around this exact timestamp" without pulling the whole market's history.
+ * Returns null (rather than throwing) if the series is empty — some very old or very short-lived
+ * markets don't retain minute-level history, and that's a normal case for the caller to fall back
+ * on, not an error.
+ */
+export async function getPolymarketHistoricalPrice(tokenId: string, atDate: Date): Promise<number | null> {
+  const client = getReadClient();
+  const atTs = Math.floor(atDate.getTime() / 1000);
+  const windowSeconds = 60 * 60; // 1 hour each side
+  try {
+    const response = await client.getPricesHistory({
+      market: tokenId,
+      startTs: atTs - windowSeconds,
+      endTs: atTs + windowSeconds,
+      fidelity: 1,
+    });
+    // The SDK's type declaration claims this resolves to MarketPrice[] directly, but the live
+    // endpoint actually wraps it as { history: MarketPrice[] } — confirmed against a real
+    // response, not just the (wrong) .d.ts. Handle both shapes rather than trust either blindly.
+    const points = Array.isArray(response) ? response : (response as unknown as { history?: unknown }).history;
+    if (!Array.isArray(points) || points.length === 0) return null;
+    const closest = points.reduce((best, point) => (Math.abs(point.t - atTs) < Math.abs(best.t - atTs) ? point : best));
+    const value = Number(closest.p);
+    return Number.isFinite(value) ? value : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function getPolymarketMidpoint(tokenId: string): Promise<number | null> {
   const client = getReadClient();
   try {
