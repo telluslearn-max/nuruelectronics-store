@@ -583,6 +583,13 @@ model CapitalCircleWallet {
   dailyCapUsd    Decimal?                  @db.Decimal(10, 2)
   weeklyCapUsd   Decimal?                  @db.Decimal(10, 2)
   monthlyCapUsd  Decimal?                  @db.Decimal(10, 2)
+  /// Circuit breaker. Set by the sizing layer when the trailing-week drawdown or a losing
+  /// streak crosses its limit; while set, no new position is approved. Cleared only by a
+  /// human from the admin report — a run of losses is either variance or a broken thesis
+  /// generator, and the code cannot tell which, so it stops rather than compounding the
+  /// second case.
+  pausedAt       DateTime?
+  pausedReason   String?
   createdAt      DateTime                  @default(now())
   updatedAt      DateTime                  @updatedAt
 
@@ -595,6 +602,14 @@ enum CapitalCirclePositionStatus {
   approved
   executed
   rejected
+  /// Refused by the code-side edge gate (see trade-policy.ts) rather than by a cap. Kept
+  /// distinct from `rejected` so "the model wanted a trade with no expected value" is
+  /// countable on its own — it's the main measure of whether the model's estimates are
+  /// improving, and it's noise if mixed in with size-capped and failed-order rows.
+  edge_rejected
+  /// Closed early by the position manager (take-profit or stop) rather than held to
+  /// resolution. resultUsd is realized at exitPrice, not at the market's final price.
+  exited
 }
 
 model CapitalCirclePosition {
@@ -607,15 +622,53 @@ model CapitalCirclePosition {
   question   String
   thesis     String
   sizeUsd    Decimal                     @db.Decimal(10, 2)
-  /// The bought outcome token's implied price (0-1) at decision time — the settlement job
-  /// divides sizeUsd by this to get an implied share count, so a resolved market's win/loss
-  /// can be computed as shares * finalPrice - sizeUsd instead of a flat win/lose guess.
+  /// The price actually used for settlement — since the overhaul, the ask-side price the
+  /// order book quoted at decision time, not a midpoint. The settlement job divides sizeUsd
+  /// by this to get an implied share count, so a resolved market's win/loss is
+  /// shares * finalPrice - sizeUsd rather than a flat win/lose guess. Using a midpoint here
+  /// (the old behaviour) silently credited every position half the spread it never earned.
   entryPrice Decimal?                    @db.Decimal(6, 4)
   /// The model's own stated conviction in its thesis, 0-100 — distinct from entryPrice (the
   /// market's implied probability): entryPrice is what the crowd thinks, confidencePct is what
   /// the model thinks. A model betting against a skewed market should often show low entryPrice
   /// alongside high confidencePct, or vice versa — the gap between them is the whole thesis.
+  /// Scored against outcomes as a Brier score (see track-record.ts) and fed back into the next
+  /// cycle, which is what turns it from a stored number into a signal.
   confidencePct Int?
+  /// Shrunk probability minus effective entry minus modelled costs, at decision time — the
+  /// expected value this position was taken for. Comparing this against realized outcomes is
+  /// how a threshold gets tuned from data instead of taste.
+  edgePct        Decimal? @db.Decimal(6, 4)
+  /// Book state at entry, kept so a post-mortem can separate "the thesis was wrong" from
+  /// "the fill was expensive".
+  spreadAtEntry  Decimal? @db.Decimal(6, 4)
+  bestAskAtEntry Decimal? @db.Decimal(6, 4)
+  /// Live: the price actually filled, derived from the CLOB order response. Simulated: the
+  /// ask we assumed we'd pay. Distinct from entryPrice so a future fill-vs-quote comparison
+  /// can measure real slippage.
+  fillPrice      Decimal? @db.Decimal(6, 4)
+  /// Modelled (simulated) or actual (live) cost drag, subtracted at settlement.
+  feesUsd        Decimal? @db.Decimal(10, 2)
+  /// The raw Kelly fraction the sizing calc produced before the fractional multiplier and caps.
+  kellyFraction  Decimal? @db.Decimal(6, 4)
+  /// The cycle that produced this position — joins a trade to the market slate, news context,
+  /// and track record that were in front of the model when it decided.
+  cycleId        String?
+  /// The market's own resolution time, captured at entry so settlement can void a position
+  /// whose market never closes instead of leaving it open forever.
+  marketEndDate  DateTime?
+  /// Polymarket event grouping. Two outcomes of the same event are the same wager, so the
+  /// portfolio limits treat them as one.
+  eventId        String?
+  /// Coarse topic bucket (crypto/sports/politics/economics/other) for per-category track records.
+  category       String?
+  /// The individual ensemble samples behind confidencePct, kept so a wide disagreement can be
+  /// distinguished from a confident estimate after the fact.
+  probEstimates  Json?
+  /// resolution | take_profit | stop | voided
+  exitReason     String?
+  /// Price at which an early exit was booked (null for held-to-resolution positions).
+  exitPrice      Decimal? @db.Decimal(6, 4)
   status     CapitalCirclePositionStatus @default(simulated)
   txHash     String?
   resultUsd  Decimal?                    @db.Decimal(10, 2)
@@ -624,6 +677,68 @@ model CapitalCirclePosition {
 
   @@index([status, createdAt])
   @@index([walletId])
+  /// Serves the dedupe check on every record_position: "am I already holding this market?"
+  @@index([marketId, resolvedAt])
+}
+
+/// One row per hourly cycle — what the agent saw and what it decided.
+///
+/// Exists because the old design kept no record of a cycle at all beyond the model's own
+/// prose summary, so "why did it pass on everything last Tuesday" was unanswerable. Storing
+/// the injected context alongside the decision makes each cycle reconstructable.
+model CapitalCircleCycleLog {
+  id             String    @id @default(cuid())
+  startedAt      DateTime  @default(now())
+  finishedAt     DateTime?
+  candidateCount Int       @default(0)
+  toolCallCount  Int       @default(0)
+  /// traded | passed | edge_rejected | error | inconclusive
+  action         String    @default("passed")
+  summary        String    @default("")
+  /// The track record and calibration figures injected into this cycle's prompt.
+  contextSnapshot Json?
+  /// The grounded-search digest used for this cycle's estimates, if the pre-pass succeeded.
+  newsContext    String?
+  positionIds    String[]  @default([])
+
+  @@index([startedAt])
+}
+
+/// Every market the agent priced, whether or not it traded it.
+///
+/// This is what makes the strategy measurable. Because the scoring stage prices the whole
+/// slate and settlement backfills each row's real outcome, these accumulate into a labeled
+/// dataset of (market, model probability, price, outcome) — including the markets that were
+/// passed on. That supports honest calibration measurement and counterfactual evaluation of
+/// policy thresholds (policy-eval.ts), neither of which is possible from taken trades alone,
+/// where the sample is selected precisely on the model's own judgement.
+model CapitalCircleCandidateSnapshot {
+  id                String   @id @default(cuid())
+  cycleId           String
+  marketId          String
+  tokenId           String
+  question          String
+  category          String?
+  eventId           String?
+  bestAsk           Decimal? @db.Decimal(6, 4)
+  bestBid           Decimal? @db.Decimal(6, 4)
+  spread            Decimal? @db.Decimal(6, 4)
+  liquidityUsd      Decimal? @db.Decimal(14, 2)
+  volume24hUsd      Decimal? @db.Decimal(14, 2)
+  hoursToResolution Decimal? @db.Decimal(8, 2)
+  /// The ensembled probability the model assigned this outcome.
+  modelProbability  Decimal? @db.Decimal(6, 4)
+  /// Spread between ensemble samples — high means the estimate was unstable, not confident.
+  disagreement      Decimal? @db.Decimal(6, 4)
+  traded            Boolean  @default(false)
+  /// Backfilled by settlement once the market closes: 1 if this outcome won, 0 if it lost.
+  resolvedOutcome   Int?
+  resolvedAt        DateTime?
+  createdAt         DateTime @default(now())
+
+  @@index([cycleId])
+  @@index([marketId, resolvedAt])
+  @@index([resolvedAt])
 }
 
 /// A subscribed browser/PWA endpoint for Web Push — the admin dashboard is already an

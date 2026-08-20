@@ -102,15 +102,21 @@ export async function sendCapitalCircleCycleEmail(result: CapitalCircleCycleResu
     console.log("[capital-circle] CAPITAL_CIRCLE_OWNER_EMAIL not set — skipping cycle-summary notification.");
     return;
   }
-  const dateLabel = new Intl.DateTimeFormat("en-KE", { dateStyle: "medium" }).format(new Date());
+  // Hourly, not weekly — the subject line used to say "this week's cycle", which made an
+  // hourly notification read like a digest and buried the one that mattered.
+  const dateLabel = new Intl.DateTimeFormat("en-KE", { dateStyle: "medium", timeStyle: "short" }).format(new Date());
   const reportUrl = `${SITE_URL}/admin/reports/capital-circle`;
   const summaryHtml = escapeHtml(result.summary).replace(/\n/g, "<br>");
+  const scanned =
+    result.candidateCount != null
+      ? `Screened ${result.candidateCount} tradeable market${result.candidateCount === 1 ? "" : "s"}; ${result.selectedCount ?? 0} passed the edge gate. `
+      : "";
   await sendPlainEmail({
     to: capitalCircleOwnerEmail,
     subject: result.ran
-      ? `Capital Circle: this week's cycle summary (${dateLabel})`
-      : `Capital Circle: this week's cycle didn't run (${dateLabel})`,
-    html: `<p>${summaryHtml}</p><p>${result.toolCallCount} tool call${result.toolCallCount === 1 ? "" : "s"} this cycle. Full position history: <a href="${reportUrl}">${reportUrl}</a></p>`,
+      ? `Capital Circle: cycle summary (${dateLabel})`
+      : `Capital Circle: cycle didn't run (${dateLabel})`,
+    html: `<p>${summaryHtml}</p><p>${scanned}${result.toolCallCount} tool call${result.toolCallCount === 1 ? "" : "s"} this cycle. Full position history: <a href="${reportUrl}">${reportUrl}</a></p>`,
   });
 }
 
