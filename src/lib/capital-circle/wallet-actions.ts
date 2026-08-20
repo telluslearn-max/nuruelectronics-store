@@ -1,12 +1,13 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { prisma } from "../prisma";
 import { requireAdminSession } from "../admin-auth";
 import { logAdminAction } from "../audit-log";
 import { redirectWithError, redirectWithSuccess } from "../admin-feedback";
 import { CAPITAL_CIRCLE_WALLET_STATUSES, parseEnumField } from "../parse-enum";
 import { DEFAULT_ALLOWED_CHAINS, evaluateIdentityChange, normalizeAddress } from "./wallet-identity";
+import { getWalletBalanceSnapshot, WALLET_ONCHAIN_TAG } from "../reports/capital-circle-wallet";
 
 const REPORT_PATH = "/admin/reports/capital-circle";
 
@@ -223,4 +224,37 @@ export async function clearCapitalCirclePause(formData: FormData): Promise<void>
 
   revalidatePath(REPORT_PATH);
   redirectWithSuccess(REPORT_PATH, "Trading resumed.");
+}
+
+/**
+ * Manual refresh for the balance panel — bypasses the 30s cache on demand. Also the one place a
+ * balance discrepancy actually gets logged: the cached snapshot loader itself stays a pure read
+ * with no side effects, specifically so a persisting gap doesn't fire an audit-log write on every
+ * cache expiry it survives (every 30s, for as long as it's wrong). A human clicking refresh is a
+ * naturally bounded, low-frequency trigger for that record instead.
+ *
+ * updateTag rather than revalidateTag: this is the textbook read-your-own-writes case — the
+ * getWalletBalanceSnapshot() call right below must see the fresh value in this same execution,
+ * not the stale-while-revalidate value revalidateTag's "max" profile would still serve once.
+ */
+export async function refreshWalletOnchainData(): Promise<void> {
+  await requireAdminSession();
+
+  updateTag(WALLET_ONCHAIN_TAG);
+  revalidatePath(REPORT_PATH);
+
+  const snapshot = await getWalletBalanceSnapshot();
+  if (snapshot.discrepancyUsd !== null && snapshot.onchainCollateral?.ok && snapshot.circleCollateral?.ok) {
+    await logAdminAction({
+      action: "capital-circle.wallet.balance-discrepancy",
+      entityType: "capital_circle_wallet",
+      entityId: snapshot.address ?? "circle-wallet",
+      summary:
+        `On-chain collateral ($${snapshot.onchainCollateral.value.toFixed(2)}) and Circle's reported balance ` +
+        `($${snapshot.circleCollateral.amount.toFixed(2)}) disagree by $${Math.abs(snapshot.discrepancyUsd).toFixed(2)}.`,
+      metadata: { onchain: snapshot.onchainCollateral.value, circle: snapshot.circleCollateral.amount, discrepancyUsd: snapshot.discrepancyUsd },
+    }).catch(() => {}); // never let a log failure break the refresh itself
+  }
+
+  redirectWithSuccess(REPORT_PATH, "Balances refreshed.");
 }

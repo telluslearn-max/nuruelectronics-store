@@ -1,10 +1,11 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { requireAdminSession } from "../admin-auth";
 import { logAdminAction } from "../audit-log";
 import { redirectWithError, redirectWithSuccess } from "../admin-feedback";
 import { withdrawUsdcToCapitalCircleWallet, BINANCE_WITHDRAW_CAP_USDC } from "./binance-client";
+import { WALLET_ONCHAIN_TAG } from "../reports/capital-circle-wallet";
 
 const REPORT_PATH = "/admin/reports/capital-circle";
 
@@ -55,5 +56,9 @@ export async function depositFromBinance(formData: FormData): Promise<void> {
   }
 
   revalidatePath(REPORT_PATH);
+  // updateTag (not revalidateTag) — this is a Server Action, and a deposit/withdrawal is exactly
+  // the read-your-own-writes case: the next load should show the fresh balance, not the stale one
+  // while a background refetch happens.
+  updateTag(WALLET_ONCHAIN_TAG);
   redirectWithSuccess(REPORT_PATH, `Requested $${amountUsdc.toFixed(2)} USDC from Binance — check the wallet balance shortly.`);
 }
