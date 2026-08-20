@@ -68,7 +68,11 @@ export function PushSubscribeButton() {
         setStatus("denied");
         return;
       }
-      const registration = await navigator.serviceWorker.register("/sw.js");
+      await navigator.serviceWorker.register("/sw.js");
+      // register() resolving only means registration started — pushManager.subscribe() needs an
+      // *activated* worker, and on a first-ever registration it's still "installing" at this
+      // point. `.ready` is the standard wait for a controlling active worker in this scope.
+      const registration = await navigator.serviceWorker.ready;
       const subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY as string),
