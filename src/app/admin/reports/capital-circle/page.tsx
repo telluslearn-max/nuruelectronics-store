@@ -489,10 +489,13 @@ export default async function CapitalCirclePage({
                       dangerouslySetInnerHTML={{ __html: depositQrByWalletId[wallet.id] }}
                     />
                     <div className="min-w-0">
-                      <div className="text-xs font-medium text-neutral-500">Scan to deposit USDC (Polygon)</div>
+                      <div className="text-xs font-medium text-neutral-500">Scan to deposit (Polygon)</div>
                       <p className="mt-1 max-w-xs text-xs text-neutral-500">
-                        Pre-fills the USDC token and this address in wallets that support EIP-681 (MetaMask, Trust
-                        Wallet). Always double-check the network is Polygon before sending.
+                        Pre-fills Polymarket&apos;s current collateral token and this address in wallets that support
+                        EIP-681 (MetaMask, Trust Wallet). This is <strong>not always plain USDC</strong> — Polymarket
+                        changed collateral tokens once already (to pUSD, April 2026) and can again; trust what the QR
+                        pre-fills over the word &quot;USDC&quot; anywhere else on this page. Always double-check the
+                        network is Polygon before sending.
                       </p>
                       <p className="mt-2 break-all font-mono text-xs text-neutral-500">{wallet.address}</p>
                     </div>
