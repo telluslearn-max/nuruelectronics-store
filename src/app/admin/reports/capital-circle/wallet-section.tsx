@@ -5,7 +5,7 @@ import { getWalletActivity, getWalletBalanceSnapshot } from "@/lib/reports/capit
 import { evaluateReadiness, type ReadinessItem, type ReadinessState } from "@/lib/capital-circle/readiness";
 import { CAPITAL_CIRCLE_NETWORK, explorerAddressUrl, explorerTokenUrl, explorerTxUrl } from "@/lib/capital-circle/chain";
 import { readCollateralAllowance } from "@/lib/capital-circle/onchain";
-import { circleWalletAddress, COLLATERAL_TOKEN_ADDRESS } from "@/lib/capital-circle/circle-wallet-client";
+import { circleWalletAddress, circleWalletId, COLLATERAL_TOKEN_ADDRESS } from "@/lib/capital-circle/circle-wallet-client";
 import { CAPITAL_CIRCLE_LIVE } from "@/lib/capital-circle/config";
 import { truncateAddress } from "@/lib/capital-circle/wallet-identity";
 import { walletDepositQrSvg } from "@/lib/capital-circle/wallet-qr";
@@ -15,6 +15,7 @@ import { isCircleWalletWithdrawConfigured, CIRCLE_WALLET_WITHDRAW_CAP_USDC } fro
 import { withdrawFromCircleWallet } from "@/lib/capital-circle/circle-withdraw-actions";
 import {
   registerCapitalCircleWallet,
+  registerConfiguredCircleWallet,
   saveCapitalCircleWalletCaps,
   updateCapitalCircleWalletIdentity,
   refreshWalletOnchainData,
@@ -273,6 +274,71 @@ async function ActivityRows() {
   );
 }
 
+/** Two fields, nothing else — chain and status are implicit (see registerCapitalCircleWallet's
+    own comment for why). Reused by both branches of RegisterWalletCard below, since "the
+    env-configured wallet isn't registered yet" and "no wallet is configured at all" both fall
+    back to the same manual path for the rare case it's actually needed. */
+function ManualRegisterForm() {
+  return (
+    <form action={registerCapitalCircleWallet} className="mt-3 space-y-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div>
+          <label className="block text-xs text-neutral-500">Circle wallet id</label>
+          <input type="text" name="circleWalletId" placeholder="from circle-wallet-setup.mjs" className={inputClass} />
+        </div>
+        <div>
+          <label className="block text-xs text-neutral-500">Address</label>
+          <input type="text" name="address" placeholder="0x…" className={inputClass} />
+        </div>
+      </div>
+      <SubmitButton className="rounded-control border border-border-subtle px-4 py-2 text-sm font-medium hover:border-foreground" pendingText="Registering…">
+        Register wallet
+      </SubmitButton>
+    </form>
+  );
+}
+
+/**
+ * Replaces the old always-present "Register a wallet" form at the bottom of the page. Two real
+ * states, not eight form fields: either CIRCLE_WALLET_ID/CIRCLE_WALLET_ADDRESS are already
+ * env-configured — the values every other part of this app already trusts and uses for real
+ * money movement — in which case registering is a single confirm click with nothing to type or
+ * mistype, or nothing is configured yet, in which case the only real next step is running the
+ * setup script. Manual entry still exists for the genuine edge case (a second wallet, managing
+ * something the env vars don't point at) but is no longer the first thing anyone sees.
+ */
+function RegisterWalletCard() {
+  const envConfigured = Boolean(circleWalletAddress && circleWalletId);
+
+  return (
+    <div className="mt-6 rounded-card border border-dashed border-border-subtle p-6 text-center text-sm text-neutral-500">
+      {envConfigured ? (
+        <>
+          <p>Found a wallet configured in your environment:</p>
+          <p className="mt-2 font-mono text-neutral-700">{truncateAddress(circleWalletAddress as string)}</p>
+          <form action={registerConfiguredCircleWallet} className="mt-3">
+            <SubmitButton className="rounded-control bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:opacity-90" pendingText="Registering…">
+              Register this wallet
+            </SubmitButton>
+          </form>
+        </>
+      ) : (
+        <p>
+          No wallet yet — provision one with{" "}
+          <code className="rounded bg-neutral-100 px-1 py-0.5">scripts/circle-wallet-setup.mjs</code>, add the
+          resulting values to your environment, then reload this page.
+        </p>
+      )}
+      <details className="mt-3 text-left">
+        <summary className="cursor-pointer text-xs text-neutral-400">
+          {envConfigured ? "Register a different wallet manually" : "Enter one manually instead"}
+        </summary>
+        <ManualRegisterForm />
+      </details>
+    </div>
+  );
+}
+
 export async function WalletSection({ wallets }: { wallets: CapitalCircleWalletSummary[] }) {
   const dbWallet = wallets.find((w) => w.address) ?? null;
 
@@ -299,15 +365,7 @@ export async function WalletSection({ wallets }: { wallets: CapitalCircleWalletS
         <WalletHero dbWallet={dbWallet} />
       </Suspense>
 
-      {dbWallet?.address ? (
-        <ReceiveCard address={dbWallet.address} />
-      ) : (
-        <div className="mt-6 rounded-card border border-dashed border-border-subtle p-6 text-center text-sm text-neutral-500">
-          No wallet registered yet — provision one with{" "}
-          <code className="rounded bg-neutral-100 px-1 py-0.5">scripts/circle-wallet-setup.mjs</code>, then register
-          it below to see a deposit address here.
-        </div>
-      )}
+      {dbWallet?.address ? <ReceiveCard address={dbWallet.address} /> : <RegisterWalletCard />}
 
       <details className={DETAILS}>
         <summary className="cursor-pointer text-sm font-medium">Activity</summary>
@@ -445,42 +503,6 @@ export async function WalletSection({ wallets }: { wallets: CapitalCircleWalletS
         )}
       </details>
 
-      <details className={DETAILS}>
-        <summary className="cursor-pointer text-sm font-medium">Register a wallet</summary>
-        <form action={registerCapitalCircleWallet} className="mt-4 space-y-3">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div>
-              <label className="block text-xs text-neutral-500">Circle wallet id</label>
-              <input type="text" name="circleWalletId" placeholder="from circle-wallet-setup.mjs" className={inputClass} />
-            </div>
-            <div>
-              <label className="block text-xs text-neutral-500">Address</label>
-              <input type="text" name="address" placeholder="0x…" className={inputClass} />
-            </div>
-            <div>
-              <label className="block text-xs text-neutral-500">Chain</label>
-              <input type="text" name="chain" defaultValue="polygon" className={inputClass} />
-            </div>
-            <div>
-              <label className="block text-xs text-neutral-500">Status</label>
-              <select name="status" defaultValue="pending" className={inputClass}>
-                <option value="pending">pending</option>
-                <option value="active">active</option>
-                <option value="frozen">frozen</option>
-              </select>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <WalletCapField name="perTxCapUsd" label="Per-tx cap (USD)" defaultValue="" />
-            <WalletCapField name="dailyCapUsd" label="Daily cap (USD)" defaultValue="" />
-            <WalletCapField name="weeklyCapUsd" label="Weekly cap (USD)" defaultValue="" />
-            <WalletCapField name="monthlyCapUsd" label="Monthly cap (USD)" defaultValue="" />
-          </div>
-          <SubmitButton className="rounded-control bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:opacity-90" pendingText="Registering…">
-            Register wallet
-          </SubmitButton>
-        </form>
-      </details>
     </div>
   );
 }
