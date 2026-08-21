@@ -5,6 +5,11 @@ import { parseMarket, toNum } from "./polymarket-client";
  * Shaped after a real Gamma /markets response: outcomes, outcomePrices and
  * clobTokenIds arrive as JSON-encoded strings holding parallel arrays, and the
  * numeric fields are inconsistently typed between markets.
+ *
+ * `tags` here is a fixture convenience, not reality — confirmed live that a real /markets row
+ * carries no `tags` field at all (see parseCategory's comment). Every "classifies from tags" test
+ * below exercises a path production never takes; "falls back to the slug" and the EPL test near
+ * the bottom of this file are the ones that match what actually happens on a live cycle.
  */
 const GAMMA_FIXTURE = {
   conditionId: "0xabc123",
@@ -89,6 +94,43 @@ describe("parseMarket", () => {
 
   it("falls back to the slug when a market carries no usable tags", () => {
     expect(parseMarket({ ...GAMMA_FIXTURE, tags: [], slug: "nfl-week-3" })?.category).toBe("sports");
+  });
+
+  it("classifies real live slug shapes — this is the path production actually runs, tags never included", () => {
+    const slugOnly = (slug: string) => parseMarket({ ...GAMMA_FIXTURE, tags: undefined, slug })?.category;
+    // Verified live against gamma-api.polymarket.com/markets on 2026-08-21 — these are real slugs
+    // of markets that were active at the time, none of which the pre-fix keyword list matched.
+    expect(slugOnly("epl-ars-cov-2026-08-21-ars")).toBe("sports");
+    expect(slugOnly("epl-new-liv-2026-08-23-draw")).toBe("sports");
+    expect(slugOnly("mlb-atl-mil-2026-08-21-total-6pt5")).toBe("sports");
+    expect(slugOnly("uefa-champions-league-winner-2027")).toBe("sports");
+    expect(slugOnly("la-liga-top-scorer-2026-27")).toBe("sports");
+    expect(slugOnly("us-x-iran-ceasefire-continues-through-august-22")).toBe("politics");
+  });
+
+  it("classifies esports as its own category, not sports or other", () => {
+    // A live top-300-by-volume snapshot on 2026-08-21 found esports (dota2/lol/cs2/valorant) as
+    // the single largest unclassified vertical — a Dota2 match at $3.8M in 24h volume outranked
+    // every crypto and traditional-sports market in the entire snapshot. These are real slugs
+    // from that snapshot, checked for zero false positives against the whole set first.
+    const slugOnly = (slug: string) => parseMarket({ ...GAMMA_FIXTURE, tags: undefined, slug })?.category;
+    expect(slugOnly("dota2-ts8-vsn2-2026-08-21-game1")).toBe("esports");
+    expect(slugOnly("lol-bro2-fox1-2026-08-21")).toBe("esports");
+    expect(slugOnly("cs2-fut-mouz-2026-08-21")).toBe("esports");
+    expect(slugOnly("val-drx1-spe-2026-08-21")).toBe("esports");
+  });
+
+  it("reports a real, non-empty slug that matches nothing as 'other', not null", () => {
+    // The old `labels.length > 0 ? "other" : null` gate never fired in production (tags are
+    // never populated on a live /markets response), so every unmatched market — 71% of the top
+    // 300 by volume in the same snapshot — silently became "uncategorized" with no visibility.
+    // A market always has a slug; "other" should mean "we looked and it's genuinely unclassified",
+    // not "we never had the tags to look in the first place".
+    expect(parseMarket({ ...GAMMA_FIXTURE, tags: undefined, slug: "highest-temperature-in-seoul-on-august-21-2026-27c" })?.category).toBe(
+      "other",
+    );
+    // An empty slug is the one genuinely informationless case — still null.
+    expect(parseMarket({ ...GAMMA_FIXTURE, tags: undefined, slug: "" })?.category).toBeNull();
   });
 
   it("accepts plain-string tags as well as objects", () => {

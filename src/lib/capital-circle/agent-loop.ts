@@ -7,8 +7,10 @@ import {
   ENSEMBLE_MAX_DISAGREEMENT,
   ENSEMBLE_SAMPLES,
   ENSEMBLE_TEMPERATURE,
+  KELLY_SHRINKAGE,
   MAX_POSITIONS_PER_CYCLE,
   MAX_TOOL_ITERATIONS,
+  MIN_EDGE,
   THINKING_BUDGET,
 } from "./config";
 import { getGenAIClient, isCapitalCircleConfigured } from "./vertex-client";
@@ -17,7 +19,7 @@ import { dispatchTool, functionDeclarations, logCandidateSlate, type ApprovedTra
 import { listActivePolymarketMarkets } from "./polymarket-client";
 import { filterAndRankCandidates, toScoringView, type ScreenedMarket } from "./candidate-filter";
 import { ensembleProbabilities, type ProbabilitySample } from "./ensemble";
-import { selectTrades, type SelectionCandidate } from "./trade-policy";
+import { requiredDeviation, selectTrades, type SelectionCandidate } from "./trade-policy";
 import { getTrackRecord, getTradingUrgency, renderTrackRecordForPrompt } from "./track-record";
 
 export type CapitalCircleCycleResult = {
@@ -159,10 +161,20 @@ export async function runCapitalCircleCycle(): Promise<CapitalCircleCycleResult>
 
   if (selection.selected.length === 0) {
     const closest = [...selection.rejected].sort((a, b) => b.edge - a.edge)[0];
+    // A quiet hour has two very different causes that used to read identically: nothing good was
+    // on offer, or the bar itself has become unreachable because measured calibration dropped λ
+    // (see requiredDeviation). Naming the deviation the bar is actually demanding distinguishes
+    // "unlucky hour" from "this desk is switched off until calibration recovers".
+    const effectiveLambda = lambda ?? KELLY_SHRINKAGE;
+    const needed = requiredDeviation(minEdge ?? MIN_EDGE, effectiveLambda);
+    const barNote =
+      needed == null
+        ? `λ is 0, so no forecast can clear the bar at all.`
+        : `At λ=${effectiveLambda} the bar needs the model ${(needed * 100).toFixed(1)} points away from the market price${needed >= 0.15 ? " — a gap an honest forecast of a liquid market will essentially never produce, so this is calibration holding the desk back, not a thin hour" : ""}.`;
     return finish(
       {
         ran: true,
-        summary: `Priced ${estimates.length} outcomes across ${screened.candidates.length} markets; none cleared the ${(minEdge ?? 0).toFixed(4)} edge bar${urgency?.hungry ? " (already relaxed — " + urgency.reason + ")" : ""}. Closest was ${closest ? `edge ${closest.edge.toFixed(4)} — ${closest.reason}` : "not measurable"}. No trade this hour.`,
+        summary: `Priced ${estimates.length} outcomes across ${screened.candidates.length} markets; none cleared the ${(minEdge ?? 0).toFixed(4)} edge bar${urgency?.hungry ? " (already relaxed — " + urgency.reason + ")" : ""}. ${barNote} Closest was ${closest ? `edge ${closest.edge.toFixed(4)} — ${closest.reason}` : "not measurable"}. No trade this hour.`,
         toolCallCount: 0,
         candidateCount: screened.candidates.length,
         selectedCount: 0,
@@ -184,6 +196,9 @@ export async function runCapitalCircleCycle(): Promise<CapitalCircleCycleResult>
       // No ceiling from this stage — recordPosition derives the real size from the trade's
       // own edge and the pool's caps, which is strictly tighter than anything guessed here.
       sizeUsd: null,
+      // The trust level this trade was actually selected at, not the cycle-wide one — the
+      // executor's re-price must not be more generous than the gate that approved it.
+      lambda: trade.lambda,
       eventId: trade.eventId ?? null,
       category: trade.category ?? null,
       marketEndDate: market?.endDate ?? null,
@@ -276,6 +291,15 @@ const scoringResponseSchema = {
 } as const;
 
 /**
+ * The scoring call returns one JSON estimate per outcome token, so its output length scales with
+ * the slate — and a truncated response doesn't error, it just silently returns fewer estimates,
+ * which looks exactly like "the model had no opinion on those markets". Set explicitly rather
+ * than inherited from the model default so widening CANDIDATE_LIMIT can't quietly start dropping
+ * candidates off the end of the slate.
+ */
+const SCORING_MAX_OUTPUT_TOKENS = 16_384;
+
+/**
  * Runs the scoring prompt ENSEMBLE_SAMPLES times at a non-zero temperature.
  * The samples are independent draws, so a market where the model is genuinely
  * uncertain produces visibly scattered numbers — which is information the
@@ -301,6 +325,7 @@ async function scoreCandidates(views: ReturnType<typeof toScoringView>[], contex
           temperature: ENSEMBLE_TEMPERATURE,
           responseMimeType: "application/json",
           responseSchema: scoringResponseSchema as never,
+          maxOutputTokens: SCORING_MAX_OUTPUT_TOKENS,
           thinkingConfig: { thinkingBudget: THINKING_BUDGET },
         },
       }),
@@ -457,7 +482,7 @@ async function runDeepDive(
       model: CAPITAL_CIRCLE_MODEL,
       contents,
       config: {
-        systemInstruction: buildDeepDiveSystemInstruction(urgency),
+        systemInstruction: buildDeepDiveSystemInstruction(urgency, toolContext.minEdge ?? MIN_EDGE),
         tools: [{ functionDeclarations }],
         toolConfig: { functionCallingConfig: { mode: FunctionCallingConfigMode.AUTO } },
         thinkingConfig: { thinkingBudget: THINKING_BUDGET },

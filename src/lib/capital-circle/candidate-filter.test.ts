@@ -150,4 +150,9 @@ describe("toScoringView", () => {
     expect(view.outcomes).toHaveLength(2);
     expect(view.outcomes[0]).toMatchObject({ outcome: "Yes", marketPrice: 0.55 });
   });
+
+  it("exposes eventId so the model can price correlated legs of the same event coherently", () => {
+    const [candidate] = filterAndRankCandidates([market({ conditionId: "a", eventId: "evt-123" })], { now: NOW }).candidates;
+    expect(toScoringView(candidate).eventId).toBe("evt-123");
+  });
 });

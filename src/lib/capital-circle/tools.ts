@@ -115,6 +115,12 @@ export type ApprovedTrade = {
   question: string;
   /** Optional ceiling. Null means "no ceiling beyond the pool's own caps". */
   sizeUsd: number | null;
+  /**
+   * The confidence-adjusted λ this specific trade was selected at (see disagreementAdjustedLambda).
+   * Falls back to the cycle-wide λ when absent. Present so record_position's independent re-price
+   * applies the same trust level that approved the trade rather than the more generous global one.
+   */
+  lambda?: number;
   eventId: string | null;
   category: string | null;
   marketEndDate: Date | null;
@@ -179,7 +185,7 @@ export async function dispatchTool(
         thesis,
         sizeUsd: typeof args.sizeUsd === "number" ? args.sizeUsd : (approved.sizeUsd ?? undefined),
         confidencePct,
-        lambda: context.lambda,
+        lambda: approved.lambda ?? context.lambda,
         minEdge: context.minEdge,
         eventId: approved.eventId,
         category: approved.category,

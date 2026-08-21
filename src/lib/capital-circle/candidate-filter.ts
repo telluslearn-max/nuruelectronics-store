@@ -149,6 +149,11 @@ export function filterAndRankCandidates(
 export function toScoringView(market: ScreenedMarket) {
   return {
     marketId: market.conditionId,
+    // Markets sharing an eventId are legs of the same real-world event (e.g. a match's
+    // moneyline, spread, and draw are three separate markets under one event) — without this,
+    // the model prices each in total isolation and has no way to notice its own estimates are
+    // mutually inconsistent, let alone that a mispriced leg implies something about its siblings.
+    eventId: market.eventId,
     question: market.question,
     category: market.category,
     hoursToResolution: Number(market.hoursToResolution.toFixed(2)),
