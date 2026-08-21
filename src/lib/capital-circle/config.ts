@@ -107,8 +107,15 @@ export const MIN_EDGE = Number(process.env.CAPITAL_CIRCLE_MIN_EDGE ?? 0.03);
  */
 export const MIN_EDGE_WHEN_HUNGRY = Number(process.env.CAPITAL_CIRCLE_MIN_EDGE_WHEN_HUNGRY ?? 0.012);
 
-/** Positions per day the desk aims to place, provided something clears the (relaxed) bar. */
-export const DAILY_POSITION_TARGET = Number(process.env.CAPITAL_CIRCLE_DAILY_POSITION_TARGET ?? 1);
+/**
+ * Positions per day the desk aims to place, provided something clears the (relaxed) bar — a
+ * floor to hit, not a ceiling: MAX_POSITIONS_PER_CYCLE (4) already allows more in a single hour
+ * if the market offers them, and hitting this target just means computeUrgency stops relaxing the
+ * edge bar for the rest of the day. 3 rather than 1 because the hunger ramp resets on every
+ * position regardless of count — see computeUrgency in trade-policy.ts — so raising this doesn't
+ * need any other threshold retuned to fit multiple positions across a day.
+ */
+export const DAILY_POSITION_TARGET = Number(process.env.CAPITAL_CIRCLE_DAILY_POSITION_TARGET ?? 3);
 
 /**
  * Hours without a position before the bar starts sliding from MIN_EDGE toward
