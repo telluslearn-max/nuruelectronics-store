@@ -5,6 +5,11 @@ import { parseMarket, toNum } from "./polymarket-client";
  * Shaped after a real Gamma /markets response: outcomes, outcomePrices and
  * clobTokenIds arrive as JSON-encoded strings holding parallel arrays, and the
  * numeric fields are inconsistently typed between markets.
+ *
+ * `tags` here is a fixture convenience, not reality — confirmed live that a real /markets row
+ * carries no `tags` field at all (see parseCategory's comment). Every "classifies from tags" test
+ * below exercises a path production never takes; "falls back to the slug" and the EPL test near
+ * the bottom of this file are the ones that match what actually happens on a live cycle.
  */
 const GAMMA_FIXTURE = {
   conditionId: "0xabc123",
@@ -89,6 +94,17 @@ describe("parseMarket", () => {
 
   it("falls back to the slug when a market carries no usable tags", () => {
     expect(parseMarket({ ...GAMMA_FIXTURE, tags: [], slug: "nfl-week-3" })?.category).toBe("sports");
+  });
+
+  it("classifies real live slug shapes — this is the path production actually runs, tags never included", () => {
+    const slugOnly = (slug: string) => parseMarket({ ...GAMMA_FIXTURE, tags: undefined, slug })?.category;
+    // Verified live against gamma-api.polymarket.com/markets on 2026-08-21 — these are real slugs
+    // of markets that were active at the time, none of which the pre-fix keyword list matched.
+    expect(slugOnly("epl-ars-cov-2026-08-21-ars")).toBe("sports");
+    expect(slugOnly("epl-new-liv-2026-08-23-draw")).toBe("sports");
+    expect(slugOnly("mlb-atl-mil-2026-08-21-total-6pt5")).toBe("sports");
+    expect(slugOnly("uefa-champions-league-winner-2027")).toBe("sports");
+    expect(slugOnly("la-liga-top-scorer-2026-27")).toBe("sports");
   });
 
   it("accepts plain-string tags as well as objects", () => {

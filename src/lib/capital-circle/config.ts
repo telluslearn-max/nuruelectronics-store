@@ -78,8 +78,16 @@ export const CANDIDATE_LIMIT = Number(process.env.CAPITAL_CIRCLE_CANDIDATE_LIMIT
  */
 export const SEARCH_HORIZON_HOURS = Number(process.env.CAPITAL_CIRCLE_SEARCH_HORIZON_HOURS ?? 72);
 
-/** Raw markets pulled from Gamma before code-side screening. Screening is cheap; missing a market isn't. */
-export const MARKET_FETCH_LIMIT = Number(process.env.CAPITAL_CIRCLE_MARKET_FETCH_LIMIT ?? 150);
+/**
+ * Raw markets pulled from Gamma before code-side screening. Screening is cheap; missing a market
+ * isn't. Gamma caps a single request at 100 rows regardless of the limit requested — verified
+ * live — so listActivePolymarketMarkets paginates via offset to actually reach this number; it
+ * previously silently topped out at 100 no matter what this was set to. Raised from 150 now that
+ * more is actually reachable: the horizon-bucketed ranking in candidate-filter.ts most needs
+ * depth in whichever bucket isn't dominated by a handful of huge crypto/political markets, and a
+ * shallow raw pull starves exactly that bucket first.
+ */
+export const MARKET_FETCH_LIMIT = Number(process.env.CAPITAL_CIRCLE_MARKET_FETCH_LIMIT ?? 300);
 
 // ---------------------------------------------------------------------------
 // Edge and sizing — the code-side decision layer. The model estimates

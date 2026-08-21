@@ -83,8 +83,12 @@ export function toNum(value: unknown): number | null {
 }
 
 /**
- * Gamma exposes topic tags in a couple of shapes depending on endpoint version;
- * this collapses them to one coarse bucket used for per-category track records.
+ * Gamma's own docs and this function's original design both assume `/markets` rows carry a
+ * `tags` array — confirmed live that they don't: a real /markets response has no `tags` field at
+ * all (it only appears on the separate /events endpoint, which this client doesn't call). So in
+ * production this has always run on the slug-only fallback below, never the tags path — the tags
+ * handling is kept because a market object built from a test fixture (or a future Gamma version)
+ * still might carry one, but slug matching is what actually classifies every live market today.
  */
 function parseCategory(raw: Record<string, unknown>): string | null {
   const tags = raw.tags;
@@ -105,7 +109,17 @@ function parseCategory(raw: Record<string, unknown>): string | null {
   const has = (...words: string[]) => words.some((word) => new RegExp(`\\b${word}\\b`).test(haystack));
 
   if (has("crypto", "bitcoin", "ethereum", "btc", "eth", "solana", "sol", "xrp", "doge")) return "crypto";
-  if (has("sports?", "nba", "nfl", "mlb", "nhl", "soccer", "football", "basketball", "tennis", "ufc", "boxing", "golf")) return "sports";
+  // League abbreviations verified against real live market slugs (e.g. "epl-ars-cov-2026-08-21-ars",
+  // "mlb-atl-mil-2026-08-21-total-6pt5") — "epl" was missing entirely before this, so every English
+  // Premier League market (routinely $100k+ in 24h volume) silently fell through to "other"/null.
+  if (
+    has(
+      "sports?", "nba", "nfl", "mlb", "nhl", "epl", "mls", "ufc",
+      "soccer", "football", "basketball", "baseball", "hockey", "tennis", "boxing", "golf", "cricket", "rugby",
+      "bundesliga", "uefa", "fifa", "la liga", "serie a", "ligue 1", "premier league", "champions league", "world cup",
+    )
+  )
+    return "sports";
   if (has("politics?", "political", "election", "president", "presidential", "senate", "congress", "geopolitics?")) return "politics";
   if (has("economics?", "economy", "fed", "inflation", "cpi", "rates", "gdp", "unemployment", "recession")) return "economics";
   return labels.length > 0 ? "other" : null;
@@ -172,6 +186,17 @@ export function parseMarket(raw: unknown): PolymarketMarketSummary | null {
 }
 
 /**
+ * Gamma silently caps a single /markets response at 100 rows — confirmed live: requesting
+ * `limit=250` or `limit=500` still returns exactly 100. There is no error, no truncation flag,
+ * nothing to notice; a caller asking for more just quietly gets less. `offset` does paginate
+ * correctly past that cap (confirmed live: offset=100 returns a distinct next page, 95/100 rows
+ * not present in the first). Without this, MARKET_FETCH_LIMIT (150 by default) was never
+ * actually reachable — every cycle was silently screening from at most 100 raw markets, not the
+ * number its own config claimed.
+ */
+const GAMMA_PAGE_SIZE = 100;
+
+/**
  * Live, real markets — no auth needed. Returns active, unclosed markets resolving within
  * `maxHoursUntilResolution` hours from now (default 24) — short-horizon by design, so a real
  * win/loss track record builds up in a day, not years. The date-range filtering happens
@@ -186,6 +211,10 @@ export function parseMarket(raw: unknown): PolymarketMarketSummary | null {
  * ones with books deep enough to enter and exit. The default limit is
  * deliberately larger than what the model ever sees: candidate-filter.ts
  * screens this list down in code first.
+ *
+ * Paginates via `offset` to actually reach `limit` past Gamma's 100-row-per-request cap (see
+ * GAMMA_PAGE_SIZE). Stops early the moment a page comes back short — that's Gamma saying the
+ * window is exhausted, and one extra request to confirm zero-more would be pure waste.
  */
 export async function listActivePolymarketMarkets(
   limit = MARKET_FETCH_LIMIT,
@@ -193,21 +222,30 @@ export async function listActivePolymarketMarkets(
 ): Promise<PolymarketMarketSummary[]> {
   const now = new Date();
   const horizonEnd = new Date(now.getTime() + maxHoursUntilResolution * 60 * 60 * 1000);
-  const params = new URLSearchParams({
-    active: "true",
-    closed: "false",
-    end_date_min: now.toISOString(),
-    end_date_max: horizonEnd.toISOString(),
-    order: "volume24hr",
-    ascending: "false",
-    limit: String(limit),
-  });
-  const response = await fetch(`${GAMMA_API_BASE}/markets?${params.toString()}`);
-  if (!response.ok) {
-    throw new Error(`Polymarket Gamma API request failed (HTTP ${response.status}).`);
+  const raw: unknown[] = [];
+
+  for (let offset = 0; offset < limit; offset += GAMMA_PAGE_SIZE) {
+    const pageSize = Math.min(GAMMA_PAGE_SIZE, limit - offset);
+    const params = new URLSearchParams({
+      active: "true",
+      closed: "false",
+      end_date_min: now.toISOString(),
+      end_date_max: horizonEnd.toISOString(),
+      order: "volume24hr",
+      ascending: "false",
+      limit: String(pageSize),
+      offset: String(offset),
+    });
+    const response = await fetch(`${GAMMA_API_BASE}/markets?${params.toString()}`);
+    if (!response.ok) {
+      throw new Error(`Polymarket Gamma API request failed (HTTP ${response.status}).`);
+    }
+    const body = await response.json();
+    const page = Array.isArray(body) ? body : [];
+    raw.push(...page);
+    if (page.length < pageSize) break;
   }
-  const body = await response.json();
-  const raw = Array.isArray(body) ? body : [];
+
   return raw.map(parseMarket).filter((m): m is PolymarketMarketSummary => Boolean(m));
 }
 
