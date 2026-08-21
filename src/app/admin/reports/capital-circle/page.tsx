@@ -393,11 +393,11 @@ export default async function CapitalCirclePage({
       </p>
 
       <div
-        className={`mt-4 inline-flex items-center gap-2 rounded-control border px-3 py-2 text-sm ${
+        className={`mt-4 flex items-center gap-2 rounded-card border p-4 text-sm ${
           report.live ? "border-green-200 bg-green-50 text-green-800" : "border-border-subtle text-neutral-600"
         }`}
       >
-        <span className={`h-2 w-2 rounded-full ${report.live ? "bg-green-500" : "bg-neutral-400"}`} />
+        <span className={`h-2 w-2 shrink-0 rounded-full ${report.live ? "bg-green-500" : "bg-neutral-400"}`} />
         {report.live
           ? "Live — a configured Circle wallet can execute real orders."
           : "Simulation mode — no Circle wallet configured yet. Real markets, real reasoning, no real funds."}
