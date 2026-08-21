@@ -84,6 +84,40 @@ export function ensembleProbabilities(samples: ProbabilitySample[][]): Ensembled
   return estimates;
 }
 
+/**
+ * How much of the slate the model simply handed back.
+ *
+ * The failure this exists to catch is the one that hid for a whole day of tuning: given each
+ * outcome's marketPrice in its input, the scoring model can return that number verbatim. Probed
+ * against a live 48-market slate, it did so on 96 of 96 outcomes across three independent samples
+ * at temperature 0.7 — not "anchored near the price", byte-identical to it.
+ *
+ * Nothing downstream can detect that. The estimates parse, the ensemble agrees perfectly (every
+ * sample is the same number), calibration and Brier look plausible — but they are scoring the
+ * market's forecasts, relabelled as the model's. And edge is λ·(p − price) − cost, so a copied
+ * price makes edge exactly −cost on every candidate: the desk prices a hundred outcomes an hour
+ * and can never trade, for a reason no log line explains.
+ *
+ * A high share here is not a bad forecast, it is the absence of one, and the two need telling
+ * apart. Compared with a tolerance rather than exact equality so a model that rounds the price
+ * it was shown still reads as copying.
+ */
+export function measureMarketAnchoring(
+  estimates: { tokenId: string; probability: number }[],
+  marketPriceByToken: Map<string, number>,
+  tolerance = 0.0005,
+): { compared: number; copied: number; share: number } {
+  let compared = 0;
+  let copied = 0;
+  for (const estimate of estimates) {
+    const price = marketPriceByToken.get(estimate.tokenId);
+    if (price == null || !Number.isFinite(price)) continue;
+    compared++;
+    if (Math.abs(estimate.probability - price) <= tolerance) copied++;
+  }
+  return { compared, copied, share: compared > 0 ? copied / compared : 0 };
+}
+
 export function median(values: number[]): number {
   if (values.length === 0) return 0;
   const sorted = [...values].sort((a, b) => a - b);
