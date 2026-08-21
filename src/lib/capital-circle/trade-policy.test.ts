@@ -8,12 +8,13 @@ import {
   computeUrgency,
   evaluateExit,
   kellySize,
+  requiredDeviation,
   selectTrades,
   shrinkProbability,
 } from "./trade-policy";
 // Derived from config rather than hardcoded: these assertions are about behaviour, and
 // re-tuning a threshold should not read as a broken test.
-import { KELLY_FRACTION, KELLY_SHRINKAGE, MAX_ENTRY_PRICE } from "./config";
+import { COST_BUFFER, KELLY_FRACTION, KELLY_SHRINKAGE, MAX_ENTRY_PRICE } from "./config";
 
 describe("effectiveEntryPrice", () => {
   it("prefers the ask, because the ask is what a taker actually pays", () => {
@@ -44,6 +45,47 @@ describe("shrinkProbability", () => {
   it("clamps nonsense inputs instead of propagating them into a size", () => {
     expect(shrinkProbability(1.8, 0.5, 1)).toBe(1);
     expect(shrinkProbability(Number.NaN, 0.5, 1)).toBe(0);
+  });
+});
+
+describe("requiredDeviation", () => {
+  /**
+   * The identity the whole edge gate reduces to. Worth locking down explicitly because it is
+   * invisible in the code that uses it: nothing named MIN_EDGE suggests "the model must disagree
+   * with the market by 8 points", and the factor that turns one into the other (λ) moves on its
+   * own as calibration is measured.
+   */
+  it("is the algebraic inverse of the edge formula — edge = λ·Δ − cost", () => {
+    for (const lambda of [1, 0.6, 0.5, 0.3, 0.15]) {
+      for (const minEdge of [0.03, 0.012]) {
+        const delta = requiredDeviation(minEdge, lambda, 0.01) as number;
+        // Feeding that deviation back through the real formula lands on the bar. Precision 4
+        // rather than exact: requiredDeviation rounds to 4dp on purpose (it is quoted to humans
+        // in cycle summaries), which caps the round-trip error at λ×5e-5.
+        const entry = 0.5;
+        const edge = shrinkProbability(entry + delta, entry, lambda) - entry - 0.01;
+        expect(edge).toBeCloseTo(minEdge, 4);
+      }
+    }
+  });
+
+  it("shows the default bar demanding an 8-point disagreement with a liquid market", () => {
+    expect(requiredDeviation(0.03, 0.5, 0.01)).toBeCloseTo(0.08, 10);
+  });
+
+  it("explodes as measured calibration pulls λ down — the desk switching itself off", () => {
+    // A model scored badly enough to earn λ=0.15 would need a 27-point disagreement, which no
+    // honest forecast of a deep market produces. That is intended, but it must be legible: this
+    // is the number the cycle summary quotes instead of reporting a generic "no edge" hour.
+    expect(requiredDeviation(0.03, 0.15, 0.01)).toBeCloseTo(0.2667, 3);
+  });
+
+  it("reports null when λ is zero, since no deviation can ever clear the bar", () => {
+    expect(requiredDeviation(0.03, 0, 0.01)).toBeNull();
+  });
+
+  it("defaults its cost buffer to the configured one", () => {
+    expect(requiredDeviation(0.03, 0.5)).toBeCloseTo((0.03 + COST_BUFFER) / 0.5, 10);
   });
 });
 

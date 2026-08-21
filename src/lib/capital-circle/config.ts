@@ -67,8 +67,25 @@ export const MAX_SPREAD = Number(process.env.CAPITAL_CIRCLE_MAX_SPREAD ?? 0.08);
 export const MAX_ENTRY_PRICE = Number(process.env.CAPITAL_CIRCLE_MAX_ENTRY_PRICE ?? 0.97);
 export const MIN_ENTRY_PRICE = Number(process.env.CAPITAL_CIRCLE_MIN_ENTRY_PRICE ?? 0.03);
 
-/** How many screened markets get priced by the model each cycle. */
-export const CANDIDATE_LIMIT = Number(process.env.CAPITAL_CIRCLE_CANDIDATE_LIMIT ?? 24);
+/**
+ * How many screened markets get priced by the model each cycle — the real width of the funnel,
+ * and the one number that decides how many chances the desk gets per hour.
+ *
+ * Raising MARKET_FETCH_LIMIT alone does almost nothing: fetching 300 markets to price 24 only
+ * changes *which* 24 get picked, not how many shots on goal there are. Clearing the edge bar
+ * requires the model to disagree with a liquid market by several percentage points (see
+ * requiredDeviation in trade-policy.ts), which is rare per market — so the number of tradeable
+ * candidates found per cycle scales with how many get priced, and 24 markets (~48 outcomes) was
+ * the binding constraint on a desk asked to find three positions a day.
+ *
+ * 48 rather than higher because the ceiling here is the scoring call's *output* budget, not its
+ * input: one JSON estimate per outcome token, so this many markets is roughly 96 estimates per
+ * sample and three samples per cycle. Input cost is negligible on Flash (well under a dollar a
+ * day at hourly cycles); output truncation is the failure mode that would silently drop
+ * candidates, which is why agent-loop.ts sets an explicit maxOutputTokens rather than trusting
+ * the default.
+ */
+export const CANDIDATE_LIMIT = Number(process.env.CAPITAL_CIRCLE_CANDIDATE_LIMIT ?? 48);
 
 /**
  * How far out to hunt. A 24-hour horizon was the original short-feedback-loop

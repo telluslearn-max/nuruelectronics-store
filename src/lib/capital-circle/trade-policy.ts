@@ -114,6 +114,37 @@ export function computeAdaptiveShrinkage(input: {
   };
 }
 
+/**
+ * How far the model's probability must sit from the market price for a trade to clear the bar.
+ *
+ * The algebra nobody had written down. Substituting shrinkProbability into the edge definition
+ * collapses the whole gate to one term:
+ *
+ *   edge = λ·p + (1−λ)·a − a − cost  =  λ·(p − a) − cost
+ *
+ * So the edge gate is not a gate on "edge" as anyone reading MIN_EDGE would picture it — it is a
+ * gate on λ × (deviation from price). Inverting it gives what the model actually has to produce:
+ *
+ *   Δ ≥ (minEdge + cost) / λ
+ *
+ * This matters because λ moves. At the defaults (λ=0.5, minEdge=0.03, cost=0.01) the model has to
+ * disagree with a liquid market by 8 percentage points. When measured calibration pulls λ down to
+ * 0.15, the same untouched settings quietly demand 27 points — a deviation no honest forecast of a
+ * deep market will ever produce, so the desk stops trading entirely.
+ *
+ * That behaviour is defensible (a model that cannot forecast should not be betting) and is left
+ * exactly as it is. What was not defensible is that it happened invisibly: every cycle reported
+ * only "below the 0.03 minimum", which reads as bad luck rather than "calibration has effectively
+ * paused this desk". Callers use this to say which of the two is happening.
+ *
+ * Returns null when λ is 0 — the model is being ignored outright and no deviation can ever clear.
+ */
+export function requiredDeviation(minEdge: number, lambda: number, costBuffer = COST_BUFFER): number | null {
+  const l = Math.min(1, Math.max(0, lambda));
+  if (l <= 0) return null;
+  return round4((minEdge + costBuffer) / l);
+}
+
 // ---------------------------------------------------------------------------
 // Trading urgency — the daily-quota mechanism
 // ---------------------------------------------------------------------------
@@ -215,6 +246,7 @@ export function evaluateEdge(input: {
   minEdge?: number;
 }): EdgeEvaluation {
   const minEdge = input.minEdge ?? MIN_EDGE;
+  const lambda = input.lambda ?? KELLY_SHRINKAGE;
   const effectiveEntry = effectiveEntryPrice(input.pricing);
 
   if (effectiveEntry == null) {
@@ -227,7 +259,7 @@ export function evaluateEdge(input: {
     };
   }
 
-  const shrunk = shrinkProbability(input.modelProbability, effectiveEntry, input.lambda);
+  const shrunk = shrinkProbability(input.modelProbability, effectiveEntry, lambda);
   const feeCost = effectiveEntry * (FEE_BPS / 10_000);
   const edge = round4(shrunk - effectiveEntry - COST_BUFFER - feeCost);
 
@@ -242,12 +274,20 @@ export function evaluateEdge(input: {
   }
 
   if (edge < minEdge) {
+    // Say what the bar actually demanded, not just that it wasn't met — see requiredDeviation.
+    // "below the 0.03 minimum" reads as a near miss; "needed 8.0 points of disagreement and had
+    // 1.5" is the number that tells you whether the desk is unlucky or structurally switched off.
+    const needed = requiredDeviation(minEdge, lambda);
+    const actual = clamp01(input.modelProbability) - effectiveEntry;
     return {
       accepted: false,
       edge,
       effectiveEntry,
       shrunkProbability: shrunk,
-      reason: `Edge ${edge.toFixed(4)} is below the ${minEdge} minimum (shrunk probability ${shrunk.toFixed(4)} vs entry ${effectiveEntry.toFixed(4)} plus costs).`,
+      reason:
+        `Edge ${edge.toFixed(4)} is below the ${minEdge} minimum. At λ=${lambda} that needs the model ` +
+        `${needed == null ? "infinitely far from" : `${(needed * 100).toFixed(1)} points away from`} the ` +
+        `${effectiveEntry.toFixed(4)} entry; it was ${(actual * 100).toFixed(1)}.`,
     };
   }
 

@@ -24,14 +24,15 @@ For each market you are given, estimate the probability that each outcome resolv
 
 How to think about it:
 - The market price IS the base rate. It is set by people with money at risk and it is usually close to right. Start there and move only for a specific, stateable reason.
-- A large deviation from the market price is a claim that you know something the market doesn't. That is sometimes true — a market can be slow to price public information — and usually false. Deviate when you can name the thing you know; otherwise stay near the price.
+- A large deviation from the market price is a claim that you know something the market doesn't. That is sometimes true — a market can be slow to price public information — and usually false. Deviate when you can name the thing you know.
+- Having decided what you believe, state that number — not a hedged version of it. Code downstream already blends your probability with the market price, at a weight set by your own measured calibration, before anything is risked. Hedging toward the price here is that same correction applied a second time: it doesn't make the desk safer, it just destroys the information in your estimate and hides real disagreements. If you think 0.70 and the market says 0.60, say 0.70 — not 0.65 to be safe. If you genuinely think the market is right, 0.60 is the honest answer and you should say that too.
 - Short-horizon markets resolving within a couple of hours are close to unpredictable. If a market's outcome depends on noise in the next 90 minutes, its price is your answer, and saying so is the correct response, not a failure.
 - Read the resolution criteria. Many apparently obvious questions turn on a technicality in how they settle.
 - Markets that share an eventId are legs of the same real-world event — a match's moneyline, a point spread, and the draw, or a tournament's per-team winner markets. Price them as a connected set, not independently: if you think Team A is 65% to win outright, your estimate for "Team A wins by more than 1.5" should be lower than that and your estimate for "Draw" should be consistent with both. An event's mutually exclusive outcomes should be internally coherent even though you're stating each as a separate number. A real disagreement between correlated legs — the market prices them inconsistently with each other — is a stronger, more checkable signal than an isolated hunch on one market alone, and worth naming explicitly in your rationale.
 - Sports and esports markets (leagues like the EPL, NBA, NFL, and competitive Dota 2/League of Legends/CS2/Valorant) are not a lesser category — treat a well-attended match market with the same seriousness as a crypto or politics market. They resolve fast, are usually deep and liquid, and a league or tournament in season produces a steady supply of genuinely researchable, short-horizon questions. Don't under-weight them by habit.
 - Your calibration is measured. Every probability you state is scored against what actually happened (Brier score) and shown back to you each cycle. Stating 0.9 to sound decisive when you mean 0.6 makes your numbers worse and is visible within days.
 
-Return a probability for every market you are given — including the ones you find uninteresting, where the honest answer is close to the market price. Coverage matters: your estimates on markets that never get traded are what measure whether your forecasting is any good.`;
+Return a probability for every market you are given — including the ones you find uninteresting, where the honest answer is close to the market price. Coverage matters: your estimates on markets that never get traded are what measure whether your forecasting is any good. Keep each rationale to a short phrase; the slate is long and a truncated response loses the estimates at the end of it entirely.`;
 }
 
 /**
@@ -39,7 +40,14 @@ Return a probability for every market you are given — including the ones you f
  * model gets a veto and no ability to add trades — a deliberate asymmetry,
  * since the failure mode being guarded against is enthusiasm, not reluctance.
  */
-export function buildDeepDiveSystemInstruction(urgency?: { hungry: boolean; reason: string } | null): string {
+export function buildDeepDiveSystemInstruction(
+  urgency?: { hungry: boolean; reason: string } | null,
+  // The bar record_position will *actually* enforce this cycle. Defaults to the strict one, but on
+  // a hungry cycle the executor is gating at the relaxed number — quoting MIN_EDGE regardless told
+  // the model the threshold was stricter than it is, which argues it into vetoing precisely the
+  // thin trades the hunger ramp lowered the bar to surface.
+  effectiveMinEdge: number = MIN_EDGE,
+): string {
   // When the desk is behind its daily target the veto bar rises: the point of relaxing the
   // edge threshold upstream is defeated if the model then vetoes the thinner trade it
   // surfaced. Vetoes stay available for hard, factual problems — never for mere thinness,
@@ -57,7 +65,7 @@ For each proposed trade:
 
 Veto when: the question's resolution criteria don't mean what the headline implies; the price has already moved to reflect the thesis; the book is too thin to enter and exit; or the market is effectively decided already. Vetoing is cheap and free — a passed hour costs nothing and there is another one along shortly.
 
-When you confirm, record_position needs your thesis (what happens, why, and what would prove it wrong) and confidencePct — your probability for that outcome as a 0-100 integer. Be consistent with the forecast that got this trade selected; if looking closely has genuinely changed your mind, state the new number and expect the trade to be refused if it no longer has an edge. record_position independently re-prices against the live book and refuses anything whose expected edge has fallen below ${MIN_EDGE} — so a refusal is information, not an error to work around. It is the only tool that touches anything resembling a real position, and ${CAPITAL_CIRCLE_LIVE ? "may execute for real if the wallet is configured" : "is currently simulation-only — no real funds move (Circle mainnet/KYB setup isn't complete yet)"}.
+When you confirm, record_position needs your thesis (what happens, why, and what would prove it wrong) and confidencePct — your probability for that outcome as a 0-100 integer. Be consistent with the forecast that got this trade selected; if looking closely has genuinely changed your mind, state the new number and expect the trade to be refused if it no longer has an edge. record_position independently re-prices against the live book and refuses anything whose expected edge has fallen below ${effectiveMinEdge} — so a refusal is information, not an error to work around. It is the only tool that touches anything resembling a real position, and ${CAPITAL_CIRCLE_LIVE ? "may execute for real if the wallet is configured" : "is currently simulation-only — no real funds move (Circle mainnet/KYB setup isn't complete yet)"}.
 
 At most ${MAX_POSITIONS_PER_CYCLE} positions this cycle. Finish with a short plain-text summary: which trades you confirmed and which you vetoed and why. Name the markets specifically — the summary is checked against what the tools actually returned.`;
 }
