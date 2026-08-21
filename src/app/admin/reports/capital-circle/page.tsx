@@ -200,31 +200,54 @@ function IntelligenceSection({ report, pausedWalletId }: { report: CapitalCircle
           )}
 
           {calibration.buckets.length > 0 && (
-            <div className="mt-4 overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-left text-xs uppercase tracking-wide text-neutral-400">
-                    <th className="py-2 pr-4 font-medium">Said</th>
-                    <th className="py-2 pr-4 font-medium">Actually happened</th>
-                    <th className="py-2 pr-4 font-medium">Gap</th>
-                    <th className="py-2 font-medium">n</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {calibration.buckets.map((bucket) => (
-                    <tr key={bucket.label} className="border-t border-border-subtle">
-                      <td className="py-2 pr-4 tabular-nums">{bucket.label}</td>
-                      <td className="py-2 pr-4 tabular-nums">{(bucket.actualRate * 100).toFixed(0)}%</td>
-                      <td className={`py-2 pr-4 tabular-nums ${Math.abs(bucket.gap) > 0.15 ? "text-red-700" : "text-neutral-600"}`}>
+            <>
+              {/* Cards on mobile — a 4-column table forced into overflow-x-auto is a sideways-scroll
+                  puzzle on a phone; the same data reads at a glance stacked. */}
+              <div className="mt-4 space-y-2 sm:hidden">
+                {calibration.buckets.map((bucket) => (
+                  <div key={bucket.label} className="rounded-card border border-border-subtle p-3 text-sm">
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium tabular-nums">Said {bucket.label}</span>
+                      <span className="text-xs text-neutral-400">n={bucket.count}</span>
+                    </div>
+                    <div className="mt-1.5 flex items-center justify-between text-xs">
+                      <span className="text-neutral-500">
+                        Actually happened <span className="tabular-nums text-neutral-700">{(bucket.actualRate * 100).toFixed(0)}%</span>
+                      </span>
+                      <span className={`tabular-nums font-medium ${Math.abs(bucket.gap) > 0.15 ? "text-red-700" : "text-neutral-500"}`}>
                         {bucket.gap > 0 ? "+" : ""}
-                        {(bucket.gap * 100).toFixed(0)}
-                      </td>
-                      <td className="py-2 tabular-nums text-neutral-500">{bucket.count}</td>
+                        {(bucket.gap * 100).toFixed(0)} gap
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-4 hidden overflow-x-auto sm:block">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-xs uppercase tracking-wide text-neutral-400">
+                      <th className="py-2 pr-4 font-medium">Said</th>
+                      <th className="py-2 pr-4 font-medium">Actually happened</th>
+                      <th className="py-2 pr-4 font-medium">Gap</th>
+                      <th className="py-2 font-medium">n</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {calibration.buckets.map((bucket) => (
+                      <tr key={bucket.label} className="border-t border-border-subtle">
+                        <td className="py-2 pr-4 tabular-nums">{bucket.label}</td>
+                        <td className="py-2 pr-4 tabular-nums">{(bucket.actualRate * 100).toFixed(0)}%</td>
+                        <td className={`py-2 pr-4 tabular-nums ${Math.abs(bucket.gap) > 0.15 ? "text-red-700" : "text-neutral-600"}`}>
+                          {bucket.gap > 0 ? "+" : ""}
+                          {(bucket.gap * 100).toFixed(0)}
+                        </td>
+                        <td className="py-2 tabular-nums text-neutral-500">{bucket.count}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
           )}
 
           {report.categories.filter((category) => category.count >= 5).length > 0 && (
@@ -249,7 +272,41 @@ function IntelligenceSection({ report, pausedWalletId }: { report: CapitalCircle
             this isn&apos;t filtered by its own judgement. Read the trade count alongside the return: a setting that traded twice
             proves nothing, and a setting that only works at one exact threshold is fitted to noise.
           </p>
-          <div className="mt-3 overflow-x-auto">
+          {/* Cards on mobile — 6 columns has no honest table layout under ~400px; the same numbers
+              read at a glance stacked, with the one that matters (return) up top. */}
+          <div className="mt-3 space-y-2 sm:hidden">
+            {report.policySweep.map((outcome) => (
+              <div key={`${outcome.params.minEdge}-${outcome.params.lambda}`} className="rounded-card border border-border-subtle p-3 text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="font-medium tabular-nums">
+                    edge {outcome.params.minEdge} · λ {outcome.params.lambda}
+                  </span>
+                  <span
+                    className={`tabular-nums font-medium ${
+                      outcome.returnOnStake == null ? "" : outcome.returnOnStake >= 0 ? "text-green-700" : "text-red-700"
+                    }`}
+                  >
+                    {outcome.returnOnStake != null ? `${(outcome.returnOnStake * 100).toFixed(1)}%` : "—"}
+                  </span>
+                </div>
+                <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
+                  <div>
+                    <div className="text-neutral-400">Trades</div>
+                    <div className="tabular-nums text-neutral-700">{outcome.tradeCount}</div>
+                  </div>
+                  <div>
+                    <div className="text-neutral-400">Win rate</div>
+                    <div className="tabular-nums text-neutral-700">{outcome.tradeCount > 0 ? `${(outcome.winRate * 100).toFixed(0)}%` : "—"}</div>
+                  </div>
+                  <div>
+                    <div className="text-neutral-400">Staked</div>
+                    <div className="tabular-nums text-neutral-700">{formatPrice(outcome.stakedUsd.toFixed(2), "USD")}</div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="mt-3 hidden overflow-x-auto sm:block">
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-xs uppercase tracking-wide text-neutral-400">
