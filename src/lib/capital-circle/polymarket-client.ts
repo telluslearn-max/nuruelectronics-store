@@ -109,6 +109,12 @@ function parseCategory(raw: Record<string, unknown>): string | null {
   const has = (...words: string[]) => words.some((word) => new RegExp(`\\b${word}\\b`).test(haystack));
 
   if (has("crypto", "bitcoin", "ethereum", "btc", "eth", "solana", "sol", "xrp", "doge")) return "crypto";
+  // Checked against a live top-300-by-volume snapshot (2026-08-21): esports markets (dota2, lol,
+  // cs2, val) were the single largest unclassified vertical — a Dota2 match at $3.8M in 24h
+  // volume outranked every crypto and traditional-sports market in the entire snapshot. Distinct
+  // from "sports" rather than folded in: esports forecasting turns on patch meta and roster form,
+  // not the same signals as a physical match, so a shared track record would blur both.
+  if (has("esports?", "dota2?", "lol", "cs2", "csgo", "valorant", "val", "league of legends")) return "esports";
   // League abbreviations verified against real live market slugs (e.g. "epl-ars-cov-2026-08-21-ars",
   // "mlb-atl-mil-2026-08-21-total-6pt5") — "epl" was missing entirely before this, so every English
   // Premier League market (routinely $100k+ in 24h volume) silently fell through to "other"/null.
@@ -120,9 +126,27 @@ function parseCategory(raw: Record<string, unknown>): string | null {
     )
   )
     return "sports";
-  if (has("politics?", "political", "election", "president", "presidential", "senate", "congress", "geopolitics?")) return "politics";
+  // "geopolitics?" alone rarely matches — real slugs describe the event ("us-x-iran-ceasefire"),
+  // not the abstraction. Added generic, time-durable terms rather than today's specific countries,
+  // which would just go stale as the news cycle moves on. Checked live for false positives: zero
+  // across the same snapshot; "ceasefire" alone already catches a real, otherwise-uncategorized market.
+  if (
+    has(
+      "politics?", "political", "election", "president", "presidential", "senate", "congress",
+      "geopolitics?", "war", "ceasefire", "sanctions?", "treaty", "nato",
+    )
+  )
+    return "politics";
   if (has("economics?", "economy", "fed", "inflation", "cpi", "rates", "gdp", "unemployment", "recession")) return "economics";
-  return labels.length > 0 ? "other" : null;
+  // Checked live: `labels.length > 0` never fires in production (tags never populate on this
+  // endpoint — see this function's top comment), so this branch was silently dead and every
+  // unmatched market — 71% of the top 300 by volume in the same snapshot, including large,
+  // legitimate verticals this list still doesn't recognize (weather, named-person social-metric
+  // markets, minor leagues) — was reported as `null` ("uncategorized") rather than the honest
+  // "other". A market with a real slug always has *something* to bucket; `null` is now reserved
+  // for the genuinely informationless case (no slug, no tags) rather than standing in for most of
+  // the market feed.
+  return labels.length > 0 || (typeof raw.slug === "string" && raw.slug.length > 0) ? "other" : null;
 }
 
 /** Exported for tests — the parse is the boundary where a Gamma format change becomes a silent trading bug. */

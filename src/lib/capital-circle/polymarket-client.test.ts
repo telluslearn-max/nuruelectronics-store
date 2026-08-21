@@ -105,6 +105,32 @@ describe("parseMarket", () => {
     expect(slugOnly("mlb-atl-mil-2026-08-21-total-6pt5")).toBe("sports");
     expect(slugOnly("uefa-champions-league-winner-2027")).toBe("sports");
     expect(slugOnly("la-liga-top-scorer-2026-27")).toBe("sports");
+    expect(slugOnly("us-x-iran-ceasefire-continues-through-august-22")).toBe("politics");
+  });
+
+  it("classifies esports as its own category, not sports or other", () => {
+    // A live top-300-by-volume snapshot on 2026-08-21 found esports (dota2/lol/cs2/valorant) as
+    // the single largest unclassified vertical — a Dota2 match at $3.8M in 24h volume outranked
+    // every crypto and traditional-sports market in the entire snapshot. These are real slugs
+    // from that snapshot, checked for zero false positives against the whole set first.
+    const slugOnly = (slug: string) => parseMarket({ ...GAMMA_FIXTURE, tags: undefined, slug })?.category;
+    expect(slugOnly("dota2-ts8-vsn2-2026-08-21-game1")).toBe("esports");
+    expect(slugOnly("lol-bro2-fox1-2026-08-21")).toBe("esports");
+    expect(slugOnly("cs2-fut-mouz-2026-08-21")).toBe("esports");
+    expect(slugOnly("val-drx1-spe-2026-08-21")).toBe("esports");
+  });
+
+  it("reports a real, non-empty slug that matches nothing as 'other', not null", () => {
+    // The old `labels.length > 0 ? "other" : null` gate never fired in production (tags are
+    // never populated on a live /markets response), so every unmatched market — 71% of the top
+    // 300 by volume in the same snapshot — silently became "uncategorized" with no visibility.
+    // A market always has a slug; "other" should mean "we looked and it's genuinely unclassified",
+    // not "we never had the tags to look in the first place".
+    expect(parseMarket({ ...GAMMA_FIXTURE, tags: undefined, slug: "highest-temperature-in-seoul-on-august-21-2026-27c" })?.category).toBe(
+      "other",
+    );
+    // An empty slug is the one genuinely informationless case — still null.
+    expect(parseMarket({ ...GAMMA_FIXTURE, tags: undefined, slug: "" })?.category).toBeNull();
   });
 
   it("accepts plain-string tags as well as objects", () => {
