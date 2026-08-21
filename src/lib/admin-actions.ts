@@ -12,6 +12,7 @@ import { renderDeliveryNotePdf, renderEstimatePdf, renderInvoicePdf, renderRecei
 import { ActionGuardError, redirectWithError, redirectWithSuccess } from "./admin-feedback";
 import { logAdminAction } from "./audit-log";
 import { PAYMENT_METHODS, parseEnumField } from "./parse-enum";
+import { hasRealEmail, syntheticCustomerEmail } from "./customer-email";
 
 function parseLineItems(
   formData: FormData,
@@ -40,16 +41,26 @@ function parseLineItems(
 export async function createManualOrder(formData: FormData): Promise<void> {
   await requireAdminSession();
 
-  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const emailInput = String(formData.get("email") ?? "").trim().toLowerCase();
   const name = String(formData.get("name") ?? "").trim() || null;
   const phone = String(formData.get("phone") ?? "").trim() || null;
   const note = String(formData.get("note") ?? "").trim() || null;
   const deductInventory = formData.get("deductInventory") === "on";
   const items = parseLineItems(formData);
+  const orderDateRaw = String(formData.get("orderDate") ?? "");
+  const orderDate = orderDateRaw && !Number.isNaN(new Date(orderDateRaw).getTime()) ? new Date(orderDateRaw) : undefined;
 
-  if (!email || items.length === 0) {
-    redirectWithError("/admin/orders/new", "A customer email and at least one line item are required.");
+  if ((!emailInput && !phone && !name) || items.length === 0) {
+    redirectWithError(
+      "/admin/orders/new",
+      "Enter a customer email, phone, or name, and at least one line item.",
+    );
   }
+
+  // No real email on file — synthesize a deterministic, never-mailable placeholder (seeded by
+  // phone if we have it, since it's more stable than a name) so Customer.email's unique-not-null
+  // constraint is still satisfied without forcing staff to invent an email for a WhatsApp sale.
+  const email = emailInput || syntheticCustomerEmail(phone ?? name ?? "customer");
 
   const order = await prisma.$transaction(async (tx) => {
     const customer = await tx.customer.upsert({
@@ -64,6 +75,7 @@ export async function createManualOrder(formData: FormData): Promise<void> {
         note,
         customerId: customer.id,
         items: { create: items },
+        ...(orderDate ? { createdAt: orderDate } : {}),
       },
     });
   });
@@ -244,7 +256,7 @@ async function sendEstimateEmailSilent(estimateId: string): Promise<{ orderId: s
       `/admin/orders/${estimate.orderId}`,
     );
   }
-  if (!estimate.order.customer.email) {
+  if (!hasRealEmail(estimate.order.customer.email)) {
     throw new ActionGuardError("Customer has no email on file.", `/admin/orders/${estimate.orderId}`);
   }
 
@@ -456,7 +468,7 @@ async function sendInvoiceEmailSilent(invoiceId: string): Promise<{ orderId: str
       `/admin/orders/${invoice.orderId}`,
     );
   }
-  if (!invoice.order.customer.email) {
+  if (!hasRealEmail(invoice.order.customer.email)) {
     throw new ActionGuardError("Customer has no email on file.", `/admin/orders/${invoice.orderId}`);
   }
 
@@ -713,7 +725,7 @@ export async function sendReceiptEmail(receiptId: string): Promise<void> {
       "Email isn't configured — set RESEND_API_KEY and DOCUMENT_EMAIL_FROM.",
     );
   }
-  if (!receipt.invoice.order.customer.email) {
+  if (!hasRealEmail(receipt.invoice.order.customer.email)) {
     redirectWithError(`/admin/orders/${receipt.invoice.orderId}`, "Customer has no email on file.");
   }
 
@@ -911,7 +923,7 @@ async function sendDeliveryNoteEmailSilent(deliveryNoteId: string): Promise<{ or
       `/admin/orders/${note.orderId}`,
     );
   }
-  if (!note.order.customer.email) {
+  if (!hasRealEmail(note.order.customer.email)) {
     throw new ActionGuardError("Customer has no email on file.", `/admin/orders/${note.orderId}`);
   }
 

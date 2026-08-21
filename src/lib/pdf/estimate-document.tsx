@@ -3,6 +3,7 @@ import { formatPrice } from "@/lib/format";
 import { DocumentShell, LineItemsTable, TotalsBlock, styles, type Moneyish } from "./document-layout";
 import type { Letterhead } from "./letterhead";
 import type { Customer, Estimate, Order, OrderItem } from "@prisma/client";
+import { displayEmail } from "@/lib/customer-email";
 
 function formatDate(date: Date) {
   return new Intl.DateTimeFormat("en-KE", { dateStyle: "medium" }).format(date);
@@ -28,8 +29,8 @@ export function EstimateDocument({
       <View style={styles.row}>
         <View style={{ flex: 1 }}>
           <Text style={styles.sectionLabel}>Prepared for</Text>
-          <Text>{customer.name ?? customer.email}</Text>
-          <Text>{customer.email}</Text>
+          <Text>{customer.name ?? displayEmail(customer.email) ?? customer.phone ?? "Customer"}</Text>
+          {displayEmail(customer.email) && <Text>{displayEmail(customer.email)}</Text>}
           {customer.phone && <Text>{customer.phone}</Text>}
         </View>
         <View style={{ flex: 1, alignItems: "flex-end" }}>

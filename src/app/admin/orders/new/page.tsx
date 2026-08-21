@@ -3,7 +3,7 @@ import { requireAdminSession } from "@/lib/admin-auth";
 import { createManualOrder } from "@/lib/admin-actions";
 import { FeedbackBanner } from "@/components/admin/feedback-banner";
 import { SubmitButton } from "@/components/admin/submit-button";
-import { inputClass, primaryButtonClass } from "../[id]/_shared";
+import { inputClass, primaryButtonClass, toDateInputValue } from "../[id]/_shared";
 import { LineItemsGrid } from "./line-items-grid";
 
 export const metadata: Metadata = {
@@ -25,24 +25,41 @@ export default async function NewManualOrderPage({
       <FeedbackBanner error={error} />
 
       <form action={createManualOrder} className="mt-8 max-w-2xl space-y-6">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <div className="sm:col-span-2">
-            <label htmlFor="email" className="block text-sm font-medium">
-              Customer email
-            </label>
-            <input id="email" name="email" type="email" required className={`mt-1 ${inputClass}`} />
-          </div>
-          <div>
-            <label htmlFor="phone" className="block text-sm font-medium">
-              Phone
-            </label>
-            <input id="phone" name="phone" type="text" className={`mt-1 ${inputClass}`} />
-          </div>
-          <div className="sm:col-span-3">
-            <label htmlFor="name" className="block text-sm font-medium">
-              Customer name
-            </label>
-            <input id="name" name="name" type="text" className={`mt-1 ${inputClass}`} />
+        <div>
+          <label htmlFor="orderDate" className="block text-sm font-medium">
+            Date of sale
+          </label>
+          <input
+            id="orderDate"
+            name="orderDate"
+            type="date"
+            defaultValue={toDateInputValue(new Date())}
+            className={`mt-1 max-w-xs ${inputClass}`}
+          />
+        </div>
+
+        <div>
+          <p className="text-sm font-medium">Customer</p>
+          <p className="mt-1 text-xs text-neutral-500">Enter at least one of name, email, or phone.</p>
+          <div className="mt-2 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label htmlFor="name" className="block text-sm font-medium">
+                Customer name
+              </label>
+              <input id="name" name="name" type="text" className={`mt-1 ${inputClass}`} />
+            </div>
+            <div>
+              <label htmlFor="phone" className="block text-sm font-medium">
+                Phone
+              </label>
+              <input id="phone" name="phone" type="text" className={`mt-1 ${inputClass}`} />
+            </div>
+            <div className="sm:col-span-2">
+              <label htmlFor="email" className="block text-sm font-medium">
+                Customer email
+              </label>
+              <input id="email" name="email" type="email" className={`mt-1 ${inputClass}`} />
+            </div>
           </div>
         </div>
 
