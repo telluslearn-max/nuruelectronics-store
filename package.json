@@ -7,7 +7,7 @@
   },
   "scripts": {
     "dev": "next dev",
-    "build": "prisma migrate deploy && prisma db seed && next build",
+    "build": "node scripts/migrate-deploy-with-retry.mjs && prisma db seed && next build",
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
