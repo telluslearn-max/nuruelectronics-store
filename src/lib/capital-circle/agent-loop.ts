@@ -18,7 +18,7 @@ import { buildDeepDiveSystemInstruction, buildNewsSearchPrompt, buildScoringSyst
 import { dispatchTool, functionDeclarations, logCandidateSlate, type ApprovedTrade, type ToolContext } from "./tools";
 import { listActivePolymarketMarkets } from "./polymarket-client";
 import { filterAndRankCandidates, toScoringView, type ScreenedMarket } from "./candidate-filter";
-import { ensembleProbabilities, type ProbabilitySample } from "./ensemble";
+import { ensembleProbabilities, measureMarketAnchoring, type ProbabilitySample } from "./ensemble";
 import { requiredDeviation, selectTrades, type SelectionCandidate } from "./trade-policy";
 import { getTrackRecord, getTradingUrgency, renderTrackRecordForPrompt } from "./track-record";
 
@@ -146,6 +146,21 @@ export async function runCapitalCircleCycle(): Promise<CapitalCircleCycleResult>
   const estimates = ensembleProbabilities(samples);
   await persistSnapshots(cycle.id, screened.candidates, estimates);
 
+  // Whether the model actually forecast anything, or just handed back the prices it was shown.
+  // Checked every cycle because the failure is silent everywhere else — see measureMarketAnchoring.
+  const marketPriceByToken = new Map<string, number>();
+  for (const market of screened.candidates) {
+    for (const token of market.tokens) marketPriceByToken.set(token.tokenId, token.price);
+  }
+  const anchoring = measureMarketAnchoring(estimates, marketPriceByToken);
+  const anchoringNote =
+    anchoring.compared > 0 && anchoring.share >= 0.9
+      ? ` The model returned the quoted market price on ${anchoring.copied} of ${anchoring.compared} outcomes, so it is not forecasting — edge is −costs by construction and no gate setting can produce a trade until that changes.`
+      : "";
+  if (anchoringNote) {
+    console.warn(`[capital-circle] scoring returned the market price on ${anchoring.copied}/${anchoring.compared} outcomes — no independent forecast this cycle.`);
+  }
+
   // --- D. Select -----------------------------------------------------------
   const selectionCandidates = buildSelectionCandidates(screened.candidates, estimates);
   const openPositions = trackRecord?.openPositions ?? [];
@@ -174,7 +189,7 @@ export async function runCapitalCircleCycle(): Promise<CapitalCircleCycleResult>
     return finish(
       {
         ran: true,
-        summary: `Priced ${estimates.length} outcomes across ${screened.candidates.length} markets; none cleared the ${(minEdge ?? 0).toFixed(4)} edge bar${urgency?.hungry ? " (already relaxed — " + urgency.reason + ")" : ""}. ${barNote} Closest was ${closest ? `edge ${closest.edge.toFixed(4)} — ${closest.reason}` : "not measurable"}. No trade this hour.`,
+        summary: `Priced ${estimates.length} outcomes across ${screened.candidates.length} markets; none cleared the ${(minEdge ?? 0).toFixed(4)} edge bar${urgency?.hungry ? " (already relaxed — " + urgency.reason + ")" : ""}. ${barNote} Closest was ${closest ? `edge ${closest.edge.toFixed(4)} — ${closest.reason}` : "not measurable"}.${anchoringNote} No trade this hour.`,
         toolCallCount: 0,
         candidateCount: screened.candidates.length,
         selectedCount: 0,
@@ -223,7 +238,7 @@ export async function runCapitalCircleCycle(): Promise<CapitalCircleCycleResult>
   return finish(
     {
       ran: true,
-      summary: verification.summary,
+      summary: `${verification.summary}${anchoringNote}`,
       toolCallCount: verification.toolCallCount,
       candidateCount: screened.candidates.length,
       selectedCount: selection.selected.length,

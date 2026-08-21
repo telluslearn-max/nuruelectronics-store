@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ensembleProbabilities, median, type ProbabilitySample } from "./ensemble";
+import { ensembleProbabilities, median, type ProbabilitySample, measureMarketAnchoring } from "./ensemble";
 
 const sample = (tokenId: string, probability: number, rationale?: string): ProbabilitySample => ({
   marketId: `market-${tokenId}`,
@@ -70,5 +70,60 @@ describe("ensembleProbabilities", () => {
     expect(ensembleProbabilities([])).toEqual([]);
     const result = ensembleProbabilities([[{ marketId: "", tokenId: "", probability: 0.5 }]]);
     expect(result).toEqual([]);
+  });
+});
+
+describe("measureMarketAnchoring", () => {
+  const prices = new Map([
+    ["a", 0.62],
+    ["b", 0.31],
+    ["c", 0.055],
+  ]);
+
+  it("catches a model handing back the prices it was shown", () => {
+    // The real production failure: 96 of 96 outcomes returned byte-identical to the input price,
+    // across three independent samples at temperature 0.7. Nothing else in the pipeline can see
+    // it — the estimates parse, the ensemble agrees perfectly because every sample is the same
+    // number, and edge lands at exactly minus costs on every candidate.
+    const result = measureMarketAnchoring(
+      [
+        { tokenId: "a", probability: 0.62 },
+        { tokenId: "b", probability: 0.31 },
+        { tokenId: "c", probability: 0.055 },
+      ],
+      prices,
+    );
+    expect(result).toEqual({ compared: 3, copied: 3, share: 1 });
+  });
+
+  it("treats a rounded copy of the price as a copy", () => {
+    const result = measureMarketAnchoring([{ tokenId: "a", probability: 0.6203 }], prices);
+    expect(result.copied).toBe(1);
+  });
+
+  it("does not flag a genuine forecast that happens to sit near the price", () => {
+    const result = measureMarketAnchoring(
+      [
+        { tokenId: "a", probability: 0.66 },
+        { tokenId: "b", probability: 0.2 },
+      ],
+      prices,
+    );
+    expect(result).toMatchObject({ compared: 2, copied: 0, share: 0 });
+  });
+
+  it("ignores estimates with no matching market price rather than counting them either way", () => {
+    const result = measureMarketAnchoring(
+      [
+        { tokenId: "a", probability: 0.62 },
+        { tokenId: "unknown", probability: 0.5 },
+      ],
+      prices,
+    );
+    expect(result).toEqual({ compared: 1, copied: 1, share: 1 });
+  });
+
+  it("reports a zero share rather than dividing by nothing when there is no overlap", () => {
+    expect(measureMarketAnchoring([], prices)).toEqual({ compared: 0, copied: 0, share: 0 });
   });
 });
