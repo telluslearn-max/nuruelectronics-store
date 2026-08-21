@@ -11,6 +11,16 @@
  * The spread between samples is kept as a signal in its own right: when the
  * model gives 0.4, 0.6 and 0.9 for the same market, the useful conclusion is
  * "it doesn't know", not "0.6". Pure module — see ensemble.test.ts.
+ *
+ * CAUTION when retuning: `disagreement` is a range (max − min), which is NOT sample-size
+ * invariant. The expected range widens as samples are added even when the underlying spread is
+ * identical — roughly 1.7σ at three samples against 2.3σ at five. So ENSEMBLE_SAMPLES and
+ * ENSEMBLE_MAX_DISAGREEMENT are coupled: raising the sample count alone tightens the effective
+ * filter by about a third, and now also shrinks every estimate's λ (see
+ * disagreementAdjustedLambda in trade-policy.ts, which reads this number for every candidate
+ * rather than only for the ones near the reject threshold). Retune the two together or not at
+ * all. Range is kept over a variance-based measure deliberately: at three samples every
+ * dispersion statistic is crude, and this one is at least legible in a log line.
  */
 
 export type ProbabilitySample = { marketId: string; tokenId: string; probability: number; rationale?: string };

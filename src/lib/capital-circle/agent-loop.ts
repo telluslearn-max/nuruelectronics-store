@@ -196,6 +196,9 @@ export async function runCapitalCircleCycle(): Promise<CapitalCircleCycleResult>
       // No ceiling from this stage — recordPosition derives the real size from the trade's
       // own edge and the pool's caps, which is strictly tighter than anything guessed here.
       sizeUsd: null,
+      // The trust level this trade was actually selected at, not the cycle-wide one — the
+      // executor's re-price must not be more generous than the gate that approved it.
+      lambda: trade.lambda,
       eventId: trade.eventId ?? null,
       category: trade.category ?? null,
       marketEndDate: market?.endDate ?? null,

@@ -115,6 +115,40 @@ export function computeAdaptiveShrinkage(input: {
 }
 
 /**
+ * How much to trust one specific estimate, given how much the ensemble's own samples disagreed
+ * about it.
+ *
+ * λ has always been a single global number: how much independent evidence one flash call is
+ * credited with, measured across the whole track record. But stability is also a *per-estimate*
+ * property — the same model on the same slate is rock-solid on one market and scattered on the
+ * next, and the ensemble already measures exactly that and then threw it away on everything below
+ * the reject threshold.
+ *
+ * Folding it into λ separates the two things the old binary filter conflated: a confident
+ * disagreement (tight samples, far from the price) is sized on its merits, while a noisy one (wide
+ * samples, same distance from the price) is pulled back toward the market until it no longer
+ * clears the bar on its own. That is the distinction that actually predicts whether a deviation is
+ * edge or noise, and it is the whole reason ensembling exists.
+ *
+ * Linear and anchored on the existing ENSEMBLE_MAX_DISAGREEMENT, so it adds no new tunable: trust
+ * reaches zero exactly where the hard filter already rejected. The old cliff becomes the limit of
+ * the ramp rather than a separate rule — nothing changes at the boundary, and a candidate at 0.24
+ * stops being treated identically to one at 0.00 purely for landing on the tolerable side of a
+ * threshold.
+ */
+export function disagreementAdjustedLambda(
+  baseLambda: number,
+  disagreement: number | null | undefined,
+  maxDisagreement: number,
+): number {
+  const base = Math.min(1, Math.max(0, baseLambda));
+  const spread = toFinite(disagreement ?? null);
+  if (spread == null || spread <= 0 || maxDisagreement <= 0) return round4(base);
+  const trust = Math.min(1, Math.max(0, 1 - spread / maxDisagreement));
+  return round4(base * trust);
+}
+
+/**
  * How far the model's probability must sit from the market price for a trade to clear the bar.
  *
  * The algebra nobody had written down. Substituting shrinkProbability into the edge definition
@@ -426,6 +460,13 @@ export type SelectedTrade = SelectionCandidate & {
   edge: number;
   effectiveEntry: number;
   shrunkProbability: number;
+  /**
+   * The confidence-adjusted λ this trade was actually selected at — carried so the executor's
+   * final re-price against the live book uses the same trust level that approved it. Re-gating at
+   * the unadjusted global λ would be strictly more generous, which quietly re-opens the door for
+   * a scattered estimate whose price has since moved against it.
+   */
+  lambda: number;
 };
 
 export type SelectionResult = {
@@ -454,11 +495,23 @@ export function selectTrades(input: {
   const takenEventIds = new Set(input.openEventIds);
   const takenMarketIds = new Set(input.openMarketIds);
 
+  // λ is adjusted per candidate by how much the ensemble disagreed about that specific estimate,
+  // so the ranking below is by confidence-adjusted edge rather than raw edge — a tight estimate
+  // 6 points off the price now outranks a scattered one 8 points off, which is the correct
+  // ordering and was not the old one.
+  const baseLambda = input.lambda ?? KELLY_SHRINKAGE;
   const scored = input.candidates
-    .map((candidate) => ({ candidate, evaluation: evaluateEdge({ modelProbability: candidate.modelProbability, pricing: candidate.pricing, lambda: input.lambda, minEdge: input.minEdge }) }))
+    .map((candidate) => {
+      const lambda = disagreementAdjustedLambda(baseLambda, candidate.disagreement, input.maxDisagreement);
+      return {
+        candidate,
+        lambda,
+        evaluation: evaluateEdge({ modelProbability: candidate.modelProbability, pricing: candidate.pricing, lambda, minEdge: input.minEdge }),
+      };
+    })
     .sort((a, b) => b.evaluation.edge - a.evaluation.edge);
 
-  for (const { candidate, evaluation } of scored) {
+  for (const { candidate, lambda, evaluation } of scored) {
     const reject = (reason: string) => rejected.push({ marketId: candidate.marketId, tokenId: candidate.tokenId, reason, edge: evaluation.edge });
 
     if (selected.length >= input.maxPositions) {
@@ -489,6 +542,7 @@ export function selectTrades(input: {
       edge: evaluation.edge,
       effectiveEntry: evaluation.effectiveEntry,
       shrunkProbability: evaluation.shrunkProbability,
+      lambda,
     });
     takenMarketIds.add(candidate.marketId);
     if (eventId) takenEventIds.add(eventId);
