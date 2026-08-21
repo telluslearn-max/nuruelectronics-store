@@ -48,6 +48,8 @@ const s = StyleSheet.create({
     borderBottomColor: "#eeeeee",
   },
   itemTitle: { fontSize: 11, fontFamily: "Helvetica-Bold" },
+  itemDescription: { fontSize: 8, color: "#888888", marginTop: 2 },
+  itemDiscount: { fontSize: 8, color: "#888888", marginTop: 2 },
   totalsRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 4 },
   totalsLabel: { color: "#666666" },
   totalRow: {
@@ -138,10 +140,18 @@ export function InvoiceDocument({
         </View>
         {items.map((item) => (
           <View style={s.itemRow} key={item.id}>
-            <Text style={[s.colItem, s.itemTitle]}>{item.title}</Text>
+            <View style={s.colItem}>
+              <Text style={s.itemTitle}>{item.title}</Text>
+              {item.description && <Text style={s.itemDescription}>{item.description}</Text>}
+            </View>
             <Text style={s.colQty}>{item.quantity}</Text>
             <Text style={s.colPrice}>{formatMoney(item.unitPrice.toString())}</Text>
-            <Text style={[s.colAmount, s.itemTitle]}>{formatMoney(item.lineTotal.toString())}</Text>
+            <View style={s.colAmount}>
+              <Text style={s.itemTitle}>{formatMoney(item.lineTotal.toString())}</Text>
+              {Number(item.discount) > 0 && (
+                <Text style={s.itemDiscount}>-{formatMoney(item.discount.toString())} discount</Text>
+              )}
+            </View>
           </View>
         ))}
 

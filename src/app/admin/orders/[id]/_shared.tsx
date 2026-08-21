@@ -40,11 +40,17 @@ export function ItemsCard({ items, currencyCode }: { items: OrderItem[]; currenc
       <p className={cardLabelClass}>Items</p>
       <ul className="mt-3 space-y-2 text-sm">
         {items.map((item) => (
-          <li key={item.id} className="flex justify-between">
+          <li key={item.id} className="flex justify-between gap-4">
             <span>
               {item.title} × {item.quantity}
+              {item.description && <span className="mt-0.5 block text-xs text-neutral-500">{item.description}</span>}
+              {Number(item.discount) > 0 && (
+                <span className="mt-0.5 block text-xs text-neutral-500">
+                  -{formatPrice(item.discount.toString(), currencyCode)} discount
+                </span>
+              )}
             </span>
-            <span>{formatPrice(item.lineTotal.toString(), currencyCode)}</span>
+            <span className="shrink-0">{formatPrice(item.lineTotal.toString(), currencyCode)}</span>
           </li>
         ))}
       </ul>
