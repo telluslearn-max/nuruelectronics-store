@@ -20,7 +20,7 @@ import {
   updateCapitalCircleWalletIdentity,
   refreshWalletOnchainData,
 } from "@/lib/capital-circle/wallet-actions";
-import { formatPrice } from "@/lib/format";
+import { formatPrice, formatEatDateTime } from "@/lib/format";
 import { moneyColorClass } from "@/components/admin/money-colors";
 import { CopyButton } from "@/components/admin/copy-button";
 import { SubmitButton } from "@/components/admin/submit-button";
@@ -253,7 +253,7 @@ async function ActivityRows() {
           <div className="min-w-0">
             <div className="truncate text-neutral-700">{row.label}</div>
             <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-neutral-400">
-              <span>{new Date(row.atMs).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })}</span>
+              <span>{formatEatDateTime(new Date(row.atMs))}</span>
               <span>{row.status}</span>
               {row.txHash && (
                 <a href={explorerTxUrl(row.txHash)} target="_blank" rel="noreferrer" className="font-mono underline">

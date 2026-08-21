@@ -10,7 +10,7 @@ import {
 } from "@/lib/reports/capital-circle";
 import { confirmSweep } from "@/lib/capital-circle/sweep-actions";
 import { clearCapitalCirclePause } from "@/lib/capital-circle/wallet-actions";
-import { formatPrice } from "@/lib/format";
+import { formatPrice, formatEatDate, formatEatDateTime } from "@/lib/format";
 import { FeedbackBanner } from "@/components/admin/feedback-banner";
 import { PushSubscribeButton } from "@/components/admin/push-subscribe-button";
 import { ScanStatus } from "@/components/admin/scan-status";
@@ -116,7 +116,7 @@ function IntelligenceSection({ report, pausedWalletId }: { report: CapitalCircle
           <div className="font-medium">Trading is paused</div>
           <p className="mt-1">{report.circuitBreaker.reason}</p>
           <p className="mt-1 text-xs text-red-700">
-            Since {report.circuitBreaker.since?.toLocaleString() ?? "unknown"}. Look at why the losses happened before resuming —
+            Since {report.circuitBreaker.since ? formatEatDateTime(report.circuitBreaker.since) : "unknown"}. Look at why the losses happened before resuming —
             the pause exists because a losing run and a broken thesis generator look identical from the inside.
           </p>
           {pausedWalletId && (
@@ -350,7 +350,7 @@ function IntelligenceSection({ report, pausedWalletId }: { report: CapitalCircle
             {report.recentCycles.map((cycle) => (
               <li key={cycle.id} className="rounded-card border border-border-subtle p-3 text-sm">
                 <div className="flex flex-wrap items-center gap-2 text-xs text-neutral-500">
-                  <span className="tabular-nums">{cycle.startedAt.toLocaleString()}</span>
+                  <span className="tabular-nums">{formatEatDateTime(cycle.startedAt)}</span>
                   <StatusPill status={cycle.action} />
                   <span>{cycle.candidateCount} candidates</span>
                   {cycle.hadNews && <span className="text-neutral-400">news grounded</span>}
@@ -477,10 +477,8 @@ export default async function CapitalCirclePage({
                 </div>
 
                 <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-neutral-400">
-                  <span>{p.createdAt.toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })}</span>
-                  {p.resolvedAt && (
-                    <span>resolved {p.resolvedAt.toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })}</span>
-                  )}
+                  <span>{formatEatDateTime(p.createdAt)}</span>
+                  {p.resolvedAt && <span>resolved {formatEatDateTime(p.resolvedAt)}</span>}
                   {p.txHash && <span className="font-mono">{p.txHash}</span>}
                 </div>
               </li>
@@ -510,7 +508,7 @@ export default async function CapitalCirclePage({
               <li key={sweep.id} className="rounded-card border border-border-subtle p-4">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="font-medium">
-                    Week of {sweep.weekStart.toLocaleDateString("en-US", { dateStyle: "medium" })}
+                    Week of {formatEatDate(sweep.weekStart)}
                   </div>
                   <span className="inline-flex items-center rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-700">
                     pending
@@ -523,7 +521,7 @@ export default async function CapitalCirclePage({
                 {sweep.detectedUsdcAmount != null && (
                   <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700">
                     {formatPrice(sweep.detectedUsdcAmount.toFixed(2), "USD")} USDC detected — landed{" "}
-                    {sweep.detectedAt?.toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })}
+                    {sweep.detectedAt && formatEatDateTime(sweep.detectedAt)}
                   </p>
                 )}
                 <form action={confirmSweep.bind(null, sweep.id)} className="mt-3 flex flex-wrap items-end gap-3">

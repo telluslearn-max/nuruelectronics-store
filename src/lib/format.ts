@@ -13,3 +13,15 @@ export function formatPrice(amount: string, currencyCode: string) {
     maximumFractionDigits: isWhole ? 0 : 2,
   }).format(value);
 }
+
+/** These pages are server-rendered, so a bare `.toLocaleString()` reports the server runtime's
+ * timezone (UTC on Vercel), not the Nairobi-based admin's — NURU is a Kenyan business, so every
+ * admin-facing timestamp should read in East Africa Time regardless of where the request happens
+ * to execute. */
+export function formatEatDateTime(date: Date): string {
+  return `${date.toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short", timeZone: "Africa/Nairobi" })} EAT`;
+}
+
+export function formatEatDate(date: Date): string {
+  return date.toLocaleDateString("en-US", { dateStyle: "medium", timeZone: "Africa/Nairobi" });
+}
