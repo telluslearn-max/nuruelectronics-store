@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { requireAdminSession } from "@/lib/admin-auth";
 import {
+  getCapitalCircleCycleStatus,
   getCapitalCircleIntelligenceReport,
   getCapitalCircleReport,
   getCapitalCircleWallets,
@@ -12,6 +13,7 @@ import { clearCapitalCirclePause } from "@/lib/capital-circle/wallet-actions";
 import { formatPrice } from "@/lib/format";
 import { FeedbackBanner } from "@/components/admin/feedback-banner";
 import { PushSubscribeButton } from "@/components/admin/push-subscribe-button";
+import { ScanStatus } from "@/components/admin/scan-status";
 import { WalletSection } from "./wallet-section";
 
 export const metadata: Metadata = { title: "Capital Circle" };
@@ -312,11 +314,12 @@ export default async function CapitalCirclePage({
   searchParams: Promise<{ success?: string; error?: string }>;
 }) {
   await requireAdminSession();
-  const [report, pendingSweeps, wallets, intelligence] = await Promise.all([
+  const [report, pendingSweeps, wallets, intelligence, cycleStatus] = await Promise.all([
     getCapitalCircleReport(),
     getPendingSweeps(),
     getCapitalCircleWallets(),
     getCapitalCircleIntelligenceReport(),
+    getCapitalCircleCycleStatus(),
   ]);
   const { success, error } = await searchParams;
 
@@ -342,6 +345,8 @@ export default async function CapitalCirclePage({
           ? "Live — a configured Circle wallet can execute real orders."
           : "Simulation mode — no Circle wallet configured yet. Real markets, real reasoning, no real funds."}
       </div>
+
+      <ScanStatus status={cycleStatus} />
 
       <PushSubscribeButton />
 

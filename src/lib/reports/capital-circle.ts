@@ -13,6 +13,7 @@ import {
 } from "../capital-circle/calibration";
 import { computeAdaptiveShrinkage } from "../capital-circle/trade-policy";
 import { sweepPolicies, type LabeledCandidate, type PolicyOutcome } from "../capital-circle/policy-eval";
+import { computeCycleStatus, type CycleStatus } from "../capital-circle/cycle-status";
 
 export type CapitalCircleReportPosition = {
   id: string;
@@ -114,6 +115,21 @@ export async function getCapitalCircleReport(limit = 50): Promise<CapitalCircleR
     totalSimulatedUsd,
     totalExecutedUsd,
   };
+}
+
+/** One targeted query, kept separate from getCapitalCircleReport rather than folded in — this
+    answers "is it alive right now," a different question from "how has it done," and the two
+    have no reason to share a round trip. */
+export async function getCapitalCircleCycleStatus(): Promise<CycleStatus> {
+  const cycle = await prisma.capitalCircleCycleLog.findFirst({
+    orderBy: { startedAt: "desc" },
+    select: { startedAt: true, finishedAt: true, action: true, summary: true },
+  });
+  if (!cycle) return computeCycleStatus(null, Date.now());
+  return computeCycleStatus(
+    { startedAtMs: cycle.startedAt.getTime(), finishedAtMs: cycle.finishedAt?.getTime() ?? null, action: cycle.action, summary: cycle.summary },
+    Date.now(),
+  );
 }
 
 export type CapitalCircleIntelligenceReport = {
