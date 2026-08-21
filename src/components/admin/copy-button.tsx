@@ -26,7 +26,10 @@ export function CopyButton({ value, label = "Copy", className }: { value: string
 
   return (
     <span className="inline-flex items-center gap-2">
-      <button type="button" onClick={handleClick} className={className}>
+      {/* min-h-9 is a floor, not a fixed size — composes with whatever padding a caller passes
+          (some contexts here use py-0.5, which alone is well under a comfortable tap target)
+          rather than every call site needing to remember to size itself for touch. */}
+      <button type="button" onClick={handleClick} className={`min-h-9 ${className ?? ""}`}>
         {status === "copied" ? "Copied" : label}
       </button>
       <span aria-live="polite" className="text-xs text-red-600">
