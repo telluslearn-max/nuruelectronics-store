@@ -118,6 +118,10 @@ export async function getBalanceUsdc(): Promise<number> {
 }
 
 export const circleWalletAddress = walletAddress ?? null;
+/** Circle's own internal wallet id — env-configured, never user-editable, so the "Register a
+    wallet" flow can offer it as a trusted one-click confirmation instead of asking someone to
+    retype a value the server already has. */
+export const circleWalletId = walletId ?? null;
 
 /**
  * The ERC-20 the Polymarket exchange actually settles orders in on the given chain — NOT
