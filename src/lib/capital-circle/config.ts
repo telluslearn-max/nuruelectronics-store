@@ -63,8 +63,27 @@ export const MAX_SPREAD = Number(process.env.CAPITAL_CIRCLE_MAX_SPREAD ?? 0.08);
  * Entry-price band. Above MAX: the payoff is a few cents against a full-size
  * downside, so a single surprise wipes out dozens of wins. Below MIN: a
  * lottery ticket whose probability we cannot estimate to that precision.
+ *
+ * MAX lowered from 0.97, for two reasons that point the same way.
+ *
+ * The first is arithmetic, and it makes most of the old band unreachable rather than merely
+ * unwise. Clearing the edge gate needs the model (minEdge + COST_BUFFER)/λ above the entry price
+ * — see requiredDeviation in trade-policy.ts — and a probability cannot exceed 1, so the highest
+ * entry the gate can ever accept is 1 − that same quantity. At the λ measured in production
+ * today (0.287) the strict bar cannot reach any entry above 0.861, and the relaxed bar cannot
+ * reach above 0.923. Everything between there and 0.97 was advertised as tradeable, priced by the
+ * model every cycle, and structurally incapable of producing a trade.
+ *
+ * The second is risk. Buying at 0.90 stakes ninety cents to win ten: one loss erases nine wins,
+ * and a forecast error of a couple of points flips the sign of the edge outright. That is exactly
+ * the regime where an imperfectly calibrated estimate does the most damage.
+ *
+ * Costs nothing in coverage, which is why it is worth doing: verified against a live 72h window,
+ * the screened universe was unchanged at 178 markets and the slate still filled to 48. Binary
+ * markets always carry a cheap side, so tightening the ceiling steers the desk to the side of the
+ * book with a real payoff rather than removing the market.
  */
-export const MAX_ENTRY_PRICE = Number(process.env.CAPITAL_CIRCLE_MAX_ENTRY_PRICE ?? 0.97);
+export const MAX_ENTRY_PRICE = Number(process.env.CAPITAL_CIRCLE_MAX_ENTRY_PRICE ?? 0.9);
 export const MIN_ENTRY_PRICE = Number(process.env.CAPITAL_CIRCLE_MIN_ENTRY_PRICE ?? 0.03);
 
 /**
