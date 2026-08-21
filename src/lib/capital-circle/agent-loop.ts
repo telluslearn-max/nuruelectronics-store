@@ -292,12 +292,24 @@ const scoringResponseSchema = {
 
 /**
  * The scoring call returns one JSON estimate per outcome token, so its output length scales with
- * the slate — and a truncated response doesn't error, it just silently returns fewer estimates,
- * which looks exactly like "the model had no opinion on those markets". Set explicitly rather
- * than inherited from the model default so widening CANDIDATE_LIMIT can't quietly start dropping
- * candidates off the end of the slate.
+ * the slate, and each estimate echoes back a 77-digit tokenId and a 66-character hex marketId —
+ * digits and hex tokenize badly, so the identifiers alone cost roughly 70 tokens per estimate
+ * before any actual content.
+ *
+ * This was set to 16_384 when CANDIDATE_LIMIT was widened, on the assumption that naming a limit
+ * was safer than inheriting one. It was the opposite: the model's own default is far higher, so
+ * the explicit value *lowered* the ceiling, and the first production cycles on the wider slate
+ * truncated mid-string at ~24.5k characters. All three ensemble samples failed to parse and the
+ * cycle recorded "no usable probabilities — no trade", which is strictly worse than the narrow
+ * slate it replaced.
+ *
+ * Pinned to Gemini 2.5 Flash's actual maximum, which is headroom of roughly 6x what the current
+ * slate needs. Note this budget is shared with thinking tokens (THINKING_BUDGET), so it is a
+ * ceiling on both, not on the JSON alone. parseScoringResponse also salvages whatever completed
+ * before a truncation point, so overflowing this degrades to a partial slate rather than a lost
+ * cycle.
  */
-const SCORING_MAX_OUTPUT_TOKENS = 16_384;
+const SCORING_MAX_OUTPUT_TOKENS = 65_536;
 
 /**
  * Runs the scoring prompt ENSEMBLE_SAMPLES times at a non-zero temperature.
@@ -344,23 +356,82 @@ async function scoreCandidates(views: ReturnType<typeof toScoringView>[], contex
   return samples;
 }
 
+function coerceSamples(entries: unknown[]): ProbabilitySample[] {
+  return entries
+    .map((entry) => {
+      const record = (entry ?? {}) as Record<string, unknown>;
+      return {
+        marketId: typeof record.marketId === "string" ? record.marketId : "",
+        tokenId: typeof record.tokenId === "string" ? record.tokenId : "",
+        probability: Number(record.probability),
+        rationale: typeof record.rationale === "string" ? record.rationale : undefined,
+      };
+    })
+    .filter((sample) => sample.marketId && sample.tokenId && Number.isFinite(sample.probability));
+}
+
+/**
+ * Pulls the estimate objects out of a response that stopped mid-flight.
+ *
+ * A truncated response is not a malformed one — everything before the cut is perfectly good, and
+ * the whole slate up to that point is exactly what the cycle needs. JSON.parse is all-or-nothing,
+ * so a single unterminated string at the tail used to discard every estimate that had already
+ * arrived, turning a long slate into a silent "the model had no opinion on anything".
+ *
+ * Walks the text tracking brace depth (string-aware, so braces inside a rationale don't count)
+ * and parses each object nested one level inside the root — the elements of the estimates array.
+ * The trailing partial object never closes, so it is simply never captured.
+ */
+export function salvageScoringEstimates(text: string): ProbabilitySample[] {
+  const objects: unknown[] = [];
+  let depth = 0;
+  let start = -1;
+  let inString = false;
+  let escaped = false;
+
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (char === "\\") escaped = true;
+      else if (char === '"') inString = false;
+      continue;
+    }
+    if (char === '"') {
+      inString = true;
+    } else if (char === "{") {
+      if (depth === 1) start = i;
+      depth++;
+    } else if (char === "}") {
+      depth--;
+      if (depth === 1 && start >= 0) {
+        try {
+          objects.push(JSON.parse(text.slice(start, i + 1)));
+        } catch {
+          // One unparseable element shouldn't cost the rest of the slate.
+        }
+        start = -1;
+      }
+    }
+  }
+  return coerceSamples(objects);
+}
+
 function parseScoringResponse(text: string | undefined): ProbabilitySample[] {
   if (!text) return [];
   try {
     const parsed = JSON.parse(text) as { estimates?: unknown };
     if (!Array.isArray(parsed.estimates)) return [];
-    return parsed.estimates
-      .map((entry) => {
-        const record = entry as Record<string, unknown>;
-        return {
-          marketId: typeof record.marketId === "string" ? record.marketId : "",
-          tokenId: typeof record.tokenId === "string" ? record.tokenId : "",
-          probability: Number(record.probability),
-          rationale: typeof record.rationale === "string" ? record.rationale : undefined,
-        };
-      })
-      .filter((sample) => sample.marketId && sample.tokenId && Number.isFinite(sample.probability));
+    return coerceSamples(parsed.estimates);
   } catch (error) {
+    const salvaged = salvageScoringEstimates(text);
+    if (salvaged.length > 0) {
+      console.warn(
+        `[capital-circle] scoring response was truncated (${text.length} chars) — recovered ${salvaged.length} complete estimate(s) from it:`,
+        error instanceof Error ? error.message : error,
+      );
+      return salvaged;
+    }
     console.error("[capital-circle] could not parse a scoring response:", error);
     return [];
   }
