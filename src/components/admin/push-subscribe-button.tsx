@@ -167,6 +167,9 @@ export function PushSubscribeButton() {
         )}
         {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
       </div>
+      {/* The button is the tap target (44px, a real touch-target minimum); the pill inside it is
+          the visual toggle, unchanged from before — padding the hit area rather than growing the
+          pill itself keeps the existing, already-reviewed look exactly as it was. */}
       <button
         type="button"
         role="switch"
@@ -174,13 +177,13 @@ export function PushSubscribeButton() {
         aria-label="Notify me when a position is taken"
         disabled={disabled}
         onClick={toggle}
-        className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
-          disabled ? "cursor-not-allowed bg-neutral-100" : on ? "bg-foreground" : "bg-neutral-200"
-        }`}
+        className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-control ${disabled ? "cursor-not-allowed" : ""}`}
       >
-        <span
-          className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${on ? "translate-x-5" : "translate-x-0"}`}
-        />
+        <span className={`relative h-6 w-11 rounded-full transition-colors ${disabled ? "bg-neutral-100" : on ? "bg-foreground" : "bg-neutral-200"}`}>
+          <span
+            className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${on ? "translate-x-5" : "translate-x-0"}`}
+          />
+        </span>
       </button>
     </div>
   );

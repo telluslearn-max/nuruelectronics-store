@@ -378,8 +378,10 @@ export async function WalletSection({ wallets }: { wallets: CapitalCircleWalletS
         wallets.map((wallet) => (
           <details key={wallet.id} className={DETAILS}>
             <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-sm font-medium">
-              <span className="font-mono">{wallet.circleWalletId ?? wallet.id}</span>
-              <WalletStatusPill status={wallet.status} />
+              <span className="min-w-0 truncate font-mono">{wallet.circleWalletId ?? wallet.id}</span>
+              <span className="shrink-0">
+                <WalletStatusPill status={wallet.status} />
+              </span>
             </summary>
 
             <form action={saveCapitalCircleWalletCaps} className="mt-4 space-y-3">
