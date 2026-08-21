@@ -39,8 +39,8 @@ export function ScanStatus({ status }: { status: CycleStatus }) {
 
   if (status.state === "never-run") {
     return (
-      <div className="mt-3 inline-flex items-center gap-2 rounded-control border border-border-subtle px-3 py-2 text-sm text-neutral-500">
-        <span className="h-2 w-2 rounded-full bg-neutral-300" />
+      <div className="mt-3 flex items-center gap-2 rounded-card border border-border-subtle p-4 text-sm text-neutral-500">
+        <span className="h-2 w-2 shrink-0 rounded-full bg-neutral-300" />
         No scan has run yet.
       </div>
     );
@@ -48,8 +48,8 @@ export function ScanStatus({ status }: { status: CycleStatus }) {
 
   if (status.state === "scanning") {
     return (
-      <div className="mt-3 inline-flex items-center gap-2 rounded-control border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-        <span className="relative flex h-2 w-2">
+      <div className="mt-3 flex items-center gap-2 rounded-card border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+        <span className="relative flex h-2 w-2 shrink-0">
           <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
           <span className="relative inline-flex h-2 w-2 rounded-full bg-amber-500" />
         </span>
@@ -62,7 +62,7 @@ export function ScanStatus({ status }: { status: CycleStatus }) {
   const summary = status.lastSummary || (status.stale ? "didn't finish cleanly" : "no summary recorded");
 
   return (
-    <div className="mt-3 inline-flex max-w-full items-start gap-2 rounded-control border border-border-subtle px-3 py-2 text-sm text-neutral-600">
+    <div className="mt-3 flex items-start gap-2 rounded-card border border-border-subtle p-4 text-sm text-neutral-600">
       <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${status.stale ? "bg-amber-400" : "bg-neutral-400"}`} />
       <span className="min-w-0">
         <span className="font-medium">
