@@ -117,14 +117,19 @@ model Order {
 }
 
 model OrderItem {
-  id        String  @id @default(cuid())
-  orderId   String
-  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  title     String
-  variantId String?
-  quantity  Int
-  unitPrice Decimal @db.Decimal(10, 2)
-  lineTotal Decimal @db.Decimal(10, 2)
+  id          String  @id @default(cuid())
+  orderId     String
+  order       Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  title       String
+  // Free-text notes shown alongside the title (e.g. serial number, condition) — most useful
+  // for manual/off-platform sales of used or serialized electronics.
+  description String?
+  variantId   String?
+  quantity    Int
+  unitPrice   Decimal @db.Decimal(10, 2)
+  // Per-line amount knocked off qty * unitPrice before it lands in lineTotal.
+  discount    Decimal @default(0) @db.Decimal(10, 2)
+  lineTotal   Decimal @db.Decimal(10, 2)
 
   @@index([orderId])
 }

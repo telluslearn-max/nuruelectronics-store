@@ -7,16 +7,34 @@ import { formatPrice } from "@/lib/format";
 // Matches parseLineItems' actual cap in admin-actions.ts (`for (let i = 0; i < 20; i++)`).
 const MAX_LINE_ITEMS = 20;
 
-type Row = { id: number; title: string; qty: string; price: string; variantId: string };
+type Row = { id: number; title: string; description: string; qty: string; price: string; discount: string; variantId: string };
 
 function emptyRow(id: number): Row {
-  return { id, title: "", qty: "1", price: "", variantId: "" };
+  return { id, title: "", description: "", qty: "1", price: "", discount: "", variantId: "" };
 }
 
 function lineTotal(row: Row): number {
   const qty = Number(row.qty) || 0;
   const price = Number(row.price) || 0;
-  return qty * price;
+  const discount = Number(row.discount) || 0;
+  return Math.max(0, qty * price - discount);
+}
+
+function TrashIcon() {
+  return (
+    <svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M4 6h12M8 6V4.5A1.5 1.5 0 0 1 9.5 3h1A1.5 1.5 0 0 1 12 4.5V6m2 0-.6 9.6a1.5 1.5 0 0 1-1.5 1.4H8.1a1.5 1.5 0 0 1-1.5-1.4L6 6" />
+    </svg>
+  );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <label className="text-xs text-neutral-500">{label}</label>
+      <div className="mt-1">{children}</div>
+    </div>
+  );
 }
 
 function LineItemRow({
@@ -33,31 +51,43 @@ function LineItemRow({
   removable: boolean;
 }) {
   return (
-    <div className="rounded-control border border-border-subtle p-3">
+    <div className="rounded-card border border-border-subtle bg-neutral-50 p-3">
       <div className="flex items-start gap-2">
-        <input
-          name={`item_title_${index}`}
-          type="text"
-          placeholder="Product / description"
-          value={row.title}
-          onChange={(e) => onChange({ title: e.target.value })}
-          className={`flex-1 ${inputClass}`}
-        />
+        <span className="mt-2.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-neutral-200 text-[11px] font-medium text-neutral-600">
+          {index + 1}
+        </span>
+        <div className="min-w-0 flex-1 space-y-1.5">
+          <input
+            name={`item_title_${index}`}
+            type="text"
+            placeholder="Product / description"
+            value={row.title}
+            onChange={(e) => onChange({ title: e.target.value })}
+            className={inputClass}
+          />
+          <input
+            name={`item_description_${index}`}
+            type="text"
+            placeholder="Serial number, condition, notes… (optional)"
+            value={row.description}
+            onChange={(e) => onChange({ description: e.target.value })}
+            className={`${inputClass} text-xs`}
+          />
+        </div>
         <button
           type="button"
           onClick={onRemove}
           disabled={!removable}
           aria-label="Remove line item"
           title="Remove line item"
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-control border border-border-subtle text-neutral-500 transition hover:border-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-30"
+          className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-control text-neutral-400 transition hover:bg-neutral-200 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent"
         >
-          &times;
+          <TrashIcon />
         </button>
       </div>
 
-      <div className="mt-2 grid grid-cols-3 gap-2">
-        <div>
-          <label className="text-xs text-neutral-500">Qty</label>
+      <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <Field label="Qty">
           <input
             name={`item_qty_${index}`}
             type="number"
@@ -65,11 +95,10 @@ function LineItemRow({
             step={1}
             value={row.qty}
             onChange={(e) => onChange({ qty: e.target.value })}
-            className={`mt-1 ${inputClass}`}
+            className={inputClass}
           />
-        </div>
-        <div>
-          <label className="text-xs text-neutral-500">Unit price (KES)</label>
+        </Field>
+        <Field label="Unit price (KES)">
           <input
             name={`item_price_${index}`}
             type="number"
@@ -77,15 +106,24 @@ function LineItemRow({
             step="0.01"
             value={row.price}
             onChange={(e) => onChange({ price: e.target.value })}
-            className={`mt-1 ${inputClass}`}
+            className={inputClass}
           />
-        </div>
-        <div>
-          <label className="text-xs text-neutral-500">Line total</label>
-          <p className="mt-1 flex h-[38px] items-center px-1 text-sm font-medium">
-            {formatPrice(String(lineTotal(row)), "KES")}
-          </p>
-        </div>
+        </Field>
+        <Field label="Discount (KES)">
+          <input
+            name={`item_discount_${index}`}
+            type="number"
+            min={0}
+            step="0.01"
+            placeholder="0"
+            value={row.discount}
+            onChange={(e) => onChange({ discount: e.target.value })}
+            className={inputClass}
+          />
+        </Field>
+        <Field label="Line total">
+          <p className="flex h-[38px] items-center text-sm font-medium">{formatPrice(String(lineTotal(row)), "KES")}</p>
+        </Field>
       </div>
 
       <details className="mt-2">
@@ -136,7 +174,7 @@ export function LineItemsGrid() {
         />
       ))}
 
-      <div className="flex items-center justify-between pt-1">
+      <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
         <button
           type="button"
           onClick={addRow}

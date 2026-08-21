@@ -14,24 +14,36 @@ import { logAdminAction } from "./audit-log";
 import { PAYMENT_METHODS, parseEnumField } from "./parse-enum";
 import { hasRealEmail, syntheticCustomerEmail } from "./customer-email";
 
-function parseLineItems(
-  formData: FormData,
-): { title: string; quantity: number; unitPrice: string; lineTotal: string; variantId?: string }[] {
-  const items: { title: string; quantity: number; unitPrice: string; lineTotal: string; variantId?: string }[] = [];
+function parseLineItems(formData: FormData): {
+  title: string;
+  description?: string;
+  quantity: number;
+  unitPrice: string;
+  discount: string;
+  lineTotal: string;
+  variantId?: string;
+}[] {
+  const items: ReturnType<typeof parseLineItems> = [];
   for (let i = 0; i < 20; i++) {
     const title = formData.get(`item_title_${i}`);
+    const description = String(formData.get(`item_description_${i}`) ?? "").trim() || undefined;
     const quantity = formData.get(`item_qty_${i}`);
     const unitPrice = formData.get(`item_price_${i}`);
+    const discountRaw = formData.get(`item_discount_${i}`);
     const variantId = String(formData.get(`item_variant_${i}`) ?? "").trim() || undefined;
     if (!title || String(title).trim() === "") continue;
     const qty = Number(quantity) || 0;
     const price = Number(unitPrice) || 0;
     if (qty <= 0) continue;
+    // Clamped so a discount can never push a line into negative revenue.
+    const discount = Math.min(Math.max(Number(discountRaw) || 0, 0), qty * price);
     items.push({
       title: String(title).trim(),
+      description,
       quantity: qty,
       unitPrice: price.toFixed(2),
-      lineTotal: (qty * price).toFixed(2),
+      discount: discount.toFixed(2),
+      lineTotal: (qty * price - discount).toFixed(2),
       variantId,
     });
   }

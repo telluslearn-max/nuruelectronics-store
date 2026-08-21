@@ -72,9 +72,11 @@ export const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   colTitle: { flex: 4 },
+  colTitleSub: { fontSize: 8, color: "#888888", marginTop: 2 },
   colQty: { flex: 1, textAlign: "right" },
   colPrice: { flex: 2, textAlign: "right" },
   colTotal: { flex: 2, textAlign: "right" },
+  colTotalSub: { fontSize: 8, color: "#888888", marginTop: 2 },
   tableHeaderText: {
     fontSize: 8,
     color: "#888888",
@@ -278,7 +280,14 @@ export function LineItemsTable({
   items,
   formatMoney,
 }: {
-  items: { title: string; quantity: number; unitPrice: Moneyish; lineTotal: Moneyish }[];
+  items: {
+    title: string;
+    description?: string | null;
+    quantity: number;
+    unitPrice: Moneyish;
+    discount?: Moneyish;
+    lineTotal: Moneyish;
+  }[];
   formatMoney: (amount: Moneyish) => string;
 }) {
   return (
@@ -289,14 +298,23 @@ export function LineItemsTable({
         <Text style={[styles.colPrice, styles.tableHeaderText]}>Unit price</Text>
         <Text style={[styles.colTotal, styles.tableHeaderText]}>Total</Text>
       </View>
-      {items.map((item, index) => (
-        <View style={styles.tableRow} key={index}>
-          <Text style={styles.colTitle}>{item.title}</Text>
-          <Text style={styles.colQty}>{item.quantity}</Text>
-          <Text style={styles.colPrice}>{formatMoney(item.unitPrice)}</Text>
-          <Text style={styles.colTotal}>{formatMoney(item.lineTotal)}</Text>
-        </View>
-      ))}
+      {items.map((item, index) => {
+        const discount = Number(item.discount ?? 0);
+        return (
+          <View style={styles.tableRow} key={index}>
+            <View style={styles.colTitle}>
+              <Text>{item.title}</Text>
+              {item.description && <Text style={styles.colTitleSub}>{item.description}</Text>}
+            </View>
+            <Text style={styles.colQty}>{item.quantity}</Text>
+            <Text style={styles.colPrice}>{formatMoney(item.unitPrice)}</Text>
+            <View>
+              <Text style={styles.colTotal}>{formatMoney(item.lineTotal)}</Text>
+              {discount > 0 && <Text style={styles.colTotalSub}>-{formatMoney(discount)} discount</Text>}
+            </View>
+          </View>
+        );
+      })}
     </View>
   );
 }
