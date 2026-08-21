@@ -3,6 +3,7 @@ import { formatPrice } from "@/lib/format";
 import { BrandWordmark, DocumentFooter, WarrantyTerms, type Moneyish } from "./document-layout";
 import type { Letterhead } from "./letterhead";
 import type { Customer, Invoice, Order, OrderItem, Receipt } from "@prisma/client";
+import { displayEmail } from "@/lib/customer-email";
 
 function formatDate(date: Date) {
   return new Intl.DateTimeFormat("en-KE", { dateStyle: "medium" }).format(date);
@@ -111,8 +112,8 @@ export function InvoiceDocument({
         <View style={s.billToBar}>
           <View>
             <Text style={s.billToLabel}>Bill to</Text>
-            <Text style={s.billToValue}>{customer.name ?? customer.email}</Text>
-            <Text style={s.billToSub}>{customer.email}</Text>
+            <Text style={s.billToValue}>{customer.name ?? displayEmail(customer.email) ?? customer.phone ?? "Customer"}</Text>
+            {displayEmail(customer.email) && <Text style={s.billToSub}>{displayEmail(customer.email)}</Text>}
             {customer.phone && <Text style={s.billToSub}>{customer.phone}</Text>}
           </View>
           <View>

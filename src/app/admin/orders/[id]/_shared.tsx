@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { formatPrice } from "@/lib/format";
+import { displayEmail } from "@/lib/customer-email";
 import type { Customer, OrderItem } from "@prisma/client";
 
 export const inputClass =
@@ -22,11 +23,12 @@ export function toDateInputValue(date: Date | null): string {
 }
 
 export function BillToCard({ customer }: { customer: Customer }) {
+  const email = displayEmail(customer.email);
   return (
     <div className={cardClass}>
       <p className={cardLabelClass}>Bill to</p>
-      <p className="mt-2 text-sm font-medium">{customer.name ?? customer.email}</p>
-      {customer.name && <p className="mt-0.5 text-sm text-neutral-500">{customer.email}</p>}
+      <p className="mt-2 text-sm font-medium">{customer.name ?? email ?? customer.phone ?? "Customer"}</p>
+      {customer.name && email && <p className="mt-0.5 text-sm text-neutral-500">{email}</p>}
       {customer.phone && <p className="mt-0.5 text-sm text-neutral-500">{customer.phone}</p>}
     </div>
   );
