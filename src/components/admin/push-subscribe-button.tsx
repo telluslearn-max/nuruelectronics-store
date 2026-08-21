@@ -20,10 +20,13 @@ type Status = "checking" | "unsupported" | "unconfigured" | "subscribed" | "unsu
 
 /** Whether this browser can even attempt push — only meaningful once actually running client-side
  * (checked from an effect, never during render), since `navigator`/`window` don't exist on the
- * server. */
-function supportStatus(): "unconfigured" | "unsupported" | "ok" {
+ * server. Checking Notification.permission here (not just service worker support) means a
+ * browser-level "denied" from a previous visit is recognized up front, instead of only being
+ * discovered by calling requestPermission() again and getting the same answer silently. */
+function supportStatus(): "unconfigured" | "unsupported" | "ok" | "denied" {
   if (!VAPID_PUBLIC_KEY) return "unconfigured";
   if (!("serviceWorker" in navigator) || !("PushManager" in window)) return "unsupported";
+  if (typeof Notification !== "undefined" && Notification.permission === "denied") return "denied";
   return "ok";
 }
 
@@ -110,6 +113,25 @@ export function PushSubscribeButton() {
     }
   }
 
+  // Browsers require a real user gesture before they'll show the permission prompt at all — a
+  // bare useEffect calling requestPermission() on mount is reliably ignored or auto-denied by
+  // Chrome/Firefox/Safari's abuse heuristics, which would make "on by default" actively worse
+  // (a silent, hard-to-reverse "denied" instead of a working toggle). This is the honest
+  // approximation instead: the *first* click or keypress anywhere on the page — not necessarily
+  // this toggle — counts as that gesture and fires the same subscribe() flow immediately. On an
+  // internal, single-admin tool the person experiencing this is the same person who asked for
+  // it, which is what separates this from the dark-pattern version of the same technique.
+  useEffect(() => {
+    if (status !== "unsubscribed") return;
+    const trigger = () => subscribe();
+    document.addEventListener("pointerdown", trigger, { once: true });
+    document.addEventListener("keydown", trigger, { once: true });
+    return () => {
+      document.removeEventListener("pointerdown", trigger);
+      document.removeEventListener("keydown", trigger);
+    };
+  }, [status]);
+
   if (status === "checking") return null;
 
   const disabled = status === "unconfigured" || status === "unsupported";
@@ -135,11 +157,19 @@ export function PushSubscribeButton() {
           </p>
         )}
         {status === "unsupported" && <p className="mt-1 text-xs text-neutral-500">This browser doesn&apos;t support push notifications.</p>}
+        {status === "unsubscribed" && (
+          <p className="mt-1 text-xs text-neutral-500">
+            Turns on the moment you click anywhere on this page — or flip it here directly.
+          </p>
+        )}
         {status === "denied" && (
           <p className="mt-1 text-xs text-red-600">Blocked in your browser&apos;s site settings — allow notifications there, then try again.</p>
         )}
         {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
       </div>
+      {/* The button is the tap target (44px, a real touch-target minimum); the pill inside it is
+          the visual toggle, unchanged from before — padding the hit area rather than growing the
+          pill itself keeps the existing, already-reviewed look exactly as it was. */}
       <button
         type="button"
         role="switch"
@@ -147,13 +177,13 @@ export function PushSubscribeButton() {
         aria-label="Notify me when a position is taken"
         disabled={disabled}
         onClick={toggle}
-        className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
-          disabled ? "cursor-not-allowed bg-neutral-100" : on ? "bg-foreground" : "bg-neutral-200"
-        }`}
+        className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-control ${disabled ? "cursor-not-allowed" : ""}`}
       >
-        <span
-          className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${on ? "translate-x-5" : "translate-x-0"}`}
-        />
+        <span className={`relative h-6 w-11 rounded-full transition-colors ${disabled ? "bg-neutral-100" : on ? "bg-foreground" : "bg-neutral-200"}`}>
+          <span
+            className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${on ? "translate-x-5" : "translate-x-0"}`}
+          />
+        </span>
       </button>
     </div>
   );
