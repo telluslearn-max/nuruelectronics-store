@@ -287,13 +287,34 @@ function parseFillPrice(response: unknown): number | null {
 }
 
 /** Fires the push notification for a real (non-rejected) position — never allowed to fail
- * recordPosition itself, since a notification is a nice-to-have, not part of the trade record. */
+ * recordPosition itself, since a notification is a nice-to-have, not part of the trade record.
+ *
+ * A skip/failure used to only reach a server console.error, which nobody running this on a
+ * hosted deploy ever sees — from the admin's side "the toggle is on but nothing arrives" and
+ * "push isn't configured server-side" look identical. Log the two skip reasons that mean push
+ * *should* have gone out and silently didn't (misconfigured or send_failed) to the audit log so
+ * they're visible on /admin/audit-log. "no_subscriptions" isn't logged — that's just nobody
+ * having turned the toggle on yet, not a fault. */
 async function notifyPositionTaken(question: string, sizeUsd: number, status: "simulated" | "executed"): Promise<void> {
-  await sendPushToAdmin({
-    title: "Capital Circle: position taken",
-    body: `${status === "executed" ? "Executed" : "Simulated"} ${formatPrice(sizeUsd.toFixed(2), "USD")} — ${question}`,
-    url: "/admin/reports/capital-circle",
-  }).catch((error) => console.error("[capital-circle] push notify failed:", error));
+  try {
+    const result = await sendPushToAdmin({
+      title: "Capital Circle: position taken",
+      body: `${status === "executed" ? "Executed" : "Simulated"} ${formatPrice(sizeUsd.toFixed(2), "USD")} — ${question}`,
+      url: "/admin/reports/capital-circle",
+    });
+    if (result.skippedReason === "not_configured" || result.skippedReason === "send_failed") {
+      await logAdminAction({
+        action: "capital-circle.push.undelivered",
+        entityType: "push_notification",
+        summary:
+          result.skippedReason === "not_configured"
+            ? "Position taken, but push wasn't sent: VAPID_PRIVATE_KEY (or the public key) isn't set server-side, even though a browser can still show \"subscribed\"."
+            : "Position taken, but every push send attempt failed (not a stale-endpoint 404/410) — check server logs for the underlying Web Push error.",
+      });
+    }
+  } catch (error) {
+    console.error("[capital-circle] push notify failed:", error);
+  }
 }
 
 function round2(value: number): number {

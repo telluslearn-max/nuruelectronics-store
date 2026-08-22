@@ -10,6 +10,7 @@ import {
 } from "@/lib/reports/capital-circle";
 import { confirmSweep } from "@/lib/capital-circle/sweep-actions";
 import { clearCapitalCirclePause } from "@/lib/capital-circle/wallet-actions";
+import { isPushConfigured } from "@/lib/push";
 import { formatPrice, formatEatDate, formatEatDateTime } from "@/lib/format";
 import { FeedbackBanner } from "@/components/admin/feedback-banner";
 import { PushSubscribeButton } from "@/components/admin/push-subscribe-button";
@@ -405,7 +406,7 @@ export default async function CapitalCirclePage({
 
       <ScanStatus status={cycleStatus} />
 
-      <PushSubscribeButton />
+      <PushSubscribeButton serverConfigured={isPushConfigured} />
 
       <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className="rounded-card border border-border-subtle p-4">
