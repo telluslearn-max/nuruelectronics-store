@@ -38,7 +38,7 @@ function supportStatus(): "unconfigured" | "unsupported" | "ok" | "denied" {
  * Renders null until mounted, always — the server can't evaluate supportStatus() at all (no
  * navigator/window), so the only hydration-safe first paint is the same "nothing yet" on both
  * sides. Anything status-specific only appears after the client has actually mounted and checked. */
-export function PushSubscribeButton() {
+export function PushSubscribeButton({ serverConfigured }: { serverConfigured: boolean }) {
   const [mounted, setMounted] = useState(false);
   const [status, setStatus] = useState<Status>("checking");
   const [error, setError] = useState<string | null>(null);
@@ -164,6 +164,16 @@ export function PushSubscribeButton() {
         )}
         {status === "denied" && (
           <p className="mt-1 text-xs text-red-600">Blocked in your browser&apos;s site settings — allow notifications there, then try again.</p>
+        )}
+        {/* The browser only knows its own NEXT_PUBLIC_VAPID_PUBLIC_KEY, so it can show
+            "subscribed" while the server-side VAPID_PRIVATE_KEY is missing and every send
+            silently no-ops — from here that looks identical to "notifications just don't
+            arrive." Surface the server's own view so that state isn't invisible. */}
+        {status === "subscribed" && !serverConfigured && (
+          <p className="mt-1 text-xs text-red-600">
+            Subscribed here, but the server can&apos;t send yet — <code className="rounded bg-red-50 px-1 py-0.5">VAPID_PRIVATE_KEY</code> is
+            missing or doesn&apos;t match. Nothing will arrive until that&apos;s fixed.
+          </p>
         )}
         {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
       </div>
