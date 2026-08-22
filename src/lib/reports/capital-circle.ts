@@ -70,13 +70,20 @@ export async function getCapitalCircleReport(limit = 50): Promise<CapitalCircleR
   let executedResolvedCount = 0;
   for (const p of positions) {
     const size = Number(p.sizeUsd);
-    if (p.status === "simulated") totalSimulatedUsd += size;
+    // Early exits used to flip status to "exited", which dropped them out of both the Simulated
+    // and Real buckets below while still counting toward the combined total above — the desk's
+    // wagered/P&L totals would quietly disagree with the sum of the two cards that are supposed
+    // to split them. That flip is gone (see position-manager.ts), but any rows written before the
+    // fix still carry status "exited" — treat them as simulated, since live selling was never
+    // implemented and an executed position can never reach "exited".
+    const isSimulated = p.status === "simulated" || p.status === "exited";
+    if (isSimulated) totalSimulatedUsd += size;
     if (p.status === "executed") totalExecutedUsd += size;
     if (p.resolvedAt && p.resultUsd != null) {
       const resultUsd = Number(p.resultUsd);
       totalRealizedPnlUsd += resultUsd;
       resolvedCount++;
-      if (p.status === "simulated") {
+      if (isSimulated) {
         simulatedPnlUsd += resultUsd;
         simulatedResolvedCount++;
       }

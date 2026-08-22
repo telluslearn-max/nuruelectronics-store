@@ -63,9 +63,14 @@ export async function manageOpenPositions(): Promise<PositionManagementResult> {
       feesUsd: position.feesUsd != null ? Number(position.feesUsd) : null,
     });
 
+    // status stays "simulated"/"executed" — it's the report's only record of which bucket a
+    // position belongs to, and overwriting it here used to make early-exited positions vanish
+    // from both the Simulated and Real breakdowns on /admin/reports/capital-circle while still
+    // counting in the combined total. exitReason ("take_profit"/"stop") already says this closed
+    // early; the UI derives the "exited" badge from that instead of from status.
     await prisma.capitalCirclePosition.update({
       where: { id: position.id },
-      data: { status: "exited", resolvedAt: new Date(), resultUsd, exitPrice, exitReason: decision.reason },
+      data: { resolvedAt: new Date(), resultUsd, exitPrice, exitReason: decision.reason },
     });
     await logAdminAction({
       action: "capital-circle.position.exit",

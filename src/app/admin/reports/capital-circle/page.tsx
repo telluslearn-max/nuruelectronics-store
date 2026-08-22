@@ -456,7 +456,7 @@ export default async function CapitalCirclePage({
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="font-medium">{p.question}</div>
                   <div className="flex shrink-0 items-center gap-2">
-                    <StatusPill status={p.status} />
+                    <StatusPill status={p.exitReason === "take_profit" || p.exitReason === "stop" ? "exited" : p.status} />
                     {p.status !== "rejected" &&
                       (p.resolvedAt && p.resultUsd != null ? <ResultBadge resultUsd={p.resultUsd} /> : <LiveBadge />)}
                   </div>
