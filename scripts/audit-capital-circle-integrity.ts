@@ -52,6 +52,23 @@ const args = process.argv.slice(2);
 const verbose = args.includes("--verbose");
 const marketLimit = Number(args[args.indexOf("--markets") + 1]) || 120;
 
+// Checked before the client is built. Without it the pg adapter quietly falls back to
+// localhost:5432 and the first query dies in a twenty-line Prisma stack trace, which reads as a
+// broken script rather than as unset configuration — a bad way to meet an operator who is here
+// because something is already wrong.
+if (!process.env.DATABASE_URL) {
+  console.error(
+    "DATABASE_URL is not set, so there is nothing to audit.\n\n" +
+      "Run this where the app's database is reachable — locally with a .env.local, or with the\n" +
+      "variable exported for the environment you actually want to inspect:\n\n" +
+      "  DATABASE_URL='...' npx tsx scripts/audit-capital-circle-integrity.ts --verbose\n\n" +
+      "Point it at the same database the deployed app writes to. A preview or dev branch holds\n" +
+      "real-looking rows that diverged from Production long ago (see the README's note on Neon\n" +
+      "branches), and auditing one of those answers a question nobody asked.",
+  );
+  process.exit(1);
+}
+
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
 const prisma = new PrismaClient({ adapter });
 
