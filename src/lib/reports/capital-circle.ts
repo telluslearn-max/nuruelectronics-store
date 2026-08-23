@@ -1,18 +1,32 @@
 import "server-only";
 import { prisma } from "../prisma";
-import { BANKROLL_USD, CAPITAL_CIRCLE_LIVE, DAILY_POSITION_TARGET, DEFAULT_PER_POSITION_CAP_USD } from "../capital-circle/config";
+import {
+  BANKROLL_USD,
+  CALIBRATION_SAMPLE_LIMIT,
+  CAPITAL_CIRCLE_LIVE,
+  DAILY_POSITION_TARGET,
+  DEFAULT_PER_POSITION_CAP_USD,
+} from "../capital-circle/config";
 import { getTradingUrgency } from "../capital-circle/track-record";
 import { isCircleWalletConfigured } from "../capital-circle/circle-wallet-client";
 import { computeWeeklySweep, weekStartOf } from "../capital-circle/sweep";
 import {
   computeCalibration,
   computeCategoryPerformance,
+  detectAssignmentInversion,
   type CalibrationReport,
   type CalibrationSample,
   type CategoryPerformance,
+  type InversionReport,
 } from "../capital-circle/calibration";
 import { computeAdaptiveShrinkage } from "../capital-circle/trade-policy";
-import { sweepPolicies, type LabeledCandidate, type PolicyOutcome } from "../capital-circle/policy-eval";
+import {
+  sweepPolicies,
+  sweepPoliciesHonestly,
+  type HonestSweepResult,
+  type LabeledCandidate,
+  type PolicyOutcome,
+} from "../capital-circle/policy-eval";
 import { computeCycleStatus, type CycleStatus } from "../capital-circle/cycle-status";
 
 export type CapitalCircleReportPosition = {
@@ -141,11 +155,19 @@ export async function getCapitalCircleCycleStatus(): Promise<CycleStatus> {
 
 export type CapitalCircleIntelligenceReport = {
   calibration: CalibrationReport;
+  /**
+   * Whether the record shows probabilities scored against the wrong outcome. Read this before
+   * anything else in the report: if it fires, every other number here is describing something
+   * other than what it claims to, and the thresholds must not be tuned against it.
+   */
+  inversion: InversionReport;
   categories: CategoryPerformance[];
   /** The shrinkage λ currently derived from that calibration — how much the code trusts the model right now. */
-  shrinkage: { lambda: number; reason: string };
+  shrinkage: { lambda: number; reason: string; halted: boolean };
   /** Counterfactual sweep over resolved candidates: what other thresholds would have earned. */
   policySweep: PolicyOutcome[];
+  /** The same sweep, held to an out-of-sample test — the only part of it worth acting on. */
+  policyEvaluation: HonestSweepResult | null;
   /** How many labeled candidates the sweep had to work with. Below ~50 the table is suggestive, not conclusive. */
   labeledCandidateCount: number;
   recentCycles: {
@@ -178,7 +200,7 @@ export async function getCapitalCircleIntelligenceReport(): Promise<CapitalCircl
     prisma.capitalCircleCandidateSnapshot.findMany({
       where: { resolvedOutcome: { not: null }, modelProbability: { not: null } },
       orderBy: { resolvedAt: "desc" },
-      take: 500,
+      take: CALIBRATION_SAMPLE_LIMIT,
     }),
     prisma.capitalCircleCycleLog.findMany({ orderBy: { startedAt: "desc" }, take: 20 }),
     prisma.capitalCirclePosition.count({ where: { status: "edge_rejected" } }),
@@ -190,9 +212,11 @@ export async function getCapitalCircleIntelligenceReport(): Promise<CapitalCircl
     probability: Number(snapshot.modelProbability),
     outcome: snapshot.resolvedOutcome === 1 ? 1 : 0,
     category: snapshot.category,
+    shownPrice: snapshot.shownPrice != null ? Number(snapshot.shownPrice) : null,
   }));
 
   const calibration = computeCalibration(samples);
+  const inversion = detectAssignmentInversion(calibration);
   const labeled: LabeledCandidate[] = snapshots.map((snapshot) => ({
     marketId: snapshot.marketId,
     tokenId: snapshot.tokenId,
@@ -204,16 +228,30 @@ export async function getCapitalCircleIntelligenceReport(): Promise<CapitalCircl
     midpoint: snapshot.bestBid != null && snapshot.bestAsk != null ? (Number(snapshot.bestBid) + Number(snapshot.bestAsk)) / 2 : null,
     spread: snapshot.spread != null ? Number(snapshot.spread) : null,
     outcome: snapshot.resolvedOutcome === 1 ? 1 : 0,
+    resolvedAt: snapshot.resolvedAt,
   }));
 
   return {
     calibration,
+    inversion,
     categories: computeCategoryPerformance(samples),
+    // Reads the same λ the desk will actually gate its next trade with: same sample window as
+    // track-record.ts, and the same inversion input, so the dashboard cannot show one number
+    // while the cycle enforces another.
     shrinkage: computeAdaptiveShrinkage({
       sampleCount: calibration.sampleCount,
       meanAbsCalibrationError: calibration.meanAbsCalibrationError,
+      inverted: inversion.inverted,
+      invertedDetail: inversion.detail,
     }),
     policySweep: labeled.length > 0 ? sweepPolicies(labeled, { capUsd: DEFAULT_PER_POSITION_CAP_USD, bankrollUsd: BANKROLL_USD }).slice(0, 10) : [],
+    // The ranked table above is a search over one dataset and its top row is chosen partly for
+    // its luck; this is the same search with the winner scored on markets it had no part in
+    // picking. Shown alongside so the table can't be read as evidence on its own.
+    policyEvaluation:
+      labeled.length > 0
+        ? sweepPoliciesHonestly(labeled, { capUsd: DEFAULT_PER_POSITION_CAP_USD, bankrollUsd: BANKROLL_USD })
+        : null,
     labeledCandidateCount: labeled.length,
     recentCycles: cycles.map((cycle) => ({
       id: cycle.id,

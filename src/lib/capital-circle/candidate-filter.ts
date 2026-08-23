@@ -157,30 +157,13 @@ export function filterAndRankCandidates(
   return { candidates, dropped };
 }
 
-/**
- * The compact shape handed to the model for scoring — every field is something
- * that should bear on a probability estimate, and nothing else, since context
- * spent on boilerplate is context not spent on the question.
+/*
+ * The model-facing view of a screened market now lives in scoring-slate.ts,
+ * which addresses outcomes by short refs and verifies the model's answer back
+ * against them. It used to be built here as a direct projection carrying raw
+ * 66-character market ids and 77-digit token ids for the model to echo, which
+ * is the mechanism that let a probability end up recorded against the wrong
+ * outcome of the right market — see that module's header for the production
+ * evidence. Building it there keeps encoding and decoding in one place, so the
+ * two can't drift apart.
  */
-export function toScoringView(market: ScreenedMarket) {
-  return {
-    marketId: market.conditionId,
-    // Markets sharing an eventId are legs of the same real-world event (e.g. a match's
-    // moneyline, spread, and draw are three separate markets under one event) — without this,
-    // the model prices each in total isolation and has no way to notice its own estimates are
-    // mutually inconsistent, let alone that a mispriced leg implies something about its siblings.
-    eventId: market.eventId,
-    question: market.question,
-    category: market.category,
-    hoursToResolution: Number(market.hoursToResolution.toFixed(2)),
-    resolutionCriteria: market.description,
-    liquidityUsd: market.liquidity,
-    volume24hUsd: market.volume24hr,
-    spread: market.spread,
-    outcomes: market.tokens.map((token) => ({
-      tokenId: token.tokenId,
-      outcome: token.outcome,
-      marketPrice: token.price,
-    })),
-  };
-}
