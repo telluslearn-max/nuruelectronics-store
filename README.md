@@ -317,6 +317,20 @@ Look at `httpRequest.status` and `jsonPayload.debugInfo` (e.g. `"URL_CRAWLED. Or
 
 Relatedly: `gcloud scheduler jobs create` fails safely with `ALREADY_EXISTS` if the job is already there — it will never silently overwrite a working config. To change an existing job's target (e.g. fixing a bad domain), use `gcloud scheduler jobs update http <name> --uri=...` instead. Don't copy-paste an old `create` snippet with a stale URI and switch it to `update` without checking the URI first.
 
+### A forecasting record can be inverted rather than merely bad, and the two look alike at a glance
+
+A poor Brier score reads as "the model isn't very good". Check the shape before believing that. If the confidence bands pair with their mirrors — counts within one of each other, actual rates summing to 1.00 — and the mid bands track 1−p (outcomes called ~35% happening ~64% of the time), that is not a badly calibrated forecaster. It is probabilities scored against the *wrong outcome of the market*, and bands either side of 0.5 look healthy only because flipping a probability near 0.5 barely moves it.
+
+The distinction decides what to do next, and getting it wrong is expensive in a specific way. Edge is the gap between a probability and a price, so a probability paired with the sibling outcome's price shows the **largest apparent edge on the board** — meaning a stricter edge threshold concentrates capital into precisely the most badly mis-paired trades. Tuning thresholds against an inverted record makes the desk worse, confidently.
+
+`detectAssignmentInversion` (calibration.ts) tests for this on every cycle and pins trading trust to its floor when it fires, and the admin report leads with it. To find out *which* stage is responsible — settlement writing the wrong label, or the scoring stage mis-pairing an estimate — run the audit, which re-checks stored outcomes against how Polymarket actually settled and compares each estimate against the price its own outcome was quoted at:
+
+```bash
+npx tsx scripts/audit-capital-circle-integrity.ts --verbose
+```
+
+It is read-only and reconstructs the price the model was shown from the CLOB's price history for rows written before `shownPrice` existed, so it works on the historical record too.
+
 ### Never let `CRON_SECRET` (or any bearer token) appear in a command you might paste or share
 
 `CRON_SECRET` authorizes every `/api/cron/*` route, including the ones that place trades. Any command that puts it inline — `--headers="Authorization=Bearer <secret>"`, a `curl -H` you're about to share for debugging — leaves it in shell history and in anything that reads that output. Prefer commands that describe config without dumping headers, e.g. `gcloud scheduler jobs describe <name> --format="value(httpTarget.uri, state)"`. **If it's ever displayed in a shared terminal or chat, treat it as compromised**: rotate it in Vercel's environment variables, then update the header on every scheduler job that uses it.
@@ -332,4 +346,5 @@ Documented deliberately rather than glossed over:
 - **Test coverage is partial.** Vitest covers the pure decision logic in `src/lib/capital-circle/` (edge gating, Kelly sizing, settlement math, calibration) — business-critical and specifically written as pure functions to make this cheap. Nothing else in the app has test coverage yet: no integration tests against the database, no route tests, no coverage for the return/refund policy or other ERP logic.
 - **One scheduled cron entry currently has no implementation.** `vercel.json` schedules `/api/cron/whatsapp-review-followup` daily, but no route file exists at that path — that entry 404s on every fire until either the route is built or the schedule entry is removed.
 - **Capital Circle's webhook path is unverified against a real payload.** Circle can't deliver webhooks to a localhost endpoint, so the signature-verification and pre-fill logic have been reviewed and unit-reasoned through but not exercised against a live notification.
+- **The historical calibration record predates outcome-identity verification.** Snapshots written before `scoring-slate.ts` began verifying that each estimate's ref and outcome name agree cannot be checked for the mis-pairing described under [Operational pitfalls](#a-forecasting-record-can-be-inverted-rather-than-merely-bad-and-the-two-look-alike-at-a-glance), and rows older than the `shownPrice` column can't distinguish a reasoned estimate from a copied price without reconstructing it from the CLOB. Treat pre-fix calibration as unreliable rather than trying to repair it: let a clean record rebuild, and use the audit script to confirm which stage produced the old one before drawing conclusions from it.
 - **The concierge's per-IP rate limiter is approximate under concurrency** — it does a count-then-insert without row locking, which is an accepted tradeoff for a cost guardrail on an unauthenticated endpoint, not a guarantee.

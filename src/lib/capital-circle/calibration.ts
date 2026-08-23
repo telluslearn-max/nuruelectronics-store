@@ -19,6 +19,14 @@ export type CalibrationSample = {
   /** 1 if that outcome happened, 0 if it didn't. */
   outcome: 0 | 1;
   category?: string | null;
+  /**
+   * The market price the model was shown for this outcome when it priced it, if
+   * recorded. Present so a sample where the model simply handed back the quoted
+   * price can be told apart from one where it actually forecast something —
+   * those two are identical in every other field and mean opposite things about
+   * the model's skill. Null on rows written before the field existed.
+   */
+  shownPrice?: number | null;
 };
 
 export type CalibrationBucket = {
@@ -51,7 +59,29 @@ export type CalibrationReport = {
   meanAbsCalibrationError: number | null;
   /** Positive means systematically overconfident across the board. */
   meanBias: number | null;
+  /**
+   * Share of scored samples whose stated probability was the market price the
+   * model was shown, within tolerance. Null when no sample carries a recorded
+   * shown price. A high share means this report is largely measuring the
+   * market's forecasts wearing the model's name.
+   */
+  passthroughShare: number | null;
+  /** How many samples were dropped as passthrough before scoring, when that was requested. */
+  excludedAsPassthrough: number;
 };
+
+export type CalibrationOptions = {
+  /**
+   * Drop samples where the model returned the price it was shown. They carry no
+   * information about the model, and leaving them in flatters every statistic
+   * here — a copied price inherits the market's own calibration.
+   */
+  excludePassthrough?: boolean;
+  /** Distance from the shown price within which an estimate counts as copied. */
+  passthroughTolerance?: number;
+};
+
+const DEFAULT_PASSTHROUGH_TOLERANCE = 0.0005;
 
 const BUCKET_EDGES = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0001];
 
@@ -86,10 +116,24 @@ function expectedGapFromNoise(predictedRate: number, count: number): number {
   return Math.sqrt(variance) * SQRT_2_OVER_PI;
 }
 
-export function computeCalibration(samples: CalibrationSample[]): CalibrationReport {
-  const valid = samples.filter(
+function isPassthrough(sample: CalibrationSample, tolerance: number): boolean {
+  const shown = sample.shownPrice;
+  if (shown == null || !Number.isFinite(shown)) return false;
+  return Math.abs(sample.probability - shown) <= tolerance;
+}
+
+export function computeCalibration(samples: CalibrationSample[], options: CalibrationOptions = {}): CalibrationReport {
+  const tolerance = options.passthroughTolerance ?? DEFAULT_PASSTHROUGH_TOLERANCE;
+  const wellFormed = samples.filter(
     (sample) => Number.isFinite(sample.probability) && sample.probability >= 0 && sample.probability <= 1 && (sample.outcome === 0 || sample.outcome === 1),
   );
+
+  const withShownPrice = wellFormed.filter((sample) => sample.shownPrice != null && Number.isFinite(sample.shownPrice));
+  const passthroughCount = withShownPrice.filter((sample) => isPassthrough(sample, tolerance)).length;
+  const passthroughShare = withShownPrice.length > 0 ? round4(passthroughCount / withShownPrice.length) : null;
+
+  const valid = options.excludePassthrough ? wellFormed.filter((sample) => !isPassthrough(sample, tolerance)) : wellFormed;
+  const excludedAsPassthrough = wellFormed.length - valid.length;
 
   if (valid.length === 0) {
     return {
@@ -100,6 +144,8 @@ export function computeCalibration(samples: CalibrationSample[]): CalibrationRep
       buckets: [],
       meanAbsCalibrationError: null,
       meanBias: null,
+      passthroughShare,
+      excludedAsPassthrough,
     };
   }
 
@@ -153,6 +199,96 @@ export function computeCalibration(samples: CalibrationSample[]): CalibrationRep
           )
         : null,
     meanBias: round4(mean(valid.map((s) => s.probability - s.outcome))),
+    passthroughShare,
+    excludedAsPassthrough,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Assignment inversion — the integrity check that outranks every other number
+// in this file
+// ---------------------------------------------------------------------------
+
+export type InversionReport = {
+  /** Samples in bands far enough from 0.5 for the test to mean anything. */
+  sampleCount: number;
+  /** Share of those samples whose band is better explained by the flipped assignment, 0-1. */
+  invertedShare: number;
+  inverted: boolean;
+  detail: string | null;
+};
+
+/**
+ * Bands within this distance of 0.5 are excluded from the test. Inverting a
+ * probability near 0.5 barely changes it, so those samples cannot distinguish
+ * the two hypotheses and would only dilute the measurement.
+ */
+const MIN_OFFSET_FROM_EVEN = 0.1;
+
+/** A bucket smaller than this is noise; one bad luck run shouldn't read as inversion. */
+const MIN_BUCKET_COUNT = 5;
+
+/** How much better the flipped fit must be before a bucket counts as inverted. */
+const INVERSION_MARGIN = 0.06;
+
+/** Below this many off-centre samples the answer isn't worth acting on. */
+const MIN_SAMPLES_FOR_INVERSION = 40;
+
+/** Share of off-centre samples that must look flipped before the desk treats it as real. */
+const INVERSION_SHARE_THRESHOLD = 0.5;
+
+/**
+ * Detects probabilities attached to the wrong outcome.
+ *
+ * A forecaster that is merely bad produces actual rates that sit between its
+ * stated probability and the base rate. A pipeline that has paired
+ * probabilities with the wrong side of a market produces actual rates that
+ * track 1−p instead — and does so symmetrically, because both sides of every
+ * affected market are wrong in opposite directions at once.
+ *
+ * The distinction matters more than any other number this module computes,
+ * because the two call for opposite responses. Bad forecasting is answered by
+ * trusting the model less and carrying on. Inverted assignment means the whole
+ * measured track record describes something other than what the desk believes
+ * it does, and tuning thresholds against it actively selects for the worst
+ * cases: a probability compared against the sibling outcome's price shows the
+ * largest apparent edge available, so a stricter edge bar concentrates capital
+ * into precisely the most badly mis-paired trades.
+ *
+ * Deliberately conservative. It only looks at bands far enough from 0.5 to
+ * discriminate, ignores thin buckets, requires the flipped fit to be clearly
+ * better rather than marginally, and needs a real sample before it will say
+ * anything at all.
+ */
+export function detectAssignmentInversion(report: CalibrationReport): InversionReport {
+  let consideredCount = 0;
+  let invertedCount = 0;
+  const invertedBands: string[] = [];
+
+  for (const bucket of report.buckets) {
+    if (bucket.count < MIN_BUCKET_COUNT) continue;
+    if (Math.abs(bucket.predictedRate - 0.5) < MIN_OFFSET_FROM_EVEN) continue;
+
+    consideredCount += bucket.count;
+    const errorIfCorrect = Math.abs(bucket.predictedRate - bucket.actualRate);
+    const errorIfFlipped = Math.abs(1 - bucket.predictedRate - bucket.actualRate);
+    if (errorIfFlipped + INVERSION_MARGIN < errorIfCorrect) {
+      invertedCount += bucket.count;
+      invertedBands.push(`${bucket.label} said ~${(bucket.predictedRate * 100).toFixed(0)}% but happened ${(bucket.actualRate * 100).toFixed(0)}%`);
+    }
+  }
+
+  const invertedShare = consideredCount > 0 ? round4(invertedCount / consideredCount) : 0;
+  const inverted = consideredCount >= MIN_SAMPLES_FOR_INVERSION && invertedShare >= INVERSION_SHARE_THRESHOLD;
+
+  return {
+    sampleCount: consideredCount,
+    invertedShare,
+    inverted,
+    detail: inverted
+      ? `${(invertedShare * 100).toFixed(0)}% of ${consideredCount} off-centre scored predictions match the flipped assignment better than the stated one (${invertedBands.join("; ")}). ` +
+        `That is the signature of probabilities recorded against the wrong outcome of a market, not of a poorly calibrated forecaster — and it makes every edge computed from these estimates untrustworthy, because a probability paired with the sibling outcome's price shows the largest apparent edge on the board.`
+      : null,
   };
 }
 

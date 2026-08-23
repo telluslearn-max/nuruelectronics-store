@@ -135,9 +135,9 @@ export function median(values: number[]): number {
  * Averaging (or taking the median of) several independent forecasts compresses the result toward
  * 0.5 relative to what a single well-informed forecaster would say — a well-documented bias in the
  * forecasting-aggregation literature (Good Judgment Project). d=1 is the identity (no-op); d>1
- * pushes the estimate further from 0.5, d<1 pulls it toward 0.5. Applied per-estimate, before
- * normalizeMarketParity — order matters, since normalizing first and then extremizing each token
- * independently would undo the Σ=1 constraint extremization is meant to compose with, not fight.
+ * pushes the estimate further from 0.5, d<1 pulls it toward 0.5. Applied per-estimate, independent
+ * of estimate-integrity.ts's complement-coherence check — that check quarantines a market whose
+ * outcomes don't sum to 1 rather than rescaling it, so there is no Σ=1 constraint here to disturb.
  *
  * 0 and 1 are returned unchanged rather than computing an infinite logit: a median of exactly 0 or
  * 1 across independent samples is already the most extreme statement possible, so there is nothing
@@ -156,48 +156,6 @@ export function extremizeProbability(probability: number, d: number): number {
 export function extremizeEstimates(estimates: EnsembledEstimate[], d: number): EnsembledEstimate[] {
   if (d === 1) return estimates; // no-op — skip the allocation entirely at the default
   return estimates.map((estimate) => ({ ...estimate, probability: extremizeProbability(estimate.probability, d) }));
-}
-
-// ---------------------------------------------------------------------------
-// Complement / simplex parity normalization
-// ---------------------------------------------------------------------------
-
-/**
- * Forces every market's own outcome-token probabilities to sum to exactly 1.
- *
- * A market's outcome tokens (Yes/No for a binary market, or N candidate tokens for a genuinely
- * multi-outcome single market) are by construction mutually exclusive and exhaustive *within that
- * one market* — the model pricing Yes at 0.65 and No at 0.40 independently is simply inconsistent,
- * and rescaling both proportionally (a straight L1 projection onto the simplex) is the correction,
- * not a judgment call. Deliberately proportional rather than softmax-with-temperature: softmax
- * introduces a free parameter (τ) nobody has tuned for this desk, where proportional rescaling has
- * none and preserves the model's own relative weighting between outcomes exactly.
- *
- * Deliberately scoped to one market (grouped by marketId), NOT to every market sharing an eventId.
- * candidate-filter.ts's own eventId comment gives the reason: siblings under one eventId can be
- * different bet *types* on the same real-world event (a match's moneyline, spread, and draw), which
- * have no reason to sum to 1 — only a market's own token set is guaranteed mutually exclusive.
- *
- * A market with only one estimate (the model failed to price its other outcome token) is left
- * alone rather than forced to exactly 1.0 — there's nothing to normalize against, and forcing it
- * would destroy the one real estimate that exists. Same for a near-zero group sum, which would
- * otherwise blow up the division.
- */
-export function normalizeMarketParity(estimates: EnsembledEstimate[]): EnsembledEstimate[] {
-  const byMarket = new Map<string, EnsembledEstimate[]>();
-  for (const estimate of estimates) {
-    const list = byMarket.get(estimate.marketId);
-    if (list) list.push(estimate);
-    else byMarket.set(estimate.marketId, [estimate]);
-  }
-
-  return estimates.map((estimate) => {
-    const siblings = byMarket.get(estimate.marketId)!;
-    if (siblings.length < 2) return estimate;
-    const sum = siblings.reduce((total, sibling) => total + sibling.probability, 0);
-    if (!Number.isFinite(sum) || sum <= 1e-6) return estimate;
-    return { ...estimate, probability: clampProbability(estimate.probability / sum) };
-  });
 }
 
 function clampProbability(value: number): number {

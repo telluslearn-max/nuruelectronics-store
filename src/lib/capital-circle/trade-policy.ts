@@ -91,26 +91,55 @@ export function shrinkProbability(modelProbability: number, marketPrice: number,
  * following the market. This is the loop that makes the system self-correcting
  * rather than merely instrumented.
  */
+// 0 error → 0.60 (trust it); 0.30+ error → 0.15 (barely trust it). Linear between.
+const WELL_CALIBRATED_LAMBDA = 0.6;
+const BADLY_CALIBRATED_LAMBDA = 0.15;
+const WORST_CALIBRATION_ERROR = 0.3;
+
 export function computeAdaptiveShrinkage(input: {
   sampleCount: number;
   meanAbsCalibrationError: number | null;
-}): { lambda: number; reason: string } {
+  /**
+   * Set when the track record shows the flipped-assignment signature (see
+   * detectAssignmentInversion). This is an integrity failure, not a calibration
+   * one, and it has to be handled before the error term is even looked at.
+   */
+  inverted?: boolean;
+  invertedDetail?: string | null;
+}): { lambda: number; reason: string; halted: boolean } {
   const { sampleCount, meanAbsCalibrationError } = input;
+
+  // Ordered first on purpose. An inverted track record makes the calibration
+  // error term meaningless — it is measuring the distance to the wrong label —
+  // so deriving a λ from it produces a confident-looking number built on
+  // nothing. Pinned to the floor rather than to the prior because the prior is
+  // the *more* trusting value: falling back to it would answer a data-integrity
+  // failure by betting more freely on the data that failed.
+  if (input.inverted) {
+    return {
+      lambda: BADLY_CALIBRATED_LAMBDA,
+      reason:
+        `Assignment inversion detected across ${sampleCount} resolved prediction(s), so measured calibration cannot be used to set trust. ` +
+        `λ is pinned to the ${BADLY_CALIBRATED_LAMBDA} floor, which in practice keeps the desk out of the market until the pipeline is fixed and a clean track record rebuilds. ` +
+        `${input.invertedDetail ?? ""}`.trim(),
+      halted: true,
+    };
+  }
+
   if (sampleCount < MIN_SAMPLES_FOR_ADAPTIVE_SHRINKAGE || meanAbsCalibrationError == null) {
     return {
       lambda: KELLY_SHRINKAGE,
       reason: `Only ${sampleCount} resolved prediction(s) — holding the ${KELLY_SHRINKAGE} prior until there are ${MIN_SAMPLES_FOR_ADAPTIVE_SHRINKAGE}.`,
+      halted: false,
     };
   }
-  // 0 error → 0.60 (trust it); 0.30+ error → 0.15 (barely trust it). Linear between.
-  const WELL_CALIBRATED = 0.6;
-  const BADLY_CALIBRATED = 0.15;
-  const WORST_ERROR = 0.3;
-  const errorShare = Math.min(1, Math.max(0, meanAbsCalibrationError / WORST_ERROR));
-  const lambda = WELL_CALIBRATED - errorShare * (WELL_CALIBRATED - BADLY_CALIBRATED);
+
+  const errorShare = Math.min(1, Math.max(0, meanAbsCalibrationError / WORST_CALIBRATION_ERROR));
+  const lambda = WELL_CALIBRATED_LAMBDA - errorShare * (WELL_CALIBRATED_LAMBDA - BADLY_CALIBRATED_LAMBDA);
   return {
     lambda: round4(lambda),
     reason: `Calibration error ${meanAbsCalibrationError.toFixed(3)} over ${sampleCount} resolved predictions — trusting the model's estimate at λ=${lambda.toFixed(2)}.`,
+    halted: false,
   };
 }
 

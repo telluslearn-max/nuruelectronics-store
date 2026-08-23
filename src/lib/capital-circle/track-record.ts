@@ -1,8 +1,17 @@
 import "server-only";
 import { prisma } from "../prisma";
-import { computeCalibration, computeCategoryPerformance, type CalibrationReport, type CalibrationSample, type CategoryPerformance } from "./calibration";
+import {
+  computeCalibration,
+  computeCategoryPerformance,
+  detectAssignmentInversion,
+  type CalibrationReport,
+  type CalibrationSample,
+  type CategoryPerformance,
+  type InversionReport,
+} from "./calibration";
 import { computeAdaptiveShrinkage, computeUrgency, type Urgency } from "./trade-policy";
 import {
+  CALIBRATION_SAMPLE_LIMIT,
   DAILY_POSITION_TARGET,
   HUNGRY_AFTER_HOURS,
   MIN_EDGE,
@@ -27,6 +36,14 @@ import {
 
 /** Enough history to be meaningful, bounded so a long-running pool doesn't grow the query without limit. */
 const HISTORY_LIMIT = 200;
+
+/**
+ * Calibration reads further back than the position history above, and reads exactly as far as
+ * the admin report does — see CALIBRATION_SAMPLE_LIMIT. The two used to differ (200 here, 500
+ * there), which meant the λ on the dashboard was computed from a different population than the λ
+ * gating real trades, while both were labelled the same thing.
+ */
+const CALIBRATION_LIMIT = CALIBRATION_SAMPLE_LIMIT;
 const RECENT_LOSSES_SHOWN = 5;
 
 export type OpenPositionSummary = {
@@ -46,18 +63,28 @@ export type TrackRecord = {
   simulatedPnlUsd: number;
   executedPnlUsd: number;
   calibration: CalibrationReport;
+  /**
+   * Whether the track record shows probabilities recorded against the wrong outcome.
+   * Read before anything else here: if this fires, every other number in this object is
+   * describing something other than what it claims to.
+   */
+  inversion: InversionReport;
   categories: CategoryPerformance[];
   /** The λ that adaptive shrinkage derived from the calibration above — what this cycle will actually size with. */
-  shrinkage: { lambda: number; reason: string };
+  shrinkage: { lambda: number; reason: string; halted: boolean };
   /**
    * Same shrinkage computation as `shrinkage`, run separately per category instead of pooled
    * across the whole track record — a topic the model has been chronically overconfident on
    * shouldn't drag down trust in one it's genuinely good at, or vice versa. Keyed by the same
    * category strings `categories` uses. A category below MIN_SAMPLES_FOR_ADAPTIVE_SHRINKAGE
    * naturally falls back to the KELLY_SHRINKAGE prior via computeAdaptiveShrinkage itself, same as
-   * the pooled figure does before enough history exists at all.
+   * the pooled figure does before enough history exists at all. Shares the same `inverted` flag
+   * as the pooled `shrinkage` above rather than detecting inversion per category: an assignment
+   * inversion is a pipeline bug (probabilities paired with the wrong outcome), not a per-topic
+   * property, so every category halts together — a category-scoped λ that stayed confidently high
+   * while the pooled figure had already halted would defeat the whole point of halting.
    */
-  categoryShrinkage: Record<string, { lambda: number; reason: string }>;
+  categoryShrinkage: Record<string, { lambda: number; reason: string; halted: boolean }>;
   recentLosses: {
     question: string;
     thesis: string;
@@ -89,7 +116,7 @@ export async function getTrackRecord(): Promise<TrackRecord> {
     prisma.capitalCircleCandidateSnapshot.findMany({
       where: { resolvedOutcome: { not: null }, modelProbability: { not: null } },
       orderBy: { resolvedAt: "desc" },
-      take: HISTORY_LIMIT,
+      take: CALIBRATION_LIMIT,
     }),
   ]);
 
@@ -100,12 +127,19 @@ export async function getTrackRecord(): Promise<TrackRecord> {
     probability: Number(snapshot.modelProbability),
     outcome: snapshot.resolvedOutcome === 1 ? 1 : 0,
     category: snapshot.category,
+    shownPrice: snapshot.shownPrice != null ? Number(snapshot.shownPrice) : null,
   }));
 
   const calibration = computeCalibration(calibrationSamples);
+  // Run against the full report rather than the passthrough-filtered one: a mis-paired
+  // estimate is still a mis-paired estimate whether or not the number came from the price,
+  // and this is the check whose answer decides whether the rest is usable at all.
+  const inversion = detectAssignmentInversion(calibration);
   const shrinkage = computeAdaptiveShrinkage({
     sampleCount: calibration.sampleCount,
     meanAbsCalibrationError: calibration.meanAbsCalibrationError,
+    inverted: inversion.inverted,
+    invertedDetail: inversion.detail,
   });
   const categories = computeCategoryPerformance(calibrationSamples);
   const categoryShrinkage: TrackRecord["categoryShrinkage"] = {};
@@ -113,6 +147,9 @@ export async function getTrackRecord(): Promise<TrackRecord> {
     categoryShrinkage[category.category] = computeAdaptiveShrinkage({
       sampleCount: category.count,
       meanAbsCalibrationError: category.meanAbsCalibrationError,
+      // Same pooled inversion flag as `shrinkage` above — see categoryShrinkage's own comment.
+      inverted: inversion.inverted,
+      invertedDetail: inversion.detail,
     });
   }
 
@@ -134,6 +171,7 @@ export async function getTrackRecord(): Promise<TrackRecord> {
     simulatedPnlUsd: round2(sumResult(resolved.filter((position) => position.status === "simulated"))),
     executedPnlUsd: round2(sumResult(resolved.filter((position) => position.status === "executed"))),
     calibration,
+    inversion,
     categories,
     shrinkage,
     categoryShrinkage,
@@ -209,7 +247,22 @@ export function renderTrackRecordForPrompt(record: TrackRecord): string {
     );
   }
 
+  // Stated before the scores themselves, because it changes what they mean. It is also
+  // the one line here the model can act on directly: the fix is entirely in how carefully
+  // it pairs each ref with the outcome name on the same line.
+  if (record.inversion.inverted) {
+    lines.push(
+      `INTEGRITY WARNING: across ${record.inversion.sampleCount} resolved predictions, ${(record.inversion.invertedShare * 100).toFixed(0)}% are better explained by the probability having been attached to the OPPOSITE outcome of the market than by the one it was recorded against. ` +
+        `Until that clears, take extra care that every estimate's ref and outcome name come from the same line — a probability paired with the other side's price is the most expensive error available here.`,
+    );
+  }
+
   const { calibration } = record;
+  if (calibration.passthroughShare != null && calibration.passthroughShare >= 0.5) {
+    lines.push(
+      `Note: ${(calibration.passthroughShare * 100).toFixed(0)}% of your scored predictions were the market price you were shown, returned unchanged. Those measure the market, not you — they cannot produce a trade and they tell nobody whether your forecasting is any good.`,
+    );
+  }
   if (calibration.sampleCount > 0 && calibration.brierScore != null) {
     lines.push(
       `Calibration over ${calibration.sampleCount} scored predictions: Brier ${calibration.brierScore.toFixed(3)} (always predicting the base rate would score ${calibration.baseRateBrier?.toFixed(3) ?? "n/a"}${

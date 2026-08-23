@@ -162,6 +162,40 @@ function IntelligenceSection({ report, pausedWalletId }: { report: CapitalCircle
         </p>
       ) : (
         <>
+          {report.inversion.inverted && (
+            // Placed above the scores rather than beside them: if this is showing, the numbers
+            // below are measuring something other than what they claim to, and tuning any
+            // threshold against them makes the desk worse rather than better.
+            <div className="mt-3 rounded-card border border-red-300 bg-red-50 p-4">
+              <div className="text-xs font-medium uppercase tracking-wide text-red-800">
+                Integrity failure — read before the scores below
+              </div>
+              <p className="mt-1 text-sm text-red-900">
+                {(report.inversion.invertedShare * 100).toFixed(0)}% of {report.inversion.sampleCount} off-centre scored
+                predictions fit the flipped assignment better than the one
+                they were recorded against. That is the signature of probabilities scored against the wrong outcome of a market,
+                not of a badly calibrated forecaster — so the Brier score, the skill score and the threshold table below are all
+                describing the wrong thing.
+              </p>
+              <p className="mt-2 text-xs text-red-800">
+                Trading trust is pinned to its floor while this holds. Run{" "}
+                <code className="rounded bg-red-100 px-1 py-0.5">npx tsx scripts/audit-capital-circle-integrity.ts</code> to
+                separate a settlement-labeling fault from a scoring-stage mis-pairing before changing any threshold.
+              </p>
+            </div>
+          )}
+
+          {calibration.passthroughShare != null && calibration.passthroughShare >= 0.5 && (
+            <div className="mt-3 rounded-card border border-amber-300 bg-amber-50 p-4">
+              <div className="text-xs font-medium uppercase tracking-wide text-amber-800">No independent forecast</div>
+              <p className="mt-1 text-sm text-amber-900">
+                {(calibration.passthroughShare * 100).toFixed(0)}% of scored predictions were the market price the model was
+                shown, returned unchanged. Those measure the market rather than the model: edge on them is −costs by
+                construction, so no threshold setting can produce a trade from them.
+              </p>
+            </div>
+          )}
+
           <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div className="rounded-card border border-border-subtle p-4">
               <div className="text-xs text-neutral-500">Brier score ({calibration.sampleCount} scored)</div>
@@ -273,6 +307,15 @@ function IntelligenceSection({ report, pausedWalletId }: { report: CapitalCircle
             this isn&apos;t filtered by its own judgement. Read the trade count alongside the return: a setting that traded twice
             proves nothing, and a setting that only works at one exact threshold is fitted to noise.
           </p>
+          {report.policyEvaluation && (
+            // The ranked table is a search, and the top row is picked partly for its luck. This is
+            // the same search scored on markets it had no hand in choosing, which is the only line
+            // here anyone should act on — it sits above the table for that reason.
+            <div className="mt-3 rounded-card border border-border-subtle bg-neutral-50 p-4">
+              <div className="text-xs font-medium uppercase tracking-wide text-neutral-500">Held out of sample</div>
+              <p className="mt-1 text-sm text-neutral-700">{report.policyEvaluation.caveat}</p>
+            </div>
+          )}
           {/* Cards on mobile — 6 columns has no honest table layout under ~400px; the same numbers
               read at a glance stacked, with the one that matters (return) up top. */}
           <div className="mt-3 space-y-2 sm:hidden">
