@@ -1,0 +1,17 @@
+{
+  "name": "capital-circle-market-watcher",
+  "version": "1.0.0",
+  "description": "Always-on worker that watches Polymarket's public market WebSocket and triggers the capital-circle-cycle pipeline more often than its hourly schedule.",
+  "type": "module",
+  "private": true,
+  "main": "index.mjs",
+  "scripts": {
+    "start": "node index.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}
