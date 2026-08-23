@@ -13,6 +13,8 @@ import { isBinanceConfigured, BINANCE_WITHDRAW_CAP_USDC } from "@/lib/capital-ci
 import { depositFromBinance } from "@/lib/capital-circle/binance-actions";
 import { isCircleWalletWithdrawConfigured, CIRCLE_WALLET_WITHDRAW_CAP_USDC } from "@/lib/capital-circle/circle-wallet-withdraw";
 import { withdrawFromCircleWallet } from "@/lib/capital-circle/circle-withdraw-actions";
+import { isCollateralBridgeConfigured, BRIDGE_TO_USDCE_CAP_USDC, WRAP_TO_COLLATERAL_CAP_USDC } from "@/lib/capital-circle/collateral-bridge";
+import { bridgeToUsdcE, checkBridgeStatus, approveForWrap, wrapToCollateral } from "@/lib/capital-circle/collateral-bridge-actions";
 import {
   registerCapitalCircleWallet,
   registerConfiguredCircleWallet,
@@ -501,6 +503,89 @@ export async function WalletSection({ wallets }: { wallets: CapitalCircleWalletS
             Not configured — set <code className="rounded bg-neutral-100 px-1 py-0.5">BINANCE_DEPOSIT_ADDRESS</code> to
             your Binance USDC-on-Polygon deposit address to enable. This is the only destination this withdrawal path
             will ever send to.
+          </p>
+        )}
+      </details>
+
+      <details className={DETAILS}>
+        <summary className="cursor-pointer text-sm font-medium">Bridge USDC → USDC.e</summary>
+        {isCollateralBridgeConfigured ? (
+          <>
+            <p className="mt-2 max-w-2xl text-sm text-neutral-500">
+              Neither Binance nor a direct wallet transfer delivers a token the exchange accepts as collateral —
+              Binance sends plain USDC, and CollateralOnramp.wrap() only accepts USDC.e. This sends already-received
+              USDC to a fresh Polymarket bridge address, which converts and returns it as USDC.e. Capped at{" "}
+              <span className="font-medium">{formatPrice(BRIDGE_TO_USDCE_CAP_USDC.toFixed(2), "USD")}</span> per
+              request. This can take a few minutes — use &quot;Check bridge status&quot; below with the deposit
+              address it gives you.
+            </p>
+            <form action={bridgeToUsdcE} className="mt-3 flex flex-wrap items-end gap-3">
+              <div>
+                <label className="block text-xs text-neutral-500">Amount (USDC)</label>
+                <input type="number" name="amountUsdc" step="0.01" min="0.01" max={BRIDGE_TO_USDCE_CAP_USDC} required className="w-40 rounded-control border border-border-subtle px-3 py-2 text-sm outline-none focus:border-foreground" />
+              </div>
+              <SubmitButton className="rounded-control bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:opacity-90" pendingText="Sending…">
+                Send to bridge
+              </SubmitButton>
+            </form>
+            <form action={checkBridgeStatus} className="mt-3 flex flex-wrap items-end gap-3 border-t border-border-subtle pt-3">
+              <div className="min-w-0 flex-1">
+                <label className="block text-xs text-neutral-500">Deposit address (from a previous bridge request)</label>
+                <input type="text" name="depositAddress" placeholder="0x…" className={inputClass} />
+              </div>
+              <SubmitButton className="rounded-control border border-border-subtle px-4 py-2 text-sm font-medium hover:border-foreground" pendingText="Checking…">
+                Check bridge status
+              </SubmitButton>
+            </form>
+          </>
+        ) : (
+          <p className="mt-2 max-w-2xl text-sm text-neutral-500">
+            {CAPITAL_CIRCLE_NETWORK.isTestnet
+              ? "Not available on testnet — the bridge and wrap contract are only confirmed on Polygon mainnet."
+              : "Register a wallet first to enable this."}
+          </p>
+        )}
+      </details>
+
+      <details className={DETAILS}>
+        <summary className="cursor-pointer text-sm font-medium">Wrap USDC.e → pUSD</summary>
+        {isCollateralBridgeConfigured ? (
+          <>
+            <p className="mt-2 max-w-2xl text-sm text-neutral-500">
+              Final step: mints pUSD 1:1 from USDC.e already in the wallet via Polymarket&apos;s CollateralOnramp
+              contract. Two on-chain calls — approve, then wrap — and the second only succeeds once the first has
+              actually confirmed, not just been submitted. Capped at{" "}
+              <span className="font-medium">{formatPrice(WRAP_TO_COLLATERAL_CAP_USDC.toFixed(2), "USD")}</span> per
+              request.
+            </p>
+            <form action={approveForWrap} className="mt-3 flex flex-wrap items-end gap-3">
+              <div>
+                <label className="block text-xs text-neutral-500">1. Approve amount (USDC.e)</label>
+                <input type="number" name="amountUsdc" step="0.01" min="0.01" max={WRAP_TO_COLLATERAL_CAP_USDC} required className="w-40 rounded-control border border-border-subtle px-3 py-2 text-sm outline-none focus:border-foreground" />
+              </div>
+              <SubmitButton className="rounded-control border border-border-subtle px-4 py-2 text-sm font-medium hover:border-foreground" pendingText="Approving…">
+                Approve
+              </SubmitButton>
+            </form>
+            <form action={wrapToCollateral} className="mt-3 flex flex-wrap items-end gap-3 border-t border-border-subtle pt-3">
+              <div>
+                <label className="block text-xs text-neutral-500">2. Wrap amount (USDC.e)</label>
+                <input type="number" name="amountUsdc" step="0.01" min="0.01" max={WRAP_TO_COLLATERAL_CAP_USDC} required className="w-40 rounded-control border border-border-subtle px-3 py-2 text-sm outline-none focus:border-foreground" />
+              </div>
+              <SubmitButton className="rounded-control bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:opacity-90" pendingText="Wrapping…">
+                Wrap to pUSD
+              </SubmitButton>
+            </form>
+            <p className="mt-2 text-xs text-neutral-400">
+              Wait for the approve transaction to confirm (check the &quot;Activity&quot; section above, or your own
+              explorer) before wrapping — wrapping too soon will simply revert on-chain, costing only gas.
+            </p>
+          </>
+        ) : (
+          <p className="mt-2 max-w-2xl text-sm text-neutral-500">
+            {CAPITAL_CIRCLE_NETWORK.isTestnet
+              ? "Not available on testnet — the bridge and wrap contract are only confirmed on Polygon mainnet."
+              : "Register a wallet first to enable this."}
           </p>
         )}
       </details>
