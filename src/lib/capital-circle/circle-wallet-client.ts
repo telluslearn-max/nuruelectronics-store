@@ -1,6 +1,6 @@
 import "server-only";
 import { initiateDeveloperControlledWalletsClient } from "@circle-fin/developer-controlled-wallets";
-import { CAPITAL_CIRCLE_NETWORK } from "./chain";
+import { CAPITAL_CIRCLE_NETWORK, COLLATERAL_DECIMALS } from "./chain";
 
 /**
  * Testnet mode is opt-in and separate from CAPITAL_CIRCLE_LIVE: it lets Phase A prove Circle's
@@ -149,11 +149,21 @@ export type WalletTransferResult = { id: string };
  * enforces nothing itself beyond what Circle's API rejects outright.
  */
 export async function transferUsdc(destinationAddress: string, amountUsdc: number): Promise<WalletTransferResult> {
+  return transferErc20(COLLATERAL_TOKEN_ADDRESS, destinationAddress, amountUsdc);
+}
+
+/**
+ * Same money-moving primitive as transferUsdc, generalized to an arbitrary ERC-20 — needed for
+ * collateral-bridge.ts, which sends native USDC (not the collateral token) to Polymarket's bridge
+ * deposit address. Same trust contract as transferUsdc: no allowlist, no cap, enforced by the
+ * caller.
+ */
+export async function transferErc20(tokenAddress: string, destinationAddress: string, amountUsdc: number): Promise<WalletTransferResult> {
   // blockchain is deliberately omitted: Circle's SDK types forbid passing it alongside walletId
   // ("Cannot be used with walletId") — the chain is already fixed by which wallet walletId names.
   const response = await getClient().createTransaction({
     walletId: walletId!,
-    tokenAddress: COLLATERAL_TOKEN_ADDRESS,
+    tokenAddress,
     amount: [amountUsdc.toString()],
     destinationAddress,
     fee: { type: "level", config: { feeLevel: "MEDIUM" } },
@@ -161,6 +171,61 @@ export async function transferUsdc(destinationAddress: string, amountUsdc: numbe
   const id = response.data?.id;
   if (!id) throw new Error("Circle createTransaction returned no transaction id.");
   return { id };
+}
+
+/**
+ * Base units for an ERC-20 amount (USDC/USDC.e/pUSD are all 6 decimals — COLLATERAL_DECIMALS).
+ * Circle's createTransaction takes decimal strings and converts internally, but
+ * createContractExecutionTransaction has no notion of a token's decimals — a raw uint256
+ * abiParameter must already be in base units. Rounds rather than truncates so a value like
+ * 12.345601 (a rounding artifact one hop upstream) doesn't silently lose a whole cent.
+ */
+export function toBaseUnits(amountDecimal: number, decimals: number = COLLATERAL_DECIMALS): string {
+  if (!Number.isFinite(amountDecimal) || amountDecimal < 0) {
+    throw new Error(`toBaseUnits: amount must be a non-negative finite number, got ${amountDecimal}.`);
+  }
+  return Math.round(amountDecimal * 10 ** decimals).toString();
+}
+
+export type ContractExecutionResult = { id: string };
+
+/**
+ * Generic contract-execution primitive for the two calls collateral-bridge.ts needs (approve,
+ * wrap) — anything beyond a plain value transfer. Like transferErc20, trusts its caller
+ * completely: no validation of contractAddress or parameters happens here.
+ */
+async function executeContract(contractAddress: string, abiFunctionSignature: string, abiParameters: unknown[]): Promise<ContractExecutionResult> {
+  const response = await getClient().createContractExecutionTransaction({
+    walletId: walletId!,
+    contractAddress,
+    abiFunctionSignature,
+    abiParameters,
+    fee: { type: "level", config: { feeLevel: "MEDIUM" } },
+  });
+  const id = response.data?.id;
+  if (!id) throw new Error("Circle createContractExecutionTransaction returned no transaction id.");
+  return { id };
+}
+
+/**
+ * Standard ERC-20 approve — the prerequisite docs.polymarket.com/concepts/pusd documents before
+ * calling CollateralOnramp.wrap(): "the caller must first approve the CollateralOnramp contract
+ * (not the pUSD token) to spend USDC.e." amountUsdc is decimal (e.g. 12.34), converted to base
+ * units here so callers never have to think in raw integer strings.
+ */
+export async function approveErc20(tokenAddress: string, spenderAddress: string, amountUsdc: number): Promise<ContractExecutionResult> {
+  return executeContract(tokenAddress, "approve(address,uint256)", [spenderAddress, toBaseUnits(amountUsdc)]);
+}
+
+/**
+ * Calls CollateralOnramp.wrap(_asset, _to, _amount) — mints pUSD 1:1 from an already-approved
+ * ERC-20 balance (USDC.e in practice; see chain.ts's usdcEAddress comment for why it's the only
+ * asset confirmed to work). Reverts on-chain (costing only gas, not the principal) if the
+ * approveErc20 call above hasn't landed yet — callers are expected to confirm that on an explorer
+ * before calling this, not to chain the two automatically.
+ */
+export async function wrapCollateral(onrampAddress: string, assetAddress: string, amountUsdc: number): Promise<ContractExecutionResult> {
+  return executeContract(onrampAddress, "wrap(address,address,uint256)", [assetAddress, walletAddress!, toBaseUnits(amountUsdc)]);
 }
 
 /**
