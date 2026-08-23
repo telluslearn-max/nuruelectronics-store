@@ -72,7 +72,19 @@ export type TrackRecord = {
   categories: CategoryPerformance[];
   /** The λ that adaptive shrinkage derived from the calibration above — what this cycle will actually size with. */
   shrinkage: { lambda: number; reason: string; halted: boolean };
-  recentLosses: { question: string; thesis: string; entryPrice: number | null; resultUsd: number }[];
+  recentLosses: {
+    question: string;
+    thesis: string;
+    entryPrice: number | null;
+    resultUsd: number;
+    /** The model's own stated confidence in this thesis, 0-100 — lets a loss be read against
+     * what it was actually confident of, not just the aggregate bias number. */
+    confidencePct: number | null;
+    /** resolution | take_profit | stop | voided | null (older rows predate this field). A
+     * stop-loss or take-profit-gone-wrong loss means the entry thesis broke down fast — a
+     * different failure mode than one that ran to resolution and simply didn't hit. */
+    exitReason: string | null;
+  }[];
   openPositions: OpenPositionSummary[];
   openExposureUsd: number;
 };
@@ -148,6 +160,8 @@ export async function getTrackRecord(): Promise<TrackRecord> {
         thesis: position.thesis.slice(0, 200),
         entryPrice: position.entryPrice != null ? Number(position.entryPrice) : null,
         resultUsd: Number(position.resultUsd ?? 0),
+        confidencePct: position.confidencePct,
+        exitReason: position.exitReason,
       })),
     openPositions,
     openExposureUsd: round2(openPositions.reduce((total, position) => total + position.sizeUsd, 0)),
@@ -250,8 +264,16 @@ export function renderTrackRecordForPrompt(record: TrackRecord): string {
   const meaningfulCategories = record.categories.filter((category) => category.count >= 5);
   if (meaningfulCategories.length > 0) {
     lines.push(
+      // Win rate alone can look fine on a category of correctly-priced coin flips and bad on one
+      // of well-called longshots — Brier score is the one that actually says whether the
+      // probabilities in that category mean anything, so both travel together here.
       `By topic: ${meaningfulCategories
-        .map((category) => `${category.category} ${(category.winRate * 100).toFixed(0)}% over ${category.count}`)
+        .map(
+          (category) =>
+            `${category.category} ${(category.winRate * 100).toFixed(0)}% over ${category.count}${
+              category.brierScore != null ? ` (Brier ${category.brierScore.toFixed(3)})` : ""
+            }`,
+        )
         .join("; ")}. Weight your confidence accordingly — you are not equally good at all of these.`,
     );
   }
@@ -259,7 +281,16 @@ export function renderTrackRecordForPrompt(record: TrackRecord): string {
   if (record.recentLosses.length > 0) {
     lines.push(
       `Recent losses to learn from:\n${record.recentLosses
-        .map((loss) => `  - "${loss.question}" (entry ${loss.entryPrice ?? "?"}, ${loss.resultUsd.toFixed(2)}): ${loss.thesis}`)
+        .map((loss) => {
+          const said = loss.confidencePct != null ? `, said ${loss.confidencePct}% confident` : "";
+          const how =
+            loss.exitReason === "stop" || loss.exitReason === "take_profit"
+              ? " — stopped out early, thesis broke down fast"
+              : loss.exitReason === "resolution"
+                ? " — held to resolution, simply didn't happen"
+                : "";
+          return `  - "${loss.question}" (entry ${loss.entryPrice ?? "?"}${said}, ${loss.resultUsd.toFixed(2)}${how}): ${loss.thesis}`;
+        })
         .join("\n")}`,
     );
   }
