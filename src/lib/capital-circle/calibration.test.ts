@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeCalibration, computeCategoryPerformance, type CalibrationSample } from "./calibration";
+import { computeCalibration, computeCategoryPerformance, detectAssignmentInversion, type CalibrationSample } from "./calibration";
 
 /** n samples at probability p, of which `winRate` share actually happened. */
 function samples(p: number, n: number, winRate: number, category?: string): CalibrationSample[] {
@@ -112,5 +112,75 @@ describe("computeCategoryPerformance", () => {
   it("groups rows with no category rather than dropping them", () => {
     const result = computeCategoryPerformance(samples(0.5, 4, 0.5));
     expect(result[0].category).toBe("uncategorized");
+  });
+});
+
+describe("passthrough accounting", () => {
+  /** n samples that hand back exactly the price they were shown. */
+  function copied(p: number, n: number, winRate: number): CalibrationSample[] {
+    return samples(p, n, winRate).map((sample) => ({ ...sample, shownPrice: p }));
+  }
+
+  it("reports what share of the record is the market's forecast wearing the model's name", () => {
+    const report = computeCalibration([...copied(0.7, 30, 0.7), ...samples(0.4, 10, 0.4).map((s) => ({ ...s, shownPrice: 0.55 }))]);
+    expect(report.passthroughShare).toBeCloseTo(0.75, 2);
+  });
+
+  it("leaves the share null when no sample records the price it was shown", () => {
+    expect(computeCalibration(samples(0.6, 20, 0.6)).passthroughShare).toBeNull();
+  });
+
+  it("can exclude copied estimates so the remainder measures the model", () => {
+    const mixed = [...copied(0.7, 30, 0.7), ...samples(0.4, 10, 0.4).map((s) => ({ ...s, shownPrice: 0.55 }))];
+    const report = computeCalibration(mixed, { excludePassthrough: true });
+    expect(report.sampleCount).toBe(10);
+    expect(report.excludedAsPassthrough).toBe(30);
+  });
+});
+
+describe("detectAssignmentInversion", () => {
+  it("stays quiet on a merely badly calibrated forecaster", () => {
+    // Overconfident in the ordinary way: actual rates sit between the stated
+    // probability and the base rate, never on the other side of 0.5.
+    const report = computeCalibration([...samples(0.8, 60, 0.6), ...samples(0.2, 60, 0.35)]);
+    expect(detectAssignmentInversion(report).inverted).toBe(false);
+  });
+
+  it("stays quiet on a perfectly calibrated one", () => {
+    const report = computeCalibration([...samples(0.75, 80, 0.75), ...samples(0.25, 80, 0.25)]);
+    expect(detectAssignmentInversion(report).inverted).toBe(false);
+  });
+
+  it("fires on the production signature: mid bands tracking 1−p", () => {
+    // Reproduces the shape the live dashboard reported over 499 scored predictions —
+    // outcomes called ~35% happening 64% of the time and ~65% happening 36%, which is
+    // 1−p to within a point, and is what probabilities recorded against the wrong side
+    // of a market look like.
+    const report = computeCalibration([
+      ...samples(0.35, 101, 0.64),
+      ...samples(0.65, 102, 0.36),
+      ...samples(0.25, 36, 0.94),
+      ...samples(0.75, 35, 0.06),
+    ]);
+
+    const inversion = detectAssignmentInversion(report);
+    expect(inversion.inverted).toBe(true);
+    expect(inversion.invertedShare).toBe(1);
+    expect(inversion.detail).toContain("wrong outcome");
+  });
+
+  it("ignores bands too close to 0.5 to tell the two hypotheses apart", () => {
+    // Flipping 0.48 gives 0.52; no amount of data there can distinguish anything.
+    const report = computeCalibration([...samples(0.48, 200, 0.52), ...samples(0.52, 200, 0.48)]);
+    const inversion = detectAssignmentInversion(report);
+    expect(inversion.sampleCount).toBe(0);
+    expect(inversion.inverted).toBe(false);
+  });
+
+  it("will not call inversion on a sample too small to mean it", () => {
+    const report = computeCalibration([...samples(0.3, 6, 0.83), ...samples(0.7, 6, 0.17)]);
+    const inversion = detectAssignmentInversion(report);
+    expect(inversion.invertedShare).toBe(1);
+    expect(inversion.inverted).toBe(false);
   });
 });

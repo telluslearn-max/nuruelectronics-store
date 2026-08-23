@@ -453,4 +453,31 @@ describe("computeAdaptiveShrinkage", () => {
     const worse = computeAdaptiveShrinkage({ sampleCount: 100, meanAbsCalibrationError: 0.2 }).lambda;
     expect(good).toBeGreaterThan(worse);
   });
+
+  it("pins trust to the floor and halts when the track record is inverted", () => {
+    // An inverted record measures the distance to the wrong label, so the error term is
+    // meaningless and a λ derived from it would be confident nonsense.
+    const result = computeAdaptiveShrinkage({
+      sampleCount: 500,
+      meanAbsCalibrationError: 0.01,
+      inverted: true,
+      invertedDetail: "mid bands track 1−p",
+    });
+
+    expect(result.halted).toBe(true);
+    expect(result.lambda).toBeCloseTo(0.15, 4);
+    expect(result.reason).toContain("inversion");
+  });
+
+  it("does not answer an inverted record by falling back to the more trusting prior", () => {
+    // The prior (0.5) is higher than the floor, so treating inversion as "not enough data"
+    // would respond to a data-integrity failure by betting more freely on the failed data.
+    const inverted = computeAdaptiveShrinkage({ sampleCount: 500, meanAbsCalibrationError: 0.01, inverted: true });
+    expect(inverted.lambda).toBeLessThan(KELLY_SHRINKAGE);
+  });
+
+  it("leaves the ordinary paths untouched when nothing is inverted", () => {
+    expect(computeAdaptiveShrinkage({ sampleCount: 100, meanAbsCalibrationError: 0, inverted: false }).halted).toBe(false);
+    expect(computeAdaptiveShrinkage({ sampleCount: 5, meanAbsCalibrationError: 0.02 }).halted).toBe(false);
+  });
 });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { filterAndRankCandidates, toScoringView } from "./candidate-filter";
+import { filterAndRankCandidates } from "./candidate-filter";
 import type { PolymarketMarketSummary } from "./polymarket-client";
 
 const NOW = new Date("2026-08-20T12:00:00Z");
@@ -164,23 +164,5 @@ describe("filterAndRankCandidates", () => {
   });
 });
 
-describe("toScoringView", () => {
-  it("exposes exactly the fields that should bear on a probability estimate", () => {
-    const [candidate] = filterAndRankCandidates([market({ conditionId: "a", description: "Resolves YES if..." })], { now: NOW }).candidates;
-    const view = toScoringView(candidate);
-    expect(view).toMatchObject({
-      marketId: "a",
-      category: "crypto",
-      liquidityUsd: 5_000,
-      volume24hUsd: 10_000,
-      resolutionCriteria: "Resolves YES if...",
-    });
-    expect(view.outcomes).toHaveLength(2);
-    expect(view.outcomes[0]).toMatchObject({ outcome: "Yes", marketPrice: 0.55 });
-  });
-
-  it("exposes eventId so the model can price correlated legs of the same event coherently", () => {
-    const [candidate] = filterAndRankCandidates([market({ conditionId: "a", eventId: "evt-123" })], { now: NOW }).candidates;
-    expect(toScoringView(candidate).eventId).toBe("evt-123");
-  });
-});
+// The model-facing projection of a screened market moved to scoring-slate.ts, and
+// is covered by scoring-slate.test.ts — including the fields asserted here before.

@@ -242,6 +242,24 @@ export const SETTLEMENT_STALE_HOURS = Number(process.env.CAPITAL_CIRCLE_SETTLEME
 // of a few independent samples is the cheapest available variance reduction.
 // ---------------------------------------------------------------------------
 
+/**
+ * Whether the scoring model is shown each outcome's current market price.
+ *
+ * Defaults to true, which is how the desk has always run, but the default is worth
+ * understanding rather than inheriting. The price is a genuine base rate — and the code
+ * already blends the model's estimate with it in shrinkProbability (p' = λ·model + (1−λ)·market),
+ * so a model that anchors on the price has it counted twice, and one that simply hands it back
+ * produces an estimate with no information in it at all. Production does the latter: the
+ * passthrough detector reports the quoted price returned verbatim on 90-96 of 96 outcomes, cycle
+ * after cycle, which makes edge equal to −costs by construction and no gate setting can rescue it.
+ *
+ * Setting this to false makes the scoring stage blind, so its estimates are the model's own and
+ * the blend happens once, in code, where it is measurable. It is off by default because it is a
+ * behavioural change to what the desk trades and deserves to be turned on deliberately and watched
+ * on its own — not bundled into a correctness fix and credited with its results.
+ */
+export const SHOW_MARKET_PRICE_TO_MODEL = process.env.CAPITAL_CIRCLE_SHOW_MARKET_PRICE !== "false";
+
 export const ENSEMBLE_SAMPLES = Number(process.env.CAPITAL_CIRCLE_ENSEMBLE_SAMPLES ?? 3);
 export const ENSEMBLE_TEMPERATURE = Number(process.env.CAPITAL_CIRCLE_ENSEMBLE_TEMPERATURE ?? 0.7);
 
@@ -250,3 +268,14 @@ export const ENSEMBLE_MAX_DISAGREEMENT = Number(process.env.CAPITAL_CIRCLE_ENSEM
 
 /** Resolved predictions needed before measured calibration replaces the KELLY_SHRINKAGE prior. */
 export const MIN_SAMPLES_FOR_ADAPTIVE_SHRINKAGE = Number(process.env.CAPITAL_CIRCLE_MIN_CALIBRATION_SAMPLES ?? 30);
+
+/**
+ * How many resolved candidate snapshots calibration is measured over.
+ *
+ * Shared by the agent's own track record and the admin report on purpose. They previously
+ * used different windows — the report read 500 rows, the cycle read 200 — and each then called
+ * computeAdaptiveShrinkage independently, so the λ displayed on the dashboard was not the λ the
+ * desk was actually gating trades with. Two numbers with the same name and different values is
+ * the kind of thing that survives a long time precisely because both look right on their own.
+ */
+export const CALIBRATION_SAMPLE_LIMIT = Number(process.env.CAPITAL_CIRCLE_CALIBRATION_SAMPLE_LIMIT ?? 500);
