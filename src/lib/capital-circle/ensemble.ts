@@ -124,3 +124,41 @@ export function median(values: number[]): number {
   const mid = Math.floor(sorted.length / 2);
   return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
 }
+
+// ---------------------------------------------------------------------------
+// Log-odds extremization
+// ---------------------------------------------------------------------------
+
+/**
+ * Pulls a probability away from 0.5 in log-odds space by factor `d`.
+ *
+ * Averaging (or taking the median of) several independent forecasts compresses the result toward
+ * 0.5 relative to what a single well-informed forecaster would say — a well-documented bias in the
+ * forecasting-aggregation literature (Good Judgment Project). d=1 is the identity (no-op); d>1
+ * pushes the estimate further from 0.5, d<1 pulls it toward 0.5. Applied per-estimate, independent
+ * of estimate-integrity.ts's complement-coherence check — that check quarantines a market whose
+ * outcomes don't sum to 1 rather than rescaling it, so there is no Σ=1 constraint here to disturb.
+ *
+ * 0 and 1 are returned unchanged rather than computing an infinite logit: a median of exactly 0 or
+ * 1 across independent samples is already the most extreme statement possible, so there is nothing
+ * left to extremize.
+ */
+export function extremizeProbability(probability: number, d: number): number {
+  const p = clampProbability(probability);
+  if (p <= 0 || p >= 1) return p;
+  if (d === 1) return p; // fast path — the common (default, inert) case
+  const logit = Math.log(p / (1 - p));
+  const extremized = 1 / (1 + Math.exp(-d * logit));
+  return clampProbability(extremized);
+}
+
+/** Applies extremizeProbability to every estimate's central probability. Samples/disagreement are left untouched — they describe what the model actually said, not the code's post-processing of it. */
+export function extremizeEstimates(estimates: EnsembledEstimate[], d: number): EnsembledEstimate[] {
+  if (d === 1) return estimates; // no-op — skip the allocation entirely at the default
+  return estimates.map((estimate) => ({ ...estimate, probability: extremizeProbability(estimate.probability, d) }));
+}
+
+function clampProbability(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.min(1, Math.max(0, value));
+}

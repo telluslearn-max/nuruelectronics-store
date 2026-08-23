@@ -7,6 +7,7 @@ import {
   ENSEMBLE_MAX_DISAGREEMENT,
   ENSEMBLE_SAMPLES,
   ENSEMBLE_TEMPERATURE,
+  EXTREMIZE_FACTOR,
   KELLY_SHRINKAGE,
   MAX_POSITIONS_PER_CYCLE,
   MAX_TOOL_ITERATIONS,
@@ -28,7 +29,7 @@ import {
   type SlateResolution,
 } from "./scoring-slate";
 import { checkComplementCoherence, describeCoherence } from "./estimate-integrity";
-import { ensembleProbabilities, measureMarketAnchoring, type ProbabilitySample } from "./ensemble";
+import { ensembleProbabilities, extremizeEstimates, measureMarketAnchoring, type ProbabilitySample } from "./ensemble";
 import { requiredDeviation, selectTrades, type SelectionCandidate } from "./trade-policy";
 import { getTrackRecord, getTradingUrgency, renderTrackRecordForPrompt } from "./track-record";
 
@@ -165,26 +166,16 @@ export async function runCapitalCircleCycle(): Promise<CapitalCircleCycleResult>
 
   const allEstimates = ensembleProbabilities(samples);
 
-  // A market whose outcome probabilities don't sum to 1 is one the model contradicted
-  // itself about; those are barred from trading for the cycle. They are still persisted
-  // below — the snapshot table is the audit record of what the model actually said, and
-  // dropping the inconvenient rows from it would hide the fault rather than fix it.
-  const questionByMarketId = new Map(screened.candidates.map((market) => [market.conditionId, market.question]));
-  const coherence = checkComplementCoherence(allEstimates, slate, questionByMarketId);
-  const coherenceNote = describeCoherence(coherence);
-  if (coherenceNote) console.warn(`[capital-circle] ${coherenceNote}`);
-
-  await persistSnapshots(cycle.id, screened.candidates, allEstimates);
-
-  const estimates = allEstimates.filter((estimate) => !coherence.quarantinedTokenIds.has(estimate.tokenId));
-
   // Whether the model actually forecast anything, or just handed back the prices it was shown.
   // Checked every cycle because the failure is silent everywhere else — see measureMarketAnchoring.
+  // Deliberately measured against the pre-extremization estimates: this is a diagnostic on what
+  // the model actually said, and transforming it first would blur the exact signal (byte-identical
+  // to the input price) the check exists to catch.
   const marketPriceByToken = new Map<string, number>();
   for (const market of screened.candidates) {
     for (const token of market.tokens) marketPriceByToken.set(token.tokenId, token.price);
   }
-  const anchoring = measureMarketAnchoring(estimates, marketPriceByToken);
+  const anchoring = measureMarketAnchoring(allEstimates, marketPriceByToken);
   const anchoringNote =
     anchoring.compared > 0 && anchoring.share >= 0.9
       ? ` The model returned the quoted market price on ${anchoring.copied} of ${anchoring.compared} outcomes, so it is not forecasting — edge is −costs by construction and no gate setting can produce a trade until that changes.`
@@ -192,6 +183,30 @@ export async function runCapitalCircleCycle(): Promise<CapitalCircleCycleResult>
   if (anchoringNote) {
     console.warn(`[capital-circle] scoring returned the market price on ${anchoring.copied}/${anchoring.compared} outcomes — no independent forecast this cycle.`);
   }
+
+  // A market whose outcome probabilities don't sum to 1 is one the model contradicted itself
+  // about; those are barred from trading for the cycle. They are still persisted below — the
+  // snapshot table is the audit record of what the model actually said, and dropping the
+  // inconvenient rows from it would hide the fault rather than fix it. Quarantine rather than
+  // repair is deliberate (see estimate-integrity.ts's own comment) — an earlier version of this
+  // pipeline rescaled incoherent pairs back to sum 1 instead, which invents a belief the model
+  // never stated; quarantining and refusing to trade the market this hour is the more conservative
+  // choice and the one that survived here.
+  const questionByMarketId = new Map(screened.candidates.map((market) => [market.conditionId, market.question]));
+  const coherence = checkComplementCoherence(allEstimates, slate, questionByMarketId);
+  const coherenceNote = describeCoherence(coherence);
+  if (coherenceNote) console.warn(`[capital-circle] ${coherenceNote}`);
+
+  // Log-odds extremization corrects median-of-samples under-confidence (see its own comment in
+  // ensemble.ts / EXTREMIZE_FACTOR in config.ts). Applied after the coherence check (which reads
+  // the model's own raw numbers) but before persistence, so the snapshot — and therefore every
+  // future calibration/Brier measurement — reflects the same number the trade decision actually
+  // uses, rather than a pre-transform figure they'd silently disagree about once extremization is
+  // ever turned on. d=1 by default, so this is a no-op today.
+  const extremizedEstimates = extremizeEstimates(allEstimates, EXTREMIZE_FACTOR);
+  await persistSnapshots(cycle.id, screened.candidates, extremizedEstimates);
+
+  const estimates = extremizedEstimates.filter((estimate) => !coherence.quarantinedTokenIds.has(estimate.tokenId));
 
   // A halted track record is the one condition that outranks everything else in the
   // summary: it means the desk's own history describes something other than what it
@@ -205,12 +220,16 @@ export async function runCapitalCircleCycle(): Promise<CapitalCircleCycleResult>
   // --- D. Select -----------------------------------------------------------
   const selectionCandidates = buildSelectionCandidates(screened.candidates, estimates);
   const openPositions = trackRecord?.openPositions ?? [];
+  const categoryLambdas = trackRecord
+    ? Object.fromEntries(Object.entries(trackRecord.categoryShrinkage).map(([category, entry]) => [category, entry.lambda]))
+    : undefined;
   const selection = selectTrades({
     candidates: selectionCandidates,
     openMarketIds: new Set(openPositions.map((position) => position.marketId)),
     openEventIds: new Set(openPositions.map((position) => position.eventId).filter((id): id is string => Boolean(id))),
     maxPositions: MAX_POSITIONS_PER_CYCLE,
     lambda,
+    categoryLambdas,
     minEdge,
     maxDisagreement: ENSEMBLE_MAX_DISAGREEMENT,
   });
