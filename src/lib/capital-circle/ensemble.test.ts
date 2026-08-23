@@ -1,5 +1,26 @@
 import { describe, expect, it } from "vitest";
-import { ensembleProbabilities, median, type ProbabilitySample, measureMarketAnchoring } from "./ensemble";
+import {
+  ensembleProbabilities,
+  extremizeEstimates,
+  extremizeProbability,
+  measureMarketAnchoring,
+  median,
+  normalizeMarketParity,
+  type EnsembledEstimate,
+  type ProbabilitySample,
+} from "./ensemble";
+
+/** Minimal EnsembledEstimate builder for the normalization/extremization tests below — only marketId/tokenId/probability matter to either function. */
+const estimate = (marketId: string, tokenId: string, probability: number, extra: Partial<EnsembledEstimate> = {}): EnsembledEstimate => ({
+  marketId,
+  tokenId,
+  probability,
+  disagreement: 0,
+  sampleCount: 1,
+  samples: [probability],
+  rationale: null,
+  ...extra,
+});
 
 const sample = (tokenId: string, probability: number, rationale?: string): ProbabilitySample => ({
   marketId: `market-${tokenId}`,
@@ -125,5 +146,115 @@ describe("measureMarketAnchoring", () => {
 
   it("reports a zero share rather than dividing by nothing when there is no overlap", () => {
     expect(measureMarketAnchoring([], prices)).toEqual({ compared: 0, copied: 0, share: 0 });
+  });
+});
+
+describe("extremizeProbability", () => {
+  it("is the identity at d=1 — ships inert by default", () => {
+    expect(extremizeProbability(0.7, 1)).toBeCloseTo(0.7, 10);
+    expect(extremizeProbability(0.12, 1)).toBeCloseTo(0.12, 10);
+  });
+
+  it("pushes a probability away from 0.5 when d > 1", () => {
+    const result = extremizeProbability(0.7, 1.3);
+    expect(result).toBeGreaterThan(0.7);
+    expect(result).toBeLessThan(1);
+  });
+
+  it("pulls a probability toward 0.5 when d < 1", () => {
+    const result = extremizeProbability(0.7, 0.5);
+    expect(result).toBeLessThan(0.7);
+    expect(result).toBeGreaterThan(0.5);
+  });
+
+  it("is symmetric around 0.5 — extremizing 0.3 and 0.7 by the same d moves them equal and opposite", () => {
+    const up = extremizeProbability(0.7, 1.3) - 0.7;
+    const down = 0.3 - extremizeProbability(0.3, 1.3);
+    expect(up).toBeCloseTo(down, 10);
+  });
+
+  it("leaves the boundaries alone rather than computing an infinite logit", () => {
+    expect(extremizeProbability(0, 1.3)).toBe(0);
+    expect(extremizeProbability(1, 1.3)).toBe(1);
+  });
+
+  it("never leaves the [0,1] range for any d", () => {
+    expect(extremizeProbability(0.99, 5)).toBeLessThanOrEqual(1);
+    expect(extremizeProbability(0.01, 5)).toBeGreaterThanOrEqual(0);
+  });
+});
+
+describe("extremizeEstimates", () => {
+  it("is a true no-op at d=1 — same array reference, not just equal values", () => {
+    const estimates = [estimate("m1", "t1", 0.6)];
+    expect(extremizeEstimates(estimates, 1)).toBe(estimates);
+  });
+
+  it("extremizes every estimate's probability, leaving other fields untouched", () => {
+    const original = estimate("m1", "t1", 0.7, { disagreement: 0.05, sampleCount: 3, samples: [0.65, 0.7, 0.75], rationale: "because" });
+    const [result] = extremizeEstimates([original], 1.3);
+    expect(result.probability).toBeGreaterThan(0.7);
+    expect(result.disagreement).toBe(0.05);
+    expect(result.sampleCount).toBe(3);
+    expect(result.samples).toEqual([0.65, 0.7, 0.75]);
+    expect(result.rationale).toBe("because");
+  });
+});
+
+describe("normalizeMarketParity", () => {
+  it("rescales a binary Yes/No pair that doesn't sum to 1 back onto the simplex", () => {
+    // Model priced Yes 0.65, No 0.40 — independently, inconsistently. Sum is 1.05.
+    const result = normalizeMarketParity([estimate("m1", "yes", 0.65), estimate("m1", "no", 0.4)]);
+    const sum = result.reduce((total, e) => total + e.probability, 0);
+    expect(sum).toBeCloseTo(1, 10);
+    // Preserves the relative ratio between the two — 0.65:0.40 stays 0.65:0.40, just rescaled.
+    expect(result[0].probability / result[1].probability).toBeCloseTo(0.65 / 0.4, 6);
+  });
+
+  it("rescales an under-priced pair the same way (sum < 1)", () => {
+    const result = normalizeMarketParity([estimate("m1", "yes", 0.45), estimate("m1", "no", 0.35)]);
+    expect(result.reduce((total, e) => total + e.probability, 0)).toBeCloseTo(1, 10);
+  });
+
+  it("normalizes a genuinely multi-outcome single market (N tokens under one marketId) the same way", () => {
+    const result = normalizeMarketParity([
+      estimate("election", "candidateA", 0.5),
+      estimate("election", "candidateB", 0.3),
+      estimate("election", "candidateC", 0.3),
+    ]);
+    expect(result.reduce((total, e) => total + e.probability, 0)).toBeCloseTo(1, 10);
+  });
+
+  it("does NOT normalize across markets sharing only an eventId — moneyline/spread/draw have no reason to sum to 1", () => {
+    // Same eventId, but different marketIds (different bet types on one real-world event).
+    const result = normalizeMarketParity([
+      estimate("moneyline-market", "home-wins", 0.6),
+      estimate("spread-market", "home-covers", 0.55),
+      estimate("draw-market", "draw", 0.25),
+    ]);
+    // Each is alone in its own marketId group, so each is left exactly as-is.
+    expect(result.map((e) => e.probability)).toEqual([0.6, 0.55, 0.25]);
+  });
+
+  it("leaves a market with only one priced outcome untouched rather than forcing it to 1.0", () => {
+    const result = normalizeMarketParity([estimate("m1", "yes", 0.7)]);
+    expect(result[0].probability).toBe(0.7);
+  });
+
+  it("leaves a degenerate near-zero-sum group untouched rather than dividing by ~0", () => {
+    const result = normalizeMarketParity([estimate("m1", "yes", 0), estimate("m1", "no", 0)]);
+    expect(result.every((e) => Number.isFinite(e.probability))).toBe(true);
+    expect(result.map((e) => e.probability)).toEqual([0, 0]);
+  });
+
+  it("preserves array order and every non-probability field", () => {
+    const a = estimate("m1", "yes", 0.65, { disagreement: 0.1, sampleCount: 3, samples: [0.6, 0.65, 0.7], rationale: "r1" });
+    const b = estimate("m1", "no", 0.4, { disagreement: 0.2, sampleCount: 3, samples: [0.3, 0.4, 0.5], rationale: "r2" });
+    const [resultA, resultB] = normalizeMarketParity([a, b]);
+    expect(resultA.tokenId).toBe("yes");
+    expect(resultA.disagreement).toBe(0.1);
+    expect(resultA.rationale).toBe("r1");
+    expect(resultB.tokenId).toBe("no");
+    expect(resultB.rationale).toBe("r2");
   });
 });

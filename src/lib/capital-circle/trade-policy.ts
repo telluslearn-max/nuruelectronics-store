@@ -487,6 +487,17 @@ export function selectTrades(input: {
   openEventIds: Set<string>;
   maxPositions: number;
   lambda?: number;
+  /**
+   * Per-category λ (see track-record.ts's categoryShrinkage), keyed by the same category string
+   * candidates carry. A candidate whose category has one here uses it instead of `lambda` — the
+   * model is not equally trustworthy in every domain (a chronically-overconfident crypto-ticks
+   * record shouldn't drag down trust in a well-calibrated politics record, and vice versa).
+   * Falls back to `lambda` for an uncategorized candidate or a category with too little history
+   * to have its own entry — same MIN_SAMPLES_FOR_ADAPTIVE_SHRINKAGE floor computeAdaptiveShrinkage
+   * already applies globally, so an under-sampled category degrades to exactly today's behavior
+   * rather than a guess.
+   */
+  categoryLambdas?: Record<string, number>;
   minEdge?: number;
   maxDisagreement: number;
 }): SelectionResult {
@@ -495,14 +506,20 @@ export function selectTrades(input: {
   const takenEventIds = new Set(input.openEventIds);
   const takenMarketIds = new Set(input.openMarketIds);
 
-  // λ is adjusted per candidate by how much the ensemble disagreed about that specific estimate,
-  // so the ranking below is by confidence-adjusted edge rather than raw edge — a tight estimate
-  // 6 points off the price now outranks a scattered one 8 points off, which is the correct
-  // ordering and was not the old one.
-  const baseLambda = input.lambda ?? KELLY_SHRINKAGE;
+  const globalLambda = input.lambda ?? KELLY_SHRINKAGE;
+  const baseLambdaFor = (candidate: SelectionCandidate): number => {
+    const key = candidate.category;
+    if (key && input.categoryLambdas?.[key] != null) return input.categoryLambdas[key];
+    return globalLambda;
+  };
+
+  // λ is adjusted per candidate — first by its category's own track record, then by how much the
+  // ensemble disagreed about that specific estimate — so the ranking below is by confidence- and
+  // topic-adjusted edge rather than raw edge — a tight estimate 6 points off the price now
+  // outranks a scattered one 8 points off, which is the correct ordering and was not the old one.
   const scored = input.candidates
     .map((candidate) => {
-      const lambda = disagreementAdjustedLambda(baseLambda, candidate.disagreement, input.maxDisagreement);
+      const lambda = disagreementAdjustedLambda(baseLambdaFor(candidate), candidate.disagreement, input.maxDisagreement);
       return {
         candidate,
         lambda,

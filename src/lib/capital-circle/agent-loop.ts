@@ -7,6 +7,7 @@ import {
   ENSEMBLE_MAX_DISAGREEMENT,
   ENSEMBLE_SAMPLES,
   ENSEMBLE_TEMPERATURE,
+  EXTREMIZE_FACTOR,
   KELLY_SHRINKAGE,
   MAX_POSITIONS_PER_CYCLE,
   MAX_TOOL_ITERATIONS,
@@ -18,7 +19,7 @@ import { buildDeepDiveSystemInstruction, buildNewsSearchPrompt, buildScoringSyst
 import { dispatchTool, functionDeclarations, logCandidateSlate, type ApprovedTrade, type ToolContext } from "./tools";
 import { listActivePolymarketMarkets } from "./polymarket-client";
 import { filterAndRankCandidates, toScoringView, type ScreenedMarket } from "./candidate-filter";
-import { ensembleProbabilities, measureMarketAnchoring, type ProbabilitySample } from "./ensemble";
+import { ensembleProbabilities, extremizeEstimates, measureMarketAnchoring, normalizeMarketParity, type ProbabilitySample } from "./ensemble";
 import { requiredDeviation, selectTrades, type SelectionCandidate } from "./trade-policy";
 import { getTrackRecord, getTradingUrgency, renderTrackRecordForPrompt } from "./track-record";
 
@@ -143,16 +144,18 @@ export async function runCapitalCircleCycle(): Promise<CapitalCircleCycleResult>
     );
   }
 
-  const estimates = ensembleProbabilities(samples);
-  await persistSnapshots(cycle.id, screened.candidates, estimates);
+  const rawEstimates = ensembleProbabilities(samples);
 
   // Whether the model actually forecast anything, or just handed back the prices it was shown.
   // Checked every cycle because the failure is silent everywhere else — see measureMarketAnchoring.
+  // Deliberately measured against the RAW estimates, before extremization/normalization below:
+  // this is a diagnostic on what the model actually said, and post-processing it first would blur
+  // the exact signal (byte-identical to the input price) the check exists to catch.
   const marketPriceByToken = new Map<string, number>();
   for (const market of screened.candidates) {
     for (const token of market.tokens) marketPriceByToken.set(token.tokenId, token.price);
   }
-  const anchoring = measureMarketAnchoring(estimates, marketPriceByToken);
+  const anchoring = measureMarketAnchoring(rawEstimates, marketPriceByToken);
   const anchoringNote =
     anchoring.compared > 0 && anchoring.share >= 0.9
       ? ` The model returned the quoted market price on ${anchoring.copied} of ${anchoring.compared} outcomes, so it is not forecasting — edge is −costs by construction and no gate setting can produce a trade until that changes.`
@@ -161,15 +164,26 @@ export async function runCapitalCircleCycle(): Promise<CapitalCircleCycleResult>
     console.warn(`[capital-circle] scoring returned the market price on ${anchoring.copied}/${anchoring.compared} outcomes — no independent forecast this cycle.`);
   }
 
+  // Extremization first (corrects per-outcome under-confidence in log-odds space), then parity
+  // normalization (forces each market's own outcome tokens back to Σ=1) — normalizing first would
+  // have extremization break the very constraint normalization just enforced. EXTREMIZE_FACTOR
+  // defaults to 1 (identity), so this is a no-op today; see its own comment in config.ts for why.
+  const estimates = normalizeMarketParity(extremizeEstimates(rawEstimates, EXTREMIZE_FACTOR));
+  await persistSnapshots(cycle.id, screened.candidates, estimates);
+
   // --- D. Select -----------------------------------------------------------
   const selectionCandidates = buildSelectionCandidates(screened.candidates, estimates);
   const openPositions = trackRecord?.openPositions ?? [];
+  const categoryLambdas = trackRecord
+    ? Object.fromEntries(Object.entries(trackRecord.categoryShrinkage).map(([category, entry]) => [category, entry.lambda]))
+    : undefined;
   const selection = selectTrades({
     candidates: selectionCandidates,
     openMarketIds: new Set(openPositions.map((position) => position.marketId)),
     openEventIds: new Set(openPositions.map((position) => position.eventId).filter((id): id is string => Boolean(id))),
     maxPositions: MAX_POSITIONS_PER_CYCLE,
     lambda,
+    categoryLambdas,
     minEdge,
     maxDisagreement: ENSEMBLE_MAX_DISAGREEMENT,
   });

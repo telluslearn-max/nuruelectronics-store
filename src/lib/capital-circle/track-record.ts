@@ -49,6 +49,15 @@ export type TrackRecord = {
   categories: CategoryPerformance[];
   /** The λ that adaptive shrinkage derived from the calibration above — what this cycle will actually size with. */
   shrinkage: { lambda: number; reason: string };
+  /**
+   * Same shrinkage computation as `shrinkage`, run separately per category instead of pooled
+   * across the whole track record — a topic the model has been chronically overconfident on
+   * shouldn't drag down trust in one it's genuinely good at, or vice versa. Keyed by the same
+   * category strings `categories` uses. A category below MIN_SAMPLES_FOR_ADAPTIVE_SHRINKAGE
+   * naturally falls back to the KELLY_SHRINKAGE prior via computeAdaptiveShrinkage itself, same as
+   * the pooled figure does before enough history exists at all.
+   */
+  categoryShrinkage: Record<string, { lambda: number; reason: string }>;
   recentLosses: {
     question: string;
     thesis: string;
@@ -98,6 +107,14 @@ export async function getTrackRecord(): Promise<TrackRecord> {
     sampleCount: calibration.sampleCount,
     meanAbsCalibrationError: calibration.meanAbsCalibrationError,
   });
+  const categories = computeCategoryPerformance(calibrationSamples);
+  const categoryShrinkage: TrackRecord["categoryShrinkage"] = {};
+  for (const category of categories) {
+    categoryShrinkage[category.category] = computeAdaptiveShrinkage({
+      sampleCount: category.count,
+      meanAbsCalibrationError: category.meanAbsCalibrationError,
+    });
+  }
 
   const now = Date.now();
   const openPositions: OpenPositionSummary[] = open.map((position) => ({
@@ -117,8 +134,9 @@ export async function getTrackRecord(): Promise<TrackRecord> {
     simulatedPnlUsd: round2(sumResult(resolved.filter((position) => position.status === "simulated"))),
     executedPnlUsd: round2(sumResult(resolved.filter((position) => position.status === "executed"))),
     calibration,
-    categories: computeCategoryPerformance(calibrationSamples),
+    categories,
     shrinkage,
+    categoryShrinkage,
     recentLosses: resolved
       .filter((position) => Number(position.resultUsd ?? 0) < 0)
       .slice(0, RECENT_LOSSES_SHOWN)

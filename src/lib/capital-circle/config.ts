@@ -193,6 +193,17 @@ export const DEFAULT_SPREAD_ASSUMPTION = Number(process.env.CAPITAL_CIRCLE_DEFAU
 export const KELLY_SHRINKAGE = Number(process.env.CAPITAL_CIRCLE_KELLY_SHRINKAGE ?? 0.5);
 
 /**
+ * Log-odds extremization factor applied to each ensembled probability before shrinkage (see
+ * extremizeProbability in ensemble.ts). d=1 is the identity — ships inert by default. Forecasting
+ * literature (Good Judgment Project) suggests d≈1.25-1.35 corrects real under-confidence in
+ * aggregated estimates, but that range hasn't been backtested against this desk's own calibration
+ * history, and turning it on measurably increases apparent edge (and therefore trade size and
+ * frequency) with no data yet to justify a specific value. Deliberately left at 1 until someone
+ * backtests it against CapitalCircleCandidateSnapshot and picks a value on purpose.
+ */
+export const EXTREMIZE_FACTOR = Number(process.env.CAPITAL_CIRCLE_EXTREMIZE_FACTOR ?? 1);
+
+/**
  * Fraction of full Kelly. Half-Kelly rather than quarter: full Kelly is only
  * optimal when the probability is known exactly and it drawdowns brutally when
  * it isn't, but quarter-Kelly on a $25 cap produces stakes so small that the

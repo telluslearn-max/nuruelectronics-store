@@ -113,4 +113,20 @@ describe("computeCategoryPerformance", () => {
     const result = computeCategoryPerformance(samples(0.5, 4, 0.5));
     expect(result[0].category).toBe("uncategorized");
   });
+
+  it("exposes meanAbsCalibrationError per category, not just brierScore — what topic-conditioned shrinkage actually needs", () => {
+    const result = computeCategoryPerformance([
+      // Crypto: says 90%, happens 50% — badly miscalibrated.
+      ...samples(0.9, 100, 0.5, "crypto"),
+      // Politics: well calibrated.
+      ...samples(0.7, 100, 0.7, "politics"),
+    ]);
+    const crypto = result.find((r) => r.category === "crypto")!;
+    const politics = result.find((r) => r.category === "politics")!;
+    expect(crypto.meanAbsCalibrationError).toBeGreaterThan(0.3);
+    expect(politics.meanAbsCalibrationError).toBeCloseTo(0, 2);
+    // Matches what computeCalibration would report for that category in isolation — this is the
+    // same computation, just surfaced per group instead of thrown away after brierScore.
+    expect(crypto.meanAbsCalibrationError).toBeCloseTo(computeCalibration(samples(0.9, 100, 0.5)).meanAbsCalibrationError!, 6);
+  });
 });

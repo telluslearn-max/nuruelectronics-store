@@ -318,6 +318,83 @@ describe("selectTrades", () => {
     expect(result.selected).toHaveLength(0);
     expect(result.rejected).toHaveLength(1);
   });
+
+  describe("categoryLambdas — topic-conditioned trust", () => {
+    it("uses a candidate's own category λ instead of the global one when present", () => {
+      // Global λ=0.15 (barely trust the model) would reject this; the category's own λ=0.6
+      // (genuinely trusted in this topic) should let it through instead.
+      const result = selectTrades({
+        candidates: [{ ...base, marketId: "m1", tokenId: "t1", category: "politics", modelProbability: 0.65 }],
+        openMarketIds: new Set(),
+        openEventIds: new Set(),
+        maxPositions: 3,
+        lambda: 0.15,
+        categoryLambdas: { politics: 0.6 },
+        minEdge: 0.03,
+        maxDisagreement: 0.25,
+      });
+      expect(result.selected).toHaveLength(1);
+      expect(result.selected[0].lambda).toBeCloseTo(0.6, 10);
+    });
+
+    it("falls back to the global λ for a category with no entry in the map", () => {
+      const result = selectTrades({
+        candidates: [{ ...base, marketId: "m1", tokenId: "t1", category: "obscure-topic", modelProbability: 0.65 }],
+        openMarketIds: new Set(),
+        openEventIds: new Set(),
+        maxPositions: 3,
+        lambda: 0.5,
+        categoryLambdas: { politics: 0.6 },
+        maxDisagreement: 0.25,
+      });
+      expect(result.selected[0].lambda).toBeCloseTo(0.5, 10);
+    });
+
+    it("falls back to the global λ for an uncategorized candidate even with a map present", () => {
+      const result = selectTrades({
+        candidates: [{ ...base, marketId: "m1", tokenId: "t1", modelProbability: 0.65 }], // no category
+        openMarketIds: new Set(),
+        openEventIds: new Set(),
+        maxPositions: 3,
+        lambda: 0.5,
+        categoryLambdas: { politics: 0.6 },
+        maxDisagreement: 0.25,
+      });
+      expect(result.selected[0].lambda).toBeCloseTo(0.5, 10);
+    });
+
+    it("still ranks two candidates by their own category-adjusted edge, not a shared global one", () => {
+      // Crypto's own λ (0.1, barely trusted) should push it below politics (0.6, well trusted)
+      // even though crypto's raw model probability is further from the price.
+      const result = selectTrades({
+        candidates: [
+          { ...base, marketId: "crypto-market", tokenId: "t1", category: "crypto", modelProbability: 0.9 },
+          { ...base, marketId: "politics-market", tokenId: "t2", category: "politics", modelProbability: 0.65 },
+        ],
+        openMarketIds: new Set(),
+        openEventIds: new Set(),
+        maxPositions: 1,
+        lambda: 0.5,
+        categoryLambdas: { crypto: 0.1, politics: 0.6 },
+        minEdge: 0.03,
+        maxDisagreement: 0.25,
+      });
+      expect(result.selected).toHaveLength(1);
+      expect(result.selected[0].marketId).toBe("politics-market");
+    });
+
+    it("omitting categoryLambdas entirely behaves exactly as before — backward compatible", () => {
+      const withMap = selectTrades({
+        candidates: [{ ...base, marketId: "m1", tokenId: "t1", category: "politics", modelProbability: 0.65 }],
+        openMarketIds: new Set(),
+        openEventIds: new Set(),
+        maxPositions: 3,
+        lambda: 0.5,
+        maxDisagreement: 0.25,
+      });
+      expect(withMap.selected[0].lambda).toBeCloseTo(0.5, 10);
+    });
+  });
 });
 
 describe("computeSettlement", () => {

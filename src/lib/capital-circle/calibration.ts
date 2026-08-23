@@ -162,13 +162,17 @@ export type CategoryPerformance = {
   wins: number;
   winRate: number;
   brierScore: number | null;
+  /** Same quantity as CalibrationReport.meanAbsCalibrationError, scoped to this category — the input topic-conditioned shrinkage (trade-policy.ts / track-record.ts) needs to compute λ per category instead of one global number. */
+  meanAbsCalibrationError: number | null;
 };
 
 /**
  * Per-topic breakdown. The model is not equally good at everything — an
  * hourly crypto tick is close to a coin flip whatever it says, while a
  * scheduled event with public information is genuinely researchable. Showing
- * it where it has been losing is more actionable than a single global number.
+ * it where it has been losing is more actionable than a single global number,
+ * and (via meanAbsCalibrationError) is also what lets λ itself be computed
+ * per category rather than blended across domains with very different edge.
  */
 export function computeCategoryPerformance(samples: CalibrationSample[]): CategoryPerformance[] {
   const byCategory = new Map<string, CalibrationSample[]>();
@@ -182,12 +186,14 @@ export function computeCategoryPerformance(samples: CalibrationSample[]): Catego
   return [...byCategory.entries()]
     .map(([category, rows]) => {
       const wins = rows.filter((r) => r.outcome === 1).length;
+      const report = computeCalibration(rows);
       return {
         category,
         count: rows.length,
         wins,
         winRate: round4(wins / rows.length),
-        brierScore: computeCalibration(rows).brierScore,
+        brierScore: report.brierScore,
+        meanAbsCalibrationError: report.meanAbsCalibrationError,
       };
     })
     .sort((a, b) => b.count - a.count);
