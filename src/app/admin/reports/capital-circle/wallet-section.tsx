@@ -1,4 +1,4 @@
-import { Suspense } from "react";
+import { Suspense, type ReactNode } from "react";
 import { Chain, getContractConfig } from "@polymarket/clob-client-v2";
 import type { CapitalCircleWalletSummary } from "@/lib/reports/capital-circle";
 import { getWalletActivity, getWalletBalanceSnapshot } from "@/lib/reports/capital-circle-wallet";
@@ -42,6 +42,7 @@ import { moneyColorClass } from "@/components/admin/money-colors";
 import { CopyButton } from "@/components/admin/copy-button";
 import { SubmitButton } from "@/components/admin/submit-button";
 import { ConfirmPendingSubmitButton } from "@/components/admin/confirm-submit-button";
+import { Tabs } from "@/components/admin/tabs";
 
 const inputClass = "w-full rounded-control border border-border-subtle px-3 py-2 text-sm outline-none focus:border-foreground";
 const DETAILS = "mt-3 rounded-card border border-border-subtle p-4";
@@ -356,6 +357,219 @@ function RegisterWalletCard() {
   );
 }
 
+/** A not-configured fallback, styled to match FlowStep's body copy rather than a full card of its
+    own — this is a rare state (an env var nobody set yet), not something worth as much visual
+    weight as the working form it stands in for. */
+function NotConfigured({ children }: { children: ReactNode }) {
+  return <p className="mt-1 text-sm text-neutral-500">{children}</p>;
+}
+
+/** One numbered step inside a money-flow tab. Replaces what used to be a whole separate
+    `<details className={DETAILS}>` card per step — same information, without each step paying
+    for its own border/padding/summary chrome, which is most of what made this section feel like
+    six near-identical cards to scroll past instead of one flow with three parts. */
+function FlowStep({ n, title, caption, children }: { n: number; title: string; caption?: string; children: ReactNode }) {
+  return (
+    <div className="flex gap-3 border-t border-border-subtle pt-4 first:border-t-0 first:pt-0">
+      <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-xs font-medium text-neutral-500">
+        {n}
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="text-sm font-medium">{title}</div>
+        {caption && <p className="mt-1 text-xs text-neutral-500">{caption}</p>}
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/** Stacks label/input/button on mobile instead of `flex-wrap`ping a fixed-width input against a
+    button that only sometimes lands on its own line — the inconsistency was a chunk of what read
+    as "terrible" on a phone. Full-width on mobile, inline from `sm:` up, same as everywhere else
+    in this app that's already gone through this pass. */
+function AmountForm({
+  action,
+  cap,
+  unit,
+  buttonText,
+  pendingText,
+  primary = true,
+}: {
+  action: (formData: FormData) => void | Promise<void>;
+  cap: number;
+  unit: string;
+  buttonText: string;
+  pendingText: string;
+  primary?: boolean;
+}) {
+  return (
+    <form action={action} className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-end">
+      <div className="flex-1 sm:max-w-[10rem]">
+        <label className="block text-xs text-neutral-500">Amount ({unit}), max {formatPrice(cap.toFixed(2), "USD")}</label>
+        <input type="number" name="amountUsdc" step="0.01" min="0.01" max={cap} required className={inputClass} />
+      </div>
+      <SubmitButton
+        className={`w-full shrink-0 rounded-control px-4 py-2 text-sm font-medium transition sm:w-auto ${
+          primary ? "bg-foreground text-background hover:opacity-90" : "border border-border-subtle hover:border-foreground"
+        }`}
+        pendingText={pendingText}
+      >
+        {buttonText}
+      </SubmitButton>
+    </form>
+  );
+}
+
+function BridgeStatusForm() {
+  return (
+    <form action={checkBridgeStatus} className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-end">
+      <div className="min-w-0 flex-1">
+        <label className="block text-xs text-neutral-500">Deposit address (from a previous bridge request)</label>
+        <input type="text" name="depositAddress" placeholder="0x…" className={inputClass} />
+      </div>
+      <SubmitButton
+        className="w-full shrink-0 rounded-control border border-border-subtle px-4 py-2 text-sm font-medium hover:border-foreground sm:w-auto"
+        pendingText="Checking…"
+      >
+        Check bridge status
+      </SubmitButton>
+    </form>
+  );
+}
+
+/** Binance → USDC.e → pUSD, one server action per step. */
+function DepositFlow() {
+  return (
+    <div className="space-y-4">
+      <p className="text-xs text-neutral-500">
+        Three separate steps — check Activity above for each one to confirm before starting the next.
+      </p>
+
+      <FlowStep
+        n={1}
+        title="Deposit from Binance"
+        caption="Pulls plain USDC from Binance to the wallet address above. Binance has no listing for Polymarket's collateral token, so this needs converting (steps 2–3) before it's usable for trading."
+      >
+        {isBinanceConfigured ? (
+          <AmountForm action={depositFromBinance} cap={BINANCE_WITHDRAW_CAP_USDC} unit="USDC" buttonText="Deposit" pendingText="Depositing…" />
+        ) : (
+          <NotConfigured>
+            Set <code className="rounded bg-neutral-100 px-1 py-0.5">BINANCE_API_KEY</code> and{" "}
+            <code className="rounded bg-neutral-100 px-1 py-0.5">BINANCE_API_SECRET</code> to enable.
+          </NotConfigured>
+        )}
+      </FlowStep>
+
+      <FlowStep
+        n={2}
+        title="Bridge to USDC.e"
+        caption="Sends USDC to a fresh Polymarket bridge address, which converts and returns it as USDC.e. Can take a few minutes — check status below with the address it gives you."
+      >
+        {isCollateralBridgeConfigured ? (
+          <>
+            <AmountForm action={bridgeToUsdcE} cap={BRIDGE_TO_USDCE_CAP_USDC} unit="USDC" buttonText="Send to bridge" pendingText="Sending…" />
+            <BridgeStatusForm />
+          </>
+        ) : (
+          <NotConfigured>
+            {CAPITAL_CIRCLE_NETWORK.isTestnet
+              ? "Not available on testnet — the bridge and wrap contract are only confirmed on Polygon mainnet."
+              : "Register a wallet first to enable this."}
+          </NotConfigured>
+        )}
+      </FlowStep>
+
+      <FlowStep
+        n={3}
+        title="Wrap to pUSD"
+        caption="Mints pUSD 1:1 from USDC.e already in the wallet via Polymarket's CollateralOnramp contract. Approve, then wrap — wrap only succeeds once approve has actually confirmed, not just been submitted."
+      >
+        {isCollateralBridgeConfigured ? (
+          <>
+            <AmountForm action={approveForWrap} cap={WRAP_TO_COLLATERAL_CAP_USDC} unit="USDC.e" buttonText="Approve" pendingText="Approving…" primary={false} />
+            <AmountForm action={wrapToCollateral} cap={WRAP_TO_COLLATERAL_CAP_USDC} unit="USDC.e" buttonText="Wrap to pUSD" pendingText="Wrapping…" />
+          </>
+        ) : (
+          <NotConfigured>
+            {CAPITAL_CIRCLE_NETWORK.isTestnet
+              ? "Not available on testnet — the bridge and wrap contract are only confirmed on Polygon mainnet."
+              : "Register a wallet first to enable this."}
+          </NotConfigured>
+        )}
+      </FlowStep>
+    </div>
+  );
+}
+
+/** pUSD → USDC.e → Binance, the same steps in reverse, plus a rarely-needed native-USDC path
+    tucked into its own nested disclosure rather than sitting at the same level as the primary
+    flow. */
+function WithdrawFlow() {
+  return (
+    <div className="space-y-4">
+      <p className="text-xs text-neutral-500">
+        Reverse of Deposit — unwrap first, then bridge-withdraw straight to your Binance deposit address.
+      </p>
+
+      <FlowStep
+        n={1}
+        title="Unwrap to USDC.e"
+        caption="Burns pUSD 1:1 back into USDC.e via Polymarket's CollateralOfframp contract. Approve, then unwrap — same confirm-before-next-step rule as wrapping."
+      >
+        {isCollateralBridgeConfigured ? (
+          <>
+            <AmountForm action={approveForUnwrap} cap={UNWRAP_FROM_COLLATERAL_CAP_USDC} unit="pUSD" buttonText="Approve" pendingText="Approving…" primary={false} />
+            <AmountForm action={unwrapToUsdcE} cap={UNWRAP_FROM_COLLATERAL_CAP_USDC} unit="pUSD" buttonText="Unwrap to USDC.e" pendingText="Unwrapping…" />
+          </>
+        ) : (
+          <NotConfigured>
+            {CAPITAL_CIRCLE_NETWORK.isTestnet
+              ? "Not available on testnet — the offramp contract is only confirmed on Polygon mainnet."
+              : "Register a wallet first to enable this."}
+          </NotConfigured>
+        )}
+      </FlowStep>
+
+      <FlowStep
+        n={2}
+        title="Bridge-withdraw to Binance"
+        caption="Sends USDC.e to a fresh bridge withdraw address, converted to native USDC and delivered directly to your Binance deposit address."
+      >
+        {isCollateralWithdrawConfigured ? (
+          <>
+            <AmountForm action={bridgeWithdrawToBinance} cap={BRIDGE_WITHDRAW_CAP_USDC} unit="USDC.e" buttonText="Bridge-withdraw to Binance" pendingText="Sending…" />
+            <BridgeStatusForm />
+          </>
+        ) : (
+          <NotConfigured>
+            Set <code className="rounded bg-neutral-100 px-1 py-0.5">BINANCE_DEPOSIT_ADDRESS</code> to enable.
+          </NotConfigured>
+        )}
+      </FlowStep>
+
+      <details className="border-t border-border-subtle pt-4">
+        <summary className="cursor-pointer text-sm font-medium text-neutral-500">
+          Native USDC sitting unconverted? Withdraw it directly
+        </summary>
+        <p className="mt-2 text-xs text-neutral-500">
+          Only works for native USDC sitting unconverted in the wallet — Binance has no listing for pUSD at all, so if
+          the wallet&apos;s balance is pUSD (the usual case once it&apos;s been wrapped for trading), use the flow
+          above instead.
+        </p>
+        {isCircleWalletWithdrawConfigured ? (
+          <AmountForm action={withdrawFromCircleWallet} cap={CIRCLE_WALLET_WITHDRAW_CAP_USDC} unit="USDC" buttonText="Withdraw" pendingText="Withdrawing…" />
+        ) : (
+          <NotConfigured>
+            Set <code className="rounded bg-neutral-100 px-1 py-0.5">BINANCE_DEPOSIT_ADDRESS</code> to your Binance
+            USDC-on-Polygon deposit address to enable. This is the only destination this withdrawal path will ever
+            send to.
+          </NotConfigured>
+        )}
+      </details>
+    </div>
+  );
+}
+
 export async function WalletSection({ wallets }: { wallets: CapitalCircleWalletSummary[] }) {
   const dbWallet = wallets.find((w) => w.address) ?? null;
 
@@ -383,6 +597,18 @@ export async function WalletSection({ wallets }: { wallets: CapitalCircleWalletS
       </Suspense>
 
       {dbWallet?.address ? <ReceiveCard address={dbWallet.address} /> : <RegisterWalletCard />}
+
+      <details className={DETAILS}>
+        <summary className="cursor-pointer text-sm font-medium">Move funds</summary>
+        <div className="mt-3">
+          <Tabs
+            tabs={[
+              { id: "deposit", label: "Deposit", content: <DepositFlow /> },
+              { id: "withdraw", label: "Withdraw", content: <WithdrawFlow /> },
+            ]}
+          />
+        </div>
+      </details>
 
       <details className={DETAILS}>
         <summary className="cursor-pointer text-sm font-medium">Activity</summary>
@@ -463,224 +689,6 @@ export async function WalletSection({ wallets }: { wallets: CapitalCircleWalletS
             </details>
           </details>
         ))}
-
-      <details className={DETAILS}>
-        <summary className="cursor-pointer text-sm font-medium">Deposit from Binance</summary>
-        {isBinanceConfigured ? (
-          <>
-            <p className="mt-2 max-w-2xl text-sm text-neutral-500">
-              Pulls USDC from Binance straight to the wallet address above. Capped at{" "}
-              <span className="font-medium">{formatPrice(BINANCE_WITHDRAW_CAP_USDC.toFixed(2), "USD")}</span> per
-              request regardless of what the Binance API key itself allows. Note: Binance has no listing for
-              Polymarket&apos;s current collateral token, so this delivers plain USDC — it will need converting
-              before it&apos;s usable as trading collateral.
-            </p>
-            <form action={depositFromBinance} className="mt-3 flex flex-wrap items-end gap-3">
-              <div>
-                <label className="block text-xs text-neutral-500">Amount (USDC)</label>
-                <input type="number" name="amountUsdc" step="0.01" min="0.01" max={BINANCE_WITHDRAW_CAP_USDC} required className="w-40 rounded-control border border-border-subtle px-3 py-2 text-sm outline-none focus:border-foreground" />
-              </div>
-              <SubmitButton className="rounded-control bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:opacity-90" pendingText="Depositing…">
-                Deposit
-              </SubmitButton>
-            </form>
-          </>
-        ) : (
-          <p className="mt-2 max-w-2xl text-sm text-neutral-500">
-            Not configured — set <code className="rounded bg-neutral-100 px-1 py-0.5">BINANCE_API_KEY</code> and{" "}
-            <code className="rounded bg-neutral-100 px-1 py-0.5">BINANCE_API_SECRET</code> to enable.
-          </p>
-        )}
-      </details>
-
-      <details className={DETAILS}>
-        <summary className="cursor-pointer text-sm font-medium">Withdraw to Binance (native USDC only)</summary>
-        {isCircleWalletWithdrawConfigured ? (
-          <>
-            <p className="mt-2 max-w-2xl text-sm text-neutral-500">
-              Pushes <strong>native USDC</strong> from the Capital Circle wallet to your Binance deposit address.
-              Capped at <span className="font-medium">{formatPrice(CIRCLE_WALLET_WITHDRAW_CAP_USDC.toFixed(2), "USD")}</span>{" "}
-              per request, and checked against the wallet&apos;s actual balance before submitting. This only works for
-              native USDC sitting unconverted in the wallet — Binance has no listing for pUSD at all, so if the
-              wallet&apos;s balance is pUSD (the usual case once it&apos;s been wrapped for trading), use &quot;Withdraw
-              pUSD to Binance&quot; further down instead.
-            </p>
-            <form action={withdrawFromCircleWallet} className="mt-3 flex flex-wrap items-end gap-3">
-              <div>
-                <label className="block text-xs text-neutral-500">Amount (USDC)</label>
-                <input type="number" name="amountUsdc" step="0.01" min="0.01" max={CIRCLE_WALLET_WITHDRAW_CAP_USDC} required className="w-40 rounded-control border border-border-subtle px-3 py-2 text-sm outline-none focus:border-foreground" />
-              </div>
-              <SubmitButton className="rounded-control bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:opacity-90" pendingText="Withdrawing…">
-                Withdraw
-              </SubmitButton>
-            </form>
-          </>
-        ) : (
-          <p className="mt-2 max-w-2xl text-sm text-neutral-500">
-            Not configured — set <code className="rounded bg-neutral-100 px-1 py-0.5">BINANCE_DEPOSIT_ADDRESS</code> to
-            your Binance USDC-on-Polygon deposit address to enable. This is the only destination this withdrawal path
-            will ever send to.
-          </p>
-        )}
-      </details>
-
-      <details className={DETAILS}>
-        <summary className="cursor-pointer text-sm font-medium">Bridge USDC → USDC.e</summary>
-        {isCollateralBridgeConfigured ? (
-          <>
-            <p className="mt-2 max-w-2xl text-sm text-neutral-500">
-              Neither Binance nor a direct wallet transfer delivers a token the exchange accepts as collateral —
-              Binance sends plain USDC, and CollateralOnramp.wrap() only accepts USDC.e. This sends already-received
-              USDC to a fresh Polymarket bridge address, which converts and returns it as USDC.e. Capped at{" "}
-              <span className="font-medium">{formatPrice(BRIDGE_TO_USDCE_CAP_USDC.toFixed(2), "USD")}</span> per
-              request. This can take a few minutes — use &quot;Check bridge status&quot; below with the deposit
-              address it gives you.
-            </p>
-            <form action={bridgeToUsdcE} className="mt-3 flex flex-wrap items-end gap-3">
-              <div>
-                <label className="block text-xs text-neutral-500">Amount (USDC)</label>
-                <input type="number" name="amountUsdc" step="0.01" min="0.01" max={BRIDGE_TO_USDCE_CAP_USDC} required className="w-40 rounded-control border border-border-subtle px-3 py-2 text-sm outline-none focus:border-foreground" />
-              </div>
-              <SubmitButton className="rounded-control bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:opacity-90" pendingText="Sending…">
-                Send to bridge
-              </SubmitButton>
-            </form>
-            <form action={checkBridgeStatus} className="mt-3 flex flex-wrap items-end gap-3 border-t border-border-subtle pt-3">
-              <div className="min-w-0 flex-1">
-                <label className="block text-xs text-neutral-500">Deposit address (from a previous bridge request)</label>
-                <input type="text" name="depositAddress" placeholder="0x…" className={inputClass} />
-              </div>
-              <SubmitButton className="rounded-control border border-border-subtle px-4 py-2 text-sm font-medium hover:border-foreground" pendingText="Checking…">
-                Check bridge status
-              </SubmitButton>
-            </form>
-          </>
-        ) : (
-          <p className="mt-2 max-w-2xl text-sm text-neutral-500">
-            {CAPITAL_CIRCLE_NETWORK.isTestnet
-              ? "Not available on testnet — the bridge and wrap contract are only confirmed on Polygon mainnet."
-              : "Register a wallet first to enable this."}
-          </p>
-        )}
-      </details>
-
-      <details className={DETAILS}>
-        <summary className="cursor-pointer text-sm font-medium">Wrap USDC.e → pUSD</summary>
-        {isCollateralBridgeConfigured ? (
-          <>
-            <p className="mt-2 max-w-2xl text-sm text-neutral-500">
-              Final step: mints pUSD 1:1 from USDC.e already in the wallet via Polymarket&apos;s CollateralOnramp
-              contract. Two on-chain calls — approve, then wrap — and the second only succeeds once the first has
-              actually confirmed, not just been submitted. Capped at{" "}
-              <span className="font-medium">{formatPrice(WRAP_TO_COLLATERAL_CAP_USDC.toFixed(2), "USD")}</span> per
-              request.
-            </p>
-            <form action={approveForWrap} className="mt-3 flex flex-wrap items-end gap-3">
-              <div>
-                <label className="block text-xs text-neutral-500">1. Approve amount (USDC.e)</label>
-                <input type="number" name="amountUsdc" step="0.01" min="0.01" max={WRAP_TO_COLLATERAL_CAP_USDC} required className="w-40 rounded-control border border-border-subtle px-3 py-2 text-sm outline-none focus:border-foreground" />
-              </div>
-              <SubmitButton className="rounded-control border border-border-subtle px-4 py-2 text-sm font-medium hover:border-foreground" pendingText="Approving…">
-                Approve
-              </SubmitButton>
-            </form>
-            <form action={wrapToCollateral} className="mt-3 flex flex-wrap items-end gap-3 border-t border-border-subtle pt-3">
-              <div>
-                <label className="block text-xs text-neutral-500">2. Wrap amount (USDC.e)</label>
-                <input type="number" name="amountUsdc" step="0.01" min="0.01" max={WRAP_TO_COLLATERAL_CAP_USDC} required className="w-40 rounded-control border border-border-subtle px-3 py-2 text-sm outline-none focus:border-foreground" />
-              </div>
-              <SubmitButton className="rounded-control bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:opacity-90" pendingText="Wrapping…">
-                Wrap to pUSD
-              </SubmitButton>
-            </form>
-            <p className="mt-2 text-xs text-neutral-400">
-              Wait for the approve transaction to confirm (check the &quot;Activity&quot; section above, or your own
-              explorer) before wrapping — wrapping too soon will simply revert on-chain, costing only gas.
-            </p>
-          </>
-        ) : (
-          <p className="mt-2 max-w-2xl text-sm text-neutral-500">
-            {CAPITAL_CIRCLE_NETWORK.isTestnet
-              ? "Not available on testnet — the bridge and wrap contract are only confirmed on Polygon mainnet."
-              : "Register a wallet first to enable this."}
-          </p>
-        )}
-      </details>
-
-      <details className={DETAILS}>
-        <summary className="cursor-pointer text-sm font-medium">Unwrap pUSD → USDC.e</summary>
-        {isCollateralBridgeConfigured ? (
-          <>
-            <p className="mt-2 max-w-2xl text-sm text-neutral-500">
-              First step of getting money back out when the wallet holds pUSD: burns pUSD 1:1 back into USDC.e via
-              Polymarket&apos;s CollateralOfframp contract — the reverse of the wrap step above. Same two-call
-              pattern: approve, then unwrap, and the second only succeeds once the first has actually confirmed.
-              Capped at <span className="font-medium">{formatPrice(UNWRAP_FROM_COLLATERAL_CAP_USDC.toFixed(2), "USD")}</span> per
-              request.
-            </p>
-            <form action={approveForUnwrap} className="mt-3 flex flex-wrap items-end gap-3">
-              <div>
-                <label className="block text-xs text-neutral-500">1. Approve amount (pUSD)</label>
-                <input type="number" name="amountUsdc" step="0.01" min="0.01" max={UNWRAP_FROM_COLLATERAL_CAP_USDC} required className="w-40 rounded-control border border-border-subtle px-3 py-2 text-sm outline-none focus:border-foreground" />
-              </div>
-              <SubmitButton className="rounded-control border border-border-subtle px-4 py-2 text-sm font-medium hover:border-foreground" pendingText="Approving…">
-                Approve
-              </SubmitButton>
-            </form>
-            <form action={unwrapToUsdcE} className="mt-3 flex flex-wrap items-end gap-3 border-t border-border-subtle pt-3">
-              <div>
-                <label className="block text-xs text-neutral-500">2. Unwrap amount (pUSD)</label>
-                <input type="number" name="amountUsdc" step="0.01" min="0.01" max={UNWRAP_FROM_COLLATERAL_CAP_USDC} required className="w-40 rounded-control border border-border-subtle px-3 py-2 text-sm outline-none focus:border-foreground" />
-              </div>
-              <SubmitButton className="rounded-control bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:opacity-90" pendingText="Unwrapping…">
-                Unwrap to USDC.e
-              </SubmitButton>
-            </form>
-            <p className="mt-2 text-xs text-neutral-400">
-              Wait for the approve transaction to confirm before unwrapping — unwrapping too soon will simply revert
-              on-chain, costing only gas.
-            </p>
-          </>
-        ) : (
-          <p className="mt-2 max-w-2xl text-sm text-neutral-500">
-            {CAPITAL_CIRCLE_NETWORK.isTestnet
-              ? "Not available on testnet — the offramp contract is only confirmed on Polygon mainnet."
-              : "Register a wallet first to enable this."}
-          </p>
-        )}
-      </details>
-
-      <details className={DETAILS}>
-        <summary className="cursor-pointer text-sm font-medium">Withdraw pUSD to Binance (via bridge)</summary>
-        {isCollateralWithdrawConfigured ? (
-          <>
-            <p className="mt-2 max-w-2xl text-sm text-neutral-500">
-              Final step: sends already-unwrapped USDC.e to a fresh Polymarket bridge withdraw address, which
-              converts it to native USDC and delivers it directly to your Binance deposit address — the same
-              destination-pinning guarantee as &quot;Withdraw to Binance&quot; above, just reached via the bridge
-              instead of a direct transfer, since USDC.e itself isn&apos;t something Binance accepts either. Capped
-              at <span className="font-medium">{formatPrice(BRIDGE_WITHDRAW_CAP_USDC.toFixed(2), "USD")}</span> per
-              request. This can take a few minutes — use &quot;Check bridge status&quot; above with the address it
-              gives you.
-            </p>
-            <form action={bridgeWithdrawToBinance} className="mt-3 flex flex-wrap items-end gap-3">
-              <div>
-                <label className="block text-xs text-neutral-500">Amount (USDC.e)</label>
-                <input type="number" name="amountUsdc" step="0.01" min="0.01" max={BRIDGE_WITHDRAW_CAP_USDC} required className="w-40 rounded-control border border-border-subtle px-3 py-2 text-sm outline-none focus:border-foreground" />
-              </div>
-              <SubmitButton className="rounded-control bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:opacity-90" pendingText="Sending…">
-                Bridge-withdraw to Binance
-              </SubmitButton>
-            </form>
-          </>
-        ) : (
-          <p className="mt-2 max-w-2xl text-sm text-neutral-500">
-            Not configured — set <code className="rounded bg-neutral-100 px-1 py-0.5">BINANCE_DEPOSIT_ADDRESS</code> to
-            enable, same as the direct withdrawal above.
-          </p>
-        )}
-      </details>
-
     </div>
   );
 }
