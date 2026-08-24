@@ -1,7 +1,30 @@
 import "server-only";
 import { createHmac } from "node:crypto";
 
-const BINANCE_API_BASE = "https://api.binance.com";
+/**
+ * Optional relay for Binance's own geo-blocking: Binance returns HTTP 451 for API requests from a
+ * "Restricted Location" (the US among them), and this app's Vercel deployment runs in iad1
+ * (Washington D.C.) — Hobby plan only supports one project-wide function region, so there's no way
+ * to move just these calls elsewhere without a relay. See services/binance-relay/README.md for the
+ * full story. Leaving BINANCE_RELAY_URL unset falls back to calling Binance directly, unchanged
+ * from before this existed.
+ *
+ * The relay never sees BINANCE_API_SECRET — signing still happens here, exactly as it did before
+ * the relay existed. It only forwards an already-signed request, so BINANCE_RELAY_SECRET (a
+ * separate, unrelated credential gating the relay itself) is the only new thing that needs adding
+ * to every signed call.
+ */
+const relayUrl = process.env.BINANCE_RELAY_URL || null;
+const relaySecret = process.env.BINANCE_RELAY_SECRET || null;
+if (relayUrl && !relaySecret) {
+  throw new Error("BINANCE_RELAY_URL is set but BINANCE_RELAY_SECRET isn't — every relayed call would fail its own auth check.");
+}
+
+const BINANCE_API_BASE = relayUrl ?? "https://api.binance.com";
+
+function binanceHeaders(apiKeyValue: string): HeadersInit {
+  return relaySecret ? { "X-MBX-APIKEY": apiKeyValue, "X-Relay-Secret": relaySecret } : { "X-MBX-APIKEY": apiKeyValue };
+}
 
 const apiKey = process.env.BINANCE_API_KEY;
 const apiSecret = process.env.BINANCE_API_SECRET;
@@ -32,7 +55,7 @@ function signedGet(path: string): Promise<Response> {
   const params = new URLSearchParams({ timestamp: Date.now().toString() });
   params.set("signature", sign(params.toString()));
   return fetch(`${BINANCE_API_BASE}${path}?${params.toString()}`, {
-    headers: { "X-MBX-APIKEY": apiKey! },
+    headers: binanceHeaders(apiKey!),
   });
 }
 
@@ -116,7 +139,7 @@ export async function withdrawUsdcToCapitalCircleWallet(amountUsdc: number): Pro
 
   const response = await fetch(`${BINANCE_API_BASE}/sapi/v1/capital/withdraw/apply?${params.toString()}`, {
     method: "POST",
-    headers: { "X-MBX-APIKEY": apiKey! },
+    headers: binanceHeaders(apiKey!),
   });
   const body = await response.json().catch(() => ({}));
   if (!response.ok) {

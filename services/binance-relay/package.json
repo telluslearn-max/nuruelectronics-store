@@ -1,0 +1,14 @@
+{
+  "name": "capital-circle-binance-relay",
+  "version": "1.0.0",
+  "description": "Transparent proxy to api.binance.com from a non-restricted region, so Vercel's US-region function calls don't trip Binance's geo-block.",
+  "type": "module",
+  "private": true,
+  "main": "index.mjs",
+  "scripts": {
+    "start": "node index.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
