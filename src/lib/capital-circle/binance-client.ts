@@ -77,7 +77,8 @@ async function resolveUsdcPolygonNetwork(): Promise<string> {
   const response = await signedGet("/sapi/v1/capital/config/getall");
   const body = await response.json().catch(() => null);
   if (!response.ok || !Array.isArray(body)) {
-    throw new Error(`Couldn't fetch Binance's coin config to resolve the Polygon network code (HTTP ${response.status}).`);
+    const detail = body && typeof body === "object" && "msg" in body ? ` — ${(body as { code?: number; msg?: string }).code ?? ""} ${(body as { msg?: string }).msg ?? ""}`.trim() : "";
+    throw new Error(`Couldn't fetch Binance's coin config to resolve the Polygon network code (HTTP ${response.status}${detail ? `, ${detail}` : ""}).`);
   }
   const usdc = body.find((c: { coin?: string }) => c.coin === "USDC");
   if (!usdc) {
