@@ -23,6 +23,7 @@
 // Optional env: POLL_INTERVAL_MS (default 300000 = 5min), WS_TRIGGER_COOLDOWN_MS (default 120000 = 2min)
 
 import WebSocket from "ws";
+import http from "node:http";
 
 const CRON_URL = process.env.CRON_URL;
 const CRON_SECRET = process.env.CRON_SECRET;
@@ -44,6 +45,8 @@ if (!CRON_SECRET) {
 
 let lastTriggerAt = 0;
 let triggerInFlight = false;
+let wsConnected = false;
+const startedAt = Date.now();
 
 /**
  * Calls the existing cron route exactly the way GCP Cloud Scheduler already does —
@@ -86,6 +89,7 @@ function connect() {
   let staleCheckTimer;
 
   ws.on("open", () => {
+    wsConnected = true;
     console.log("[ws] connected");
     // Empty assets_ids + custom_feature_enabled is the discovery mode — confirmed live
     // against the real endpoint that this yields a global new_market feed, not one
@@ -129,12 +133,37 @@ function connect() {
   ws.on("error", (error) => console.error("[ws] error:", error.message));
 
   ws.on("close", (code, reason) => {
+    wsConnected = false;
     console.log(`[ws] closed (${code} ${reason.toString()}) — reconnecting in 5s.`);
     clearInterval(pingTimer);
     clearInterval(staleCheckTimer);
     setTimeout(connect, 5_000);
   });
 }
+
+/**
+ * Cloud Run Services require the container to bind PORT and answer HTTP — there is no
+ * "just run a background process" mode. This server does no work of its own; it only
+ * reports the state the WS/trigger logic above is already tracking, so Cloud Run's
+ * health check has something to poll while the real logic runs independently of any
+ * request arriving here. No inbound traffic is expected in normal operation (this
+ * service is deployed --no-allow-unauthenticated with nothing else calling it) —
+ * Cloud Run's own health probe is the only caller this needs to satisfy.
+ */
+const PORT = process.env.PORT ?? 8080;
+http
+  .createServer((_req, res) => {
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(
+      JSON.stringify({
+        status: "ok",
+        wsConnected,
+        uptimeSeconds: Math.floor((Date.now() - startedAt) / 1000),
+        lastTriggerAgoSeconds: lastTriggerAt ? Math.floor((Date.now() - lastTriggerAt) / 1000) : null,
+      }),
+    );
+  })
+  .listen(PORT, () => console.log(`[startup] health server listening on :${PORT}`));
 
 console.log(`[startup] market watcher starting — poll every ${POLL_INTERVAL_MS}ms, WS trigger cooldown ${WS_TRIGGER_COOLDOWN_MS}ms.`);
 connect();
