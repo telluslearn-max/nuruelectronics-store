@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "../prisma";
+import { formatPrice } from "../format";
 import { computeCalibration, computeCategoryPerformance, type CalibrationReport, type CalibrationSample, type CategoryPerformance } from "./calibration";
 import { computeAdaptiveShrinkage, computeUrgency, type Urgency } from "./trade-policy";
 import {
@@ -173,7 +174,7 @@ export function renderTrackRecordForPrompt(record: TrackRecord): string {
     lines.push("Track record: nothing has resolved yet — this is early, so state honest probabilities rather than reaching for a trade.");
   } else {
     lines.push(
-      `Track record: ${record.wins}/${record.resolvedCount} resolved positions won (${((record.winRate ?? 0) * 100).toFixed(1)}%), realized P&L $${record.realizedPnlUsd.toFixed(2)}.`,
+      `Track record: ${record.wins}/${record.resolvedCount} resolved positions won (${((record.winRate ?? 0) * 100).toFixed(1)}%), realized P&L ${formatPrice(String(record.realizedPnlUsd), "USD")}.`,
     );
   }
 
@@ -221,8 +222,8 @@ export function renderTrackRecordForPrompt(record: TrackRecord): string {
   if (record.openPositions.length > 0) {
     lines.push(
       `Currently open (do not duplicate these — the code will refuse them anyway): ${record.openPositions
-        .map((position) => `"${position.question}" ($${position.sizeUsd.toFixed(2)} at ${position.entryPrice ?? "?"}, held ${position.hoursHeld}h)`)
-        .join("; ")}. Total open exposure $${record.openExposureUsd.toFixed(2)}.`,
+        .map((position) => `"${position.question}" (${formatPrice(String(position.sizeUsd), "USD")} at ${position.entryPrice ?? "?"}, held ${position.hoursHeld}h)`)
+        .join("; ")}. Total open exposure ${formatPrice(String(record.openExposureUsd), "USD")}.`,
     );
   } else {
     lines.push("No positions are currently open.");

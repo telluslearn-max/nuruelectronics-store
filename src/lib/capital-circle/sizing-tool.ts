@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "../prisma";
+import { formatPrice } from "../format";
 import {
   BANKROLL_USD,
   CAPITAL_CIRCLE_LIVE,
@@ -99,7 +100,7 @@ export async function checkCircuitBreaker(): Promise<CircuitBreakerState> {
   if (weeklyPnl < -MAX_WEEKLY_DRAWDOWN_USD) {
     return {
       tripped: true,
-      reason: `Trailing-week P&L is $${weeklyPnl.toFixed(2)}, past the $${MAX_WEEKLY_DRAWDOWN_USD.toFixed(2)} drawdown limit.`,
+      reason: `Trailing-week P&L is ${formatPrice(String(weeklyPnl), "USD")}, past the ${formatPrice(String(MAX_WEEKLY_DRAWDOWN_USD), "USD")} drawdown limit.`,
     };
   }
 
@@ -173,7 +174,7 @@ export async function sizePosition(input: SizingInput | number): Promise<SizingR
   const exposureUsd = Number(openExposure._sum.sizeUsd ?? 0);
   const exposureHeadroom = Math.max(0, MAX_TOTAL_EXPOSURE_USD - exposureUsd);
   if (exposureHeadroom <= 0) {
-    return reject(`Open exposure of $${exposureUsd.toFixed(2)} is at the $${MAX_TOTAL_EXPOSURE_USD.toFixed(2)} portfolio limit.`);
+    return reject(`Open exposure of ${formatPrice(String(exposureUsd), "USD")} is at the ${formatPrice(String(MAX_TOTAL_EXPOSURE_USD), "USD")} portfolio limit.`);
   }
 
   // Kelly, when the caller supplied the edge inputs to compute it from.
@@ -193,7 +194,7 @@ export async function sizePosition(input: SizingInput | number): Promise<SizingR
       return { approvedUsd: 0, capUsd: perTxCapUsd, capped: true, reason: `No Kelly stake: ${kelly.reason}`, kellyFraction };
     }
     targetUsd = Math.min(requestedUsd, kelly.recommendedUsd);
-    kellyNote = ` Kelly sizing suggested $${kelly.recommendedUsd.toFixed(2)} (${kelly.reason})`;
+    kellyNote = ` Kelly sizing suggested ${formatPrice(String(kelly.recommendedUsd), "USD")} (${kelly.reason})`;
   }
 
   const now = new Date();
@@ -216,7 +217,7 @@ export async function sizePosition(input: SizingInput | number): Promise<SizingR
       approvedUsd: capped.approvedUsd,
       capUsd: capped.capUsd,
       capped: true,
-      reason: `Requested $${requestedUsd.toFixed(2)}:${kellyNote ? `${kellyNote};` : ""} ${capped.reason} — sized down to $${capped.approvedUsd.toFixed(2)}.`,
+      reason: `Requested ${formatPrice(String(requestedUsd), "USD")}:${kellyNote ? `${kellyNote};` : ""} ${capped.reason} — sized down to ${formatPrice(String(capped.approvedUsd), "USD")}.`,
       kellyFraction,
     };
   }
@@ -225,7 +226,7 @@ export async function sizePosition(input: SizingInput | number): Promise<SizingR
     approvedUsd: capped.approvedUsd,
     capUsd: capped.capUsd,
     capped: false,
-    reason: `Approved $${capped.approvedUsd.toFixed(2)} — within all configured caps.${kellyNote}`,
+    reason: `Approved ${formatPrice(String(capped.approvedUsd), "USD")} — within all configured caps.${kellyNote}`,
     kellyFraction,
   };
 }

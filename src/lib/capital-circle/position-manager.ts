@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "../prisma";
+import { formatPrice } from "../format";
 import { logAdminAction } from "../audit-log";
 import { getOrderBookSummary } from "./polymarket-client";
 import { evaluateExit, computeSettlement } from "./trade-policy";
@@ -71,7 +72,7 @@ export async function manageOpenPositions(): Promise<PositionManagementResult> {
       action: "capital-circle.position.exit",
       entityType: "capital_circle_position",
       entityId: position.id,
-      summary: `Capital Circle exited "${position.question}" at ${exitPrice.toFixed(4)} (${decision.reason}): ${resultUsd >= 0 ? "+" : ""}$${resultUsd.toFixed(2)}. ${decision.note}`,
+      summary: `Capital Circle exited "${position.question}" at ${exitPrice.toFixed(4)} (${decision.reason}): ${resultUsd >= 0 ? "+" : ""}${formatPrice(String(resultUsd), "USD")}. ${decision.note}`,
       metadata: { exitPrice, entryPrice, reason: decision.reason, resultUsd, settlementNote: note },
     }).catch((error) => console.error("[capital-circle] failed to log exit:", error));
     exited++;

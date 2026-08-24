@@ -2,6 +2,7 @@
 
 import { revalidatePath, updateTag } from "next/cache";
 import { prisma } from "../prisma";
+import { formatPrice } from "../format";
 import { requireAdminSession } from "../admin-auth";
 import { logAdminAction } from "../audit-log";
 import { redirectWithError, redirectWithSuccess } from "../admin-feedback";
@@ -44,7 +45,7 @@ export async function confirmSweep(sweepId: string, formData: FormData): Promise
         action: "capital-circle.sweep.confirm",
         entityType: "capital_circle_sweep",
         entityId: sweepId,
-        summary: `Capital Circle sweep for week of ${sweep.weekStart.toISOString().slice(0, 10)} confirmed: $${confirmedUsdcAmount.toFixed(2)} USDC received.`,
+        summary: `Capital Circle sweep for week of ${sweep.weekStart.toISOString().slice(0, 10)} confirmed: ${formatPrice(String(confirmedUsdcAmount), "USD")} USDC received.`,
         metadata: { weekStart: sweep.weekStart.toISOString(), proposedUsd: Number(sweep.sweepAmountUsd), confirmedUsdcAmount },
       },
       tx,

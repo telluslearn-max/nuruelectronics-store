@@ -85,8 +85,8 @@ export async function sendSweepReadyEmail(sweep: CapitalCircleSweep): Promise<vo
   const reportUrl = `${SITE_URL}/admin/reports/capital-circle`;
   await sendPlainEmail({
     to: capitalCircleOwnerEmail,
-    subject: `Capital Circle: $${Number(sweep.sweepAmountUsd).toFixed(2)} ready to sweep (week of ${weekLabel})`,
-    html: `<p>This week's profit was $${Number(sweep.totalProfitUsd).toFixed(2)}. ${Number(sweep.splitPercent)}% of that — $${Number(sweep.sweepAmountUsd).toFixed(2)} — is staged for the Capital Circle wallet.</p><p>Convert it to USDC (Circle Mint or an exchange), send it to the wallet, then confirm the amount received here: <a href="${reportUrl}">${reportUrl}</a></p>`,
+    subject: `Capital Circle: ${formatPrice(String(Number(sweep.sweepAmountUsd)), "USD")} ready to sweep (week of ${weekLabel})`,
+    html: `<p>This week's profit was ${formatPrice(String(Number(sweep.totalProfitUsd)), "USD")}. ${Number(sweep.splitPercent)}% of that — ${formatPrice(String(Number(sweep.sweepAmountUsd)), "USD")} — is staged for the Capital Circle wallet.</p><p>Convert it to USDC (Circle Mint or an exchange), send it to the wallet, then confirm the amount received here: <a href="${reportUrl}">${reportUrl}</a></p>`,
   });
 }
 

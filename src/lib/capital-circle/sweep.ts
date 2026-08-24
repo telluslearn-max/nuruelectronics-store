@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "../prisma";
+import { formatPrice } from "../format";
 import { logAdminAction } from "../audit-log";
 import { computePnl } from "../reports/pnl";
 import { CAPITAL_CIRCLE_SWEEP_PERCENT } from "./config";
@@ -70,7 +71,7 @@ export async function recordPendingSweep(weekStart: Date) {
     action: "capital-circle.sweep.propose",
     entityType: "capital_circle_sweep",
     entityId: sweep.id,
-    summary: `Capital Circle sweep proposed for week of ${weekStart.toISOString().slice(0, 10)}: $${sweepAmountUsd.toFixed(2)} (${CAPITAL_CIRCLE_SWEEP_PERCENT}% of $${totalProfitUsd.toFixed(2)} profit) — awaiting manual USD→USDC conversion and confirmation.`,
+    summary: `Capital Circle sweep proposed for week of ${weekStart.toISOString().slice(0, 10)}: ${formatPrice(String(sweepAmountUsd), "USD")} (${CAPITAL_CIRCLE_SWEEP_PERCENT}% of ${formatPrice(String(totalProfitUsd), "USD")} profit) — awaiting manual USD→USDC conversion and confirmation.`,
     metadata: { weekStart: weekStart.toISOString(), totalProfitUsd, sweepAmountUsd },
   });
 

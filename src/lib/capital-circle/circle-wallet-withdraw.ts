@@ -1,4 +1,5 @@
 import "server-only";
+import { formatPrice } from "../format";
 import { getBalanceUsdc, transferUsdc, isCircleWalletConfigured, type WalletTransferResult } from "./circle-wallet-client";
 
 /**
@@ -40,7 +41,7 @@ export async function withdrawUsdcToBinance(amountUsdc: number): Promise<WalletT
 
   const balance = await getBalanceUsdc();
   if (amountUsdc > balance) {
-    throw new Error(`Amount exceeds the wallet's actual balance of $${balance.toFixed(2)} USDC.`);
+    throw new Error(`Amount exceeds the wallet's actual balance of ${formatPrice(String(balance), "USD")} USDC.`);
   }
 
   return transferUsdc(destinationAddress, amountUsdc);
