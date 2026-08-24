@@ -1,0 +1,9 @@
+{
+  "src/lib/admin-actions.ts": 1,
+  "src/lib/shopify/mock-data.ts": 1,
+  "src/lib/expense-actions.ts": 0,
+  "src/lib/pdf/render.ts": 0,
+  "src/lib/capital-circle/binance-actions.ts": 0,
+  "src/lib/capital-circle/circle-withdraw-actions.ts": 0,
+  "src/lib/api-response.ts": 0
+}
