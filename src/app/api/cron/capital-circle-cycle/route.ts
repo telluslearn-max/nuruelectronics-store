@@ -5,6 +5,19 @@ import { sendCapitalCircleCycleEmail } from "@/lib/email";
 import { constantTimeEqual } from "@/lib/admin-session-token";
 import { prisma } from "@/lib/prisma";
 
+/**
+ * Was missing entirely — every other route in this codebase that calls Gemini more than once
+ * declares one explicitly (see concierge/chat and concierge/voice-turn, both maxDuration=60), but
+ * this route runs a *multi-stage* pipeline (a grounding call, then an ENSEMBLE_SAMPLES-way scoring
+ * call producing up to SCORING_MAX_OUTPUT_TOKENS of JSON, then a deep-dive tool-calling loop up to
+ * MAX_TOOL_ITERATIONS rounds) that can plausibly run well past a platform default. Set to 300 to
+ * match runCycleWithLock's own transaction `timeout: 300_000` below — that number already encodes
+ * the author's own expectation of how long a cycle can legitimately take; the route just never
+ * had a matching ceiling of its own, so on a plan/config where the default is lower, every
+ * invocation may have been silently killed by the platform before ever writing a cycle log.
+ */
+export const maxDuration = 300;
+
 function isAuthorized(request: Request): boolean {
   const secret = process.env.CRON_SECRET;
   if (!secret) return false;
