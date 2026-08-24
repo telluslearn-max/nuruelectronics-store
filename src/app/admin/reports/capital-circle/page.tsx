@@ -578,7 +578,7 @@ export default async function CapitalCirclePage({
                       min="0"
                       defaultValue={(sweep.detectedUsdcAmount ?? sweep.sweepAmountUsd).toFixed(2)}
                       required
-                      className="w-40 rounded-control border border-border-subtle px-3 py-2 text-sm outline-none focus:border-foreground"
+                      className="w-40 rounded-control border border-border-subtle px-3 py-2 text-base outline-none focus:border-foreground sm:text-sm"
                     />
                   </div>
                   <button

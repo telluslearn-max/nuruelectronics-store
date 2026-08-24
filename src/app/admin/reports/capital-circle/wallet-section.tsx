@@ -44,7 +44,10 @@ import { SubmitButton } from "@/components/admin/submit-button";
 import { ConfirmPendingSubmitButton } from "@/components/admin/confirm-submit-button";
 import { Tabs } from "@/components/admin/tabs";
 
-const inputClass = "w-full rounded-control border border-border-subtle px-3 py-2 text-sm outline-none focus:border-foreground";
+/** text-base (16px), not text-sm (14px), below sm: — iOS Safari auto-zooms in on focusing any
+    input under 16px and the zoom sticks after you scroll away, which is exactly the "fine at
+    first, then stuck zoomed in" symptom this was causing on the money-movement forms below. */
+const inputClass = "w-full rounded-control border border-border-subtle px-3 py-2 text-base outline-none focus:border-foreground sm:text-sm";
 const DETAILS = "mt-3 rounded-card border border-border-subtle p-4";
 
 const WALLET_STATUS_STYLES: Record<string, string> = {
