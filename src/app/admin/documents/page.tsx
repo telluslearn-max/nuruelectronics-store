@@ -168,7 +168,7 @@ export default async function AdminDocumentsPage({
           <select
             name="status"
             defaultValue={status ?? ""}
-            className="w-full rounded-control border border-border-subtle px-3 py-2 text-sm outline-none focus:border-foreground"
+            className="w-full rounded-control border border-border-subtle px-3 py-2 text-base outline-none focus:border-foreground sm:text-sm"
           >
             <option value="">All</option>
             {statusOptions.map((option) => (
