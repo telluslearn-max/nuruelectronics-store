@@ -28,6 +28,14 @@ export type CapitalCircleNetwork = {
    * Polygon Blockscout's independently-verified contract source (Sourcify), not just docs.
    */
   collateralOnrampAddress: string | null;
+  /**
+   * The reverse of the onramp — burns pUSD 1:1 back into USDC.e via
+   * unwrap(address _asset, address _to, uint256 _amount). Address from docs.polymarket.com's own
+   * contracts page, cross-verified against real on-chain transaction history (Blockscout): every
+   * observed unwrap() call used _asset = the USDC.e address above, never anything else, matching
+   * the onramp's own verified behavior in reverse.
+   */
+  collateralOfframpAddress: string | null;
   explorerBaseUrl: string;
   label: string;
   isTestnet: boolean;
@@ -48,6 +56,7 @@ export function networkConfig(isTestnet: boolean): CapitalCircleNetwork {
       nativeUsdcAddress: null,
       usdcEAddress: null,
       collateralOnrampAddress: null,
+      collateralOfframpAddress: null,
       explorerBaseUrl: "https://amoy.polygonscan.com",
       label: "Polygon Amoy (testnet)",
       isTestnet: true,
@@ -60,6 +69,7 @@ export function networkConfig(isTestnet: boolean): CapitalCircleNetwork {
     nativeUsdcAddress: "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359",
     usdcEAddress: "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174",
     collateralOnrampAddress: "0x93070a847efEf7F70739046A929D47a521F5B8ee",
+    collateralOfframpAddress: "0x2957922Eb93258b93368531d39fAcCA3B4dC5854",
     explorerBaseUrl: "https://polygonscan.com",
     label: "Polygon",
     isTestnet: false,

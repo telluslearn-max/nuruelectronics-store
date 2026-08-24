@@ -229,6 +229,19 @@ export async function wrapCollateral(onrampAddress: string, assetAddress: string
 }
 
 /**
+ * Calls CollateralOfframp.unwrap(_asset, _to, _amount) — the reverse of wrapCollateral: burns
+ * pUSD 1:1 back into an ERC-20 balance (USDC.e in practice; docs.polymarket.com/concepts/pusd and
+ * real on-chain unwrap() call history both confirm it's the only asset the offramp actually pays
+ * out). Same prerequisite as the wrap direction, just against the offramp contract and the pUSD
+ * token instead: the caller must first approve the CollateralOfframp contract to spend pUSD.
+ * Reverts on-chain (gas only) if that approval hasn't landed yet — same "confirm on an explorer
+ * before calling this" contract as wrapCollateral.
+ */
+export async function unwrapCollateral(offrampAddress: string, assetAddress: string, amountUsdc: number): Promise<ContractExecutionResult> {
+  return executeContract(offrampAddress, "unwrap(address,address,uint256)", [assetAddress, walletAddress!, toBaseUnits(amountUsdc)]);
+}
+
+/**
  * EIP-3009 TransferWithAuthorization types — the exact gasless-USDC-transfer signature the x402
  * payment protocol's "exact" EVM scheme (and EIP-3009-compatible tokens generally) use. Verified
  * verbatim against x402-foundation/x402's canonical source

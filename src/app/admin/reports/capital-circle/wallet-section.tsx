@@ -13,8 +13,23 @@ import { isBinanceConfigured, BINANCE_WITHDRAW_CAP_USDC } from "@/lib/capital-ci
 import { depositFromBinance } from "@/lib/capital-circle/binance-actions";
 import { isCircleWalletWithdrawConfigured, CIRCLE_WALLET_WITHDRAW_CAP_USDC } from "@/lib/capital-circle/circle-wallet-withdraw";
 import { withdrawFromCircleWallet } from "@/lib/capital-circle/circle-withdraw-actions";
-import { isCollateralBridgeConfigured, BRIDGE_TO_USDCE_CAP_USDC, WRAP_TO_COLLATERAL_CAP_USDC } from "@/lib/capital-circle/collateral-bridge";
-import { bridgeToUsdcE, checkBridgeStatus, approveForWrap, wrapToCollateral } from "@/lib/capital-circle/collateral-bridge-actions";
+import {
+  isCollateralBridgeConfigured,
+  isCollateralWithdrawConfigured,
+  BRIDGE_TO_USDCE_CAP_USDC,
+  WRAP_TO_COLLATERAL_CAP_USDC,
+  UNWRAP_FROM_COLLATERAL_CAP_USDC,
+  BRIDGE_WITHDRAW_CAP_USDC,
+} from "@/lib/capital-circle/collateral-bridge";
+import {
+  bridgeToUsdcE,
+  checkBridgeStatus,
+  approveForWrap,
+  wrapToCollateral,
+  approveForUnwrap,
+  unwrapToUsdcE,
+  bridgeWithdrawToBinance,
+} from "@/lib/capital-circle/collateral-bridge-actions";
 import {
   registerCapitalCircleWallet,
   registerConfiguredCircleWallet,
@@ -479,14 +494,16 @@ export async function WalletSection({ wallets }: { wallets: CapitalCircleWalletS
       </details>
 
       <details className={DETAILS}>
-        <summary className="cursor-pointer text-sm font-medium">Withdraw to Binance</summary>
+        <summary className="cursor-pointer text-sm font-medium">Withdraw to Binance (native USDC only)</summary>
         {isCircleWalletWithdrawConfigured ? (
           <>
             <p className="mt-2 max-w-2xl text-sm text-neutral-500">
-              Pushes USDC from the Capital Circle wallet to your Binance deposit address. Capped at{" "}
-              <span className="font-medium">{formatPrice(CIRCLE_WALLET_WITHDRAW_CAP_USDC.toFixed(2), "USD")}</span>{" "}
-              per request, and checked against the wallet&apos;s actual balance before submitting — this is the only
-              way funds leave the wallet outside of live Polymarket trading.
+              Pushes <strong>native USDC</strong> from the Capital Circle wallet to your Binance deposit address.
+              Capped at <span className="font-medium">{formatPrice(CIRCLE_WALLET_WITHDRAW_CAP_USDC.toFixed(2), "USD")}</span>{" "}
+              per request, and checked against the wallet&apos;s actual balance before submitting. This only works for
+              native USDC sitting unconverted in the wallet — Binance has no listing for pUSD at all, so if the
+              wallet&apos;s balance is pUSD (the usual case once it&apos;s been wrapped for trading), use &quot;Withdraw
+              pUSD to Binance&quot; further down instead.
             </p>
             <form action={withdrawFromCircleWallet} className="mt-3 flex flex-wrap items-end gap-3">
               <div>
@@ -586,6 +603,80 @@ export async function WalletSection({ wallets }: { wallets: CapitalCircleWalletS
             {CAPITAL_CIRCLE_NETWORK.isTestnet
               ? "Not available on testnet — the bridge and wrap contract are only confirmed on Polygon mainnet."
               : "Register a wallet first to enable this."}
+          </p>
+        )}
+      </details>
+
+      <details className={DETAILS}>
+        <summary className="cursor-pointer text-sm font-medium">Unwrap pUSD → USDC.e</summary>
+        {isCollateralBridgeConfigured ? (
+          <>
+            <p className="mt-2 max-w-2xl text-sm text-neutral-500">
+              First step of getting money back out when the wallet holds pUSD: burns pUSD 1:1 back into USDC.e via
+              Polymarket&apos;s CollateralOfframp contract — the reverse of the wrap step above. Same two-call
+              pattern: approve, then unwrap, and the second only succeeds once the first has actually confirmed.
+              Capped at <span className="font-medium">{formatPrice(UNWRAP_FROM_COLLATERAL_CAP_USDC.toFixed(2), "USD")}</span> per
+              request.
+            </p>
+            <form action={approveForUnwrap} className="mt-3 flex flex-wrap items-end gap-3">
+              <div>
+                <label className="block text-xs text-neutral-500">1. Approve amount (pUSD)</label>
+                <input type="number" name="amountUsdc" step="0.01" min="0.01" max={UNWRAP_FROM_COLLATERAL_CAP_USDC} required className="w-40 rounded-control border border-border-subtle px-3 py-2 text-sm outline-none focus:border-foreground" />
+              </div>
+              <SubmitButton className="rounded-control border border-border-subtle px-4 py-2 text-sm font-medium hover:border-foreground" pendingText="Approving…">
+                Approve
+              </SubmitButton>
+            </form>
+            <form action={unwrapToUsdcE} className="mt-3 flex flex-wrap items-end gap-3 border-t border-border-subtle pt-3">
+              <div>
+                <label className="block text-xs text-neutral-500">2. Unwrap amount (pUSD)</label>
+                <input type="number" name="amountUsdc" step="0.01" min="0.01" max={UNWRAP_FROM_COLLATERAL_CAP_USDC} required className="w-40 rounded-control border border-border-subtle px-3 py-2 text-sm outline-none focus:border-foreground" />
+              </div>
+              <SubmitButton className="rounded-control bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:opacity-90" pendingText="Unwrapping…">
+                Unwrap to USDC.e
+              </SubmitButton>
+            </form>
+            <p className="mt-2 text-xs text-neutral-400">
+              Wait for the approve transaction to confirm before unwrapping — unwrapping too soon will simply revert
+              on-chain, costing only gas.
+            </p>
+          </>
+        ) : (
+          <p className="mt-2 max-w-2xl text-sm text-neutral-500">
+            {CAPITAL_CIRCLE_NETWORK.isTestnet
+              ? "Not available on testnet — the offramp contract is only confirmed on Polygon mainnet."
+              : "Register a wallet first to enable this."}
+          </p>
+        )}
+      </details>
+
+      <details className={DETAILS}>
+        <summary className="cursor-pointer text-sm font-medium">Withdraw pUSD to Binance (via bridge)</summary>
+        {isCollateralWithdrawConfigured ? (
+          <>
+            <p className="mt-2 max-w-2xl text-sm text-neutral-500">
+              Final step: sends already-unwrapped USDC.e to a fresh Polymarket bridge withdraw address, which
+              converts it to native USDC and delivers it directly to your Binance deposit address — the same
+              destination-pinning guarantee as &quot;Withdraw to Binance&quot; above, just reached via the bridge
+              instead of a direct transfer, since USDC.e itself isn&apos;t something Binance accepts either. Capped
+              at <span className="font-medium">{formatPrice(BRIDGE_WITHDRAW_CAP_USDC.toFixed(2), "USD")}</span> per
+              request. This can take a few minutes — use &quot;Check bridge status&quot; above with the address it
+              gives you.
+            </p>
+            <form action={bridgeWithdrawToBinance} className="mt-3 flex flex-wrap items-end gap-3">
+              <div>
+                <label className="block text-xs text-neutral-500">Amount (USDC.e)</label>
+                <input type="number" name="amountUsdc" step="0.01" min="0.01" max={BRIDGE_WITHDRAW_CAP_USDC} required className="w-40 rounded-control border border-border-subtle px-3 py-2 text-sm outline-none focus:border-foreground" />
+              </div>
+              <SubmitButton className="rounded-control bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:opacity-90" pendingText="Sending…">
+                Bridge-withdraw to Binance
+              </SubmitButton>
+            </form>
+          </>
+        ) : (
+          <p className="mt-2 max-w-2xl text-sm text-neutral-500">
+            Not configured — set <code className="rounded bg-neutral-100 px-1 py-0.5">BINANCE_DEPOSIT_ADDRESS</code> to
+            enable, same as the direct withdrawal above.
           </p>
         )}
       </details>

@@ -32,16 +32,24 @@ describe("networkConfig — the regression lock on the wrong-chain / wrong-colla
     expect(network.nativeUsdcAddress).toBe("0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359");
     expect(network.usdcEAddress).toBe("0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174");
     expect(network.collateralOnrampAddress).toBe("0x93070a847efEf7F70739046A929D47a521F5B8ee");
-    // The three must be distinct from each other and from the collateral (pUSD) token — a typo
+    expect(network.collateralOfframpAddress).toBe("0x2957922Eb93258b93368531d39fAcCA3B4dC5854");
+    // All four must be distinct from each other and from the collateral (pUSD) token — a typo
     // that collapsed any two of these would silently send funds nowhere useful.
-    const addresses = [network.nativeUsdcAddress, network.usdcEAddress, network.collateralOnrampAddress, network.collateralTokenAddress];
+    const addresses = [
+      network.nativeUsdcAddress,
+      network.usdcEAddress,
+      network.collateralOnrampAddress,
+      network.collateralOfframpAddress,
+      network.collateralTokenAddress,
+    ];
     expect(new Set(addresses).size).toBe(addresses.length);
   });
 
-  it("testnet: bridge/wrap addresses are null, not guessed", () => {
+  it("testnet: bridge/wrap/unwrap addresses are null, not guessed", () => {
     const network = networkConfig(true);
     expect(network.nativeUsdcAddress).toBeNull();
     expect(network.usdcEAddress).toBeNull();
     expect(network.collateralOnrampAddress).toBeNull();
+    expect(network.collateralOfframpAddress).toBeNull();
   });
 });
