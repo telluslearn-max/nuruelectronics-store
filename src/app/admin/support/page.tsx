@@ -7,7 +7,7 @@ import { parsePage, type PageSearchParams } from "@/lib/pagination";
 import { PaginationControls } from "@/components/admin/pagination-controls";
 import { FeedbackBanner } from "@/components/admin/feedback-banner";
 import { StatusPill } from "@/components/admin/status-pill";
-import { ConfirmSubmitButton } from "@/components/admin/confirm-submit-button";
+import { ConfirmPendingSubmitButton } from "@/components/admin/confirm-submit-button";
 
 export const metadata: Metadata = { title: "Support (AI Agent Decisions)" };
 
@@ -96,13 +96,13 @@ export default async function AdminSupportPage({
                 </form>
                 <form action={denyCase}>
                   <input type="hidden" name="caseId" value={returnCase.id} />
-                  <ConfirmSubmitButton
+                  <ConfirmPendingSubmitButton
                     confirmMessage={`Deny the ${reasonLabel(returnCase.reason)} case for order ${returnCase.shopifyOrderName}?`}
                     className={dangerButtonClass}
                     pendingText="Denying…"
                   >
                     Deny
-                  </ConfirmSubmitButton>
+                  </ConfirmPendingSubmitButton>
                 </form>
               </div>
             )}

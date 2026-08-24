@@ -23,7 +23,7 @@ import { formatPrice } from "@/lib/format";
 import { moneyColorClass } from "@/components/admin/money-colors";
 import { CopyButton } from "@/components/admin/copy-button";
 import { SubmitButton } from "@/components/admin/submit-button";
-import { ConfirmSubmitButton } from "@/components/admin/confirm-submit-button";
+import { ConfirmPendingSubmitButton } from "@/components/admin/confirm-submit-button";
 
 const inputClass = "w-full rounded-control border border-border-subtle px-3 py-2 text-sm outline-none focus:border-foreground";
 const DETAILS = "mt-3 rounded-card border border-border-subtle p-4";
@@ -373,7 +373,7 @@ export async function WalletSection({ wallets }: { wallets: CapitalCircleWalletS
                   <input type="checkbox" name="confirmReplace" />I mean to replace the current identity, not just fix
                   a typo elsewhere.
                 </label>
-                <ConfirmSubmitButton
+                <ConfirmPendingSubmitButton
                   confirmMessage={`Change this wallet's identity? It currently points at ${
                     wallet.address ? truncateAddress(wallet.address) : "no address"
                   } / ${wallet.circleWalletId ?? "no Circle id"} — whatever you've entered above will replace it.`}
@@ -381,7 +381,7 @@ export async function WalletSection({ wallets }: { wallets: CapitalCircleWalletS
                   pendingText="Updating…"
                 >
                   Update identity
-                </ConfirmSubmitButton>
+                </ConfirmPendingSubmitButton>
               </form>
             </details>
           </details>

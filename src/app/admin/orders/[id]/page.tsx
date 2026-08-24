@@ -6,7 +6,7 @@ import { requireAdminSession } from "@/lib/admin-auth";
 import { formatPrice } from "@/lib/format";
 import { StatusPill } from "@/components/admin/status-pill";
 import { getShopifyOrderById } from "@/lib/shopify/admin-api";
-import { ConfirmSubmitButton } from "@/components/admin/confirm-submit-button";
+import { ConfirmPendingSubmitButton } from "@/components/admin/confirm-submit-button";
 import { FeedbackBanner } from "@/components/admin/feedback-banner";
 import { SubmitButton } from "@/components/admin/submit-button";
 import {
@@ -174,12 +174,12 @@ export default async function AdminOrderHubPage({
                     {editable && <span className="text-neutral-300">·</span>}
                     {editable && (
                       <form action={deleteEstimate.bind(null, estimate.id)}>
-                        <ConfirmSubmitButton
+                        <ConfirmPendingSubmitButton
                           confirmMessage={`Delete estimate ${estimate.number}? This removes the document completely — this can't be undone.`}
                           className="underline hover:text-foreground"
                         >
                           Delete
-                        </ConfirmSubmitButton>
+                        </ConfirmPendingSubmitButton>
                       </form>
                     )}
                   </div>
@@ -318,12 +318,12 @@ export default async function AdminOrderHubPage({
               )}
               {invoiceDeletable && (
                 <form action={deleteInvoice.bind(null, order.invoice.id)}>
-                  <ConfirmSubmitButton
+                  <ConfirmPendingSubmitButton
                     confirmMessage={`Delete invoice ${order.invoice.number}? This removes it and its ledger entries completely — this can't be undone.`}
                     className="underline hover:text-foreground"
                   >
                     Delete
-                  </ConfirmSubmitButton>
+                  </ConfirmPendingSubmitButton>
                 </form>
               )}
             </div>
@@ -503,12 +503,12 @@ export default async function AdminOrderHubPage({
               </form>
               {order.deliveryNote.status === "pending" && (
                 <form action={deleteDeliveryNote.bind(null, order.deliveryNote.id)}>
-                  <ConfirmSubmitButton
+                  <ConfirmPendingSubmitButton
                     confirmMessage={`Delete delivery note ${order.deliveryNote.number}? This removes the document completely — this can't be undone.`}
                     className="underline hover:text-foreground"
                   >
                     Delete
-                  </ConfirmSubmitButton>
+                  </ConfirmPendingSubmitButton>
                 </form>
               )}
             </div>

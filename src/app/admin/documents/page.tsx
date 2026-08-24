@@ -7,7 +7,7 @@ import { StatusPill } from "@/components/admin/status-pill";
 import { parsePage, type PageSearchParams } from "@/lib/pagination";
 import { PaginationControls } from "@/components/admin/pagination-controls";
 import { BulkSelectionBar } from "@/components/admin/bulk-selection-bar";
-import { ConfirmSubmitButton } from "@/components/admin/confirm-submit-button";
+import { ConfirmPendingSubmitButton } from "@/components/admin/confirm-submit-button";
 import { FeedbackBanner } from "@/components/admin/feedback-banner";
 import { bulkDeleteDocuments, bulkEmailDocuments } from "@/lib/admin-actions";
 
@@ -203,13 +203,13 @@ export default async function AdminDocumentsPage({
             >
               Email selected
             </button>
-            <ConfirmSubmitButton
+            <ConfirmPendingSubmitButton
               confirmMessage="Delete the selected documents? Ineligible ones (e.g. paid invoices) will be skipped. This can't be undone."
               formAction={bulkDeleteDocuments.bind(null, type)}
               className="rounded-control border border-border-subtle px-3 py-1.5 text-sm font-medium text-red-600 hover:border-red-600"
             >
               Delete selected
-            </ConfirmSubmitButton>
+            </ConfirmPendingSubmitButton>
           </BulkSelectionBar>
           <ul className="space-y-3">
             {rows.map((row) => (
