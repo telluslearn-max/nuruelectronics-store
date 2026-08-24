@@ -48,7 +48,7 @@ export default async function AdminPayrollRegisterPage({
             type="date"
             name="from"
             defaultValue={from ?? ""}
-            className="w-full rounded-control border border-border-subtle px-3 py-2 text-sm outline-none focus:border-foreground"
+            className="w-full rounded-control border border-border-subtle px-3 py-2 text-base outline-none focus:border-foreground sm:text-sm"
           />
         </div>
         <div>
@@ -57,7 +57,7 @@ export default async function AdminPayrollRegisterPage({
             type="date"
             name="to"
             defaultValue={to ?? ""}
-            className="w-full rounded-control border border-border-subtle px-3 py-2 text-sm outline-none focus:border-foreground"
+            className="w-full rounded-control border border-border-subtle px-3 py-2 text-base outline-none focus:border-foreground sm:text-sm"
           />
         </div>
         <button type="submit" className="rounded-control border border-border-subtle px-4 py-2 text-sm font-medium hover:border-foreground">

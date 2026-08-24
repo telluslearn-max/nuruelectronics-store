@@ -47,7 +47,7 @@ export default async function AdminIncomeStatementPage({
             type="date"
             name="from"
             defaultValue={from.toISOString().slice(0, 10)}
-            className="w-full rounded-control border border-border-subtle px-3 py-2 text-sm outline-none focus:border-foreground"
+            className="w-full rounded-control border border-border-subtle px-3 py-2 text-base outline-none focus:border-foreground sm:text-sm"
           />
         </div>
         <div>
@@ -56,7 +56,7 @@ export default async function AdminIncomeStatementPage({
             type="date"
             name="to"
             defaultValue={to.toISOString().slice(0, 10)}
-            className="w-full rounded-control border border-border-subtle px-3 py-2 text-sm outline-none focus:border-foreground"
+            className="w-full rounded-control border border-border-subtle px-3 py-2 text-base outline-none focus:border-foreground sm:text-sm"
           />
         </div>
         <button

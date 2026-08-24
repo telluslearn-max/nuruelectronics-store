@@ -14,7 +14,7 @@ function formatDate(date: Date) {
 }
 
 const inputClass =
-  "w-full rounded-control border border-border-subtle px-3 py-2 text-sm outline-none focus:border-foreground";
+  "w-full rounded-control border border-border-subtle px-3 py-2 text-base outline-none focus:border-foreground sm:text-sm";
 const primaryButtonClass =
   "rounded-control bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:opacity-90";
 

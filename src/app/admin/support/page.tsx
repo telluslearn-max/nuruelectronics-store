@@ -12,7 +12,7 @@ import { ConfirmPendingSubmitButton } from "@/components/admin/confirm-submit-bu
 export const metadata: Metadata = { title: "Support (AI Agent Decisions)" };
 
 const inputClass =
-  "w-full rounded-control border border-border-subtle px-3 py-2 text-sm outline-none focus:border-foreground";
+  "w-full rounded-control border border-border-subtle px-3 py-2 text-base outline-none focus:border-foreground sm:text-sm";
 const primaryButtonClass =
   "rounded-control bg-foreground px-3 py-1.5 text-xs font-medium text-background transition hover:opacity-90 disabled:opacity-50";
 const dangerButtonClass =
