@@ -38,40 +38,93 @@ const CHAIN_ID_BY_NETWORK: Record<string, number> = {
 const USDC_DECIMALS = 6;
 
 /**
- * Comma-separated hostnames this app is allowed to pay via x402. Empty (default) means nothing is
- * allowed — fail closed, same as every other guardrail this session. Each entry may optionally
- * pin the expected payee address as `host=0xAddress` (e.g. `api.example.com=0xabc...`) — x402 has
- * no protocol-level way to pin a destination the way a plain wallet transfer does (the requesting
- * server always names its own payTo in the 402 response, and paying it is the entire point of the
- * protocol), so this is the strongest guarantee available: an operator who trusts a specific host
- * to always pay itself can catch that host suddenly naming a different payTo. Hosts listed without
- * `=address` get the allowlist check only, same as before.
+ * One allowlisted host: which category it was approved under, and (optionally) the payee address
+ * an operator trusts it to always name in its own 402 response.
  */
-const ALLOWED_HOSTS_RAW = (process.env.X402_ALLOWED_HOSTS ?? "")
-  .split(",")
-  .map((h) => h.trim())
-  .filter(Boolean);
+export type AllowlistEntry = {
+  host: string;
+  category: string;
+  pinnedPayTo: string | null;
+};
 
-const PINNED_PAY_TO_BY_HOST = new Map<string, string>(
-  ALLOWED_HOSTS_RAW.filter((entry) => entry.includes("="))
-    .map((entry) => {
-      const [host, address] = entry.split("=");
-      return [host.trim().toLowerCase(), address.trim().toLowerCase()] as const;
-    }),
-);
+/**
+ * Parses X402_ALLOWED_HOSTS. Each comma-separated entry is `category:host` or
+ * `category:host=0xAddress` (e.g. `news:api.example.com`, `sports-odds:odds.example.com=0xabc...`).
+ *
+ * Every host is approved *for a category*, not just approved outright — there is no dynamic
+ * marketplace discovery wired in yet (Circle's own service-discovery is CLI-only today, with no
+ * public REST API, so it can't be called from this serverless route at all; see the comment on
+ * discoverableCategories below for what this is laying groundwork for). Until then, every host
+ * still has to be explicitly listed by an operator — categorizing them doesn't loosen that, it
+ * organizes it: the model is told which categories exist and what each host under one is for,
+ * and different categories can carry different price ceilings (see CATEGORY_CAPS_USDC) instead of
+ * one flat cap sized for whichever category is most expensive.
+ *
+ * Pure and exported specifically so this parsing — the part a malformed env var could get wrong
+ * silently — is unit-tested rather than only ever exercised by a real payment attempt.
+ */
+export function parseAllowlist(raw: string): AllowlistEntry[] {
+  return raw
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+    .flatMap((entry): AllowlistEntry[] => {
+      const colonIndex = entry.indexOf(":");
+      if (colonIndex <= 0) {
+        console.error(`[x402] ignoring malformed X402_ALLOWED_HOSTS entry (expected "category:host", got "${entry}").`);
+        return [];
+      }
+      const category = entry.slice(0, colonIndex).trim().toLowerCase();
+      const hostPart = entry.slice(colonIndex + 1).trim();
+      const [host, address] = hostPart.split("=");
+      if (!host) return [];
+      return [{ host: host.trim().toLowerCase(), category, pinnedPayTo: address ? address.trim().toLowerCase() : null }];
+    });
+}
 
-const ALLOWED_HOSTS = ALLOWED_HOSTS_RAW.map((entry) => entry.split("=")[0].trim().toLowerCase());
+/**
+ * Per-category price ceilings, parsed from X402_CATEGORY_CAPS_USDC (e.g. `news:0.05,sports-odds:0.75`).
+ * A category with no entry here falls back to the flat X402_PAYMENT_CAP_USDC — same reasoning as
+ * parseAllowlist for why this is a pure, separately-tested function.
+ */
+export function parseCategoryCaps(raw: string): Map<string, number> {
+  const caps = new Map<string, number>();
+  for (const entry of raw.split(",").map((e) => e.trim()).filter(Boolean)) {
+    const [category, amount] = entry.split(":");
+    const value = Number(amount);
+    if (!category || !Number.isFinite(value) || value <= 0) {
+      console.error(`[x402] ignoring malformed X402_CATEGORY_CAPS_USDC entry (expected "category:amount", got "${entry}").`);
+      continue;
+    }
+    caps.set(category.trim().toLowerCase(), value);
+  }
+  return caps;
+}
 
-/** Hard ceiling on any single x402 payment — independent of whatever the resource server asks for, checked against its own stated price before any signature is produced. */
+const ALLOWLIST = parseAllowlist(process.env.X402_ALLOWED_HOSTS ?? "");
+const ALLOWLIST_BY_HOST = new Map(ALLOWLIST.map((entry) => [entry.host, entry]));
+const CATEGORY_CAPS_USDC = parseCategoryCaps(process.env.X402_CATEGORY_CAPS_USDC ?? "");
+
+/** Hard ceiling on any single x402 payment when its category has no cap of its own — checked against the resource server's own stated price before any signature is produced. */
 export const X402_PAYMENT_CAP_USDC = Number(process.env.X402_PAYMENT_CAP_USDC ?? 0.5);
 
-export const isX402PaymentConfigured = Boolean(circleWalletAddress) && ALLOWED_HOSTS.length > 0;
+/** The distinct categories currently approved — what the model's tool description enumerates, and (once discovery is wired in) what a discovered service's own category will be checked against. */
+export function approvedCategories(): string[] {
+  return [...new Set(ALLOWLIST.map((entry) => entry.category))].sort();
+}
 
-function isHostAllowed(url: string): boolean {
+/** The per-call price ceiling for a category — its own cap if one is configured, else the flat default. */
+export function capForCategory(category: string): number {
+  return CATEGORY_CAPS_USDC.get(category.toLowerCase()) ?? X402_PAYMENT_CAP_USDC;
+}
+
+export const isX402PaymentConfigured = Boolean(circleWalletAddress) && ALLOWLIST.length > 0;
+
+function allowlistEntryForUrl(url: string): AllowlistEntry | null {
   try {
-    return ALLOWED_HOSTS.includes(new URL(url).hostname.toLowerCase());
+    return ALLOWLIST_BY_HOST.get(new URL(url).hostname.toLowerCase()) ?? null;
   } catch {
-    return false;
+    return null;
   }
 }
 
@@ -95,8 +148,8 @@ function base64EncodeJson(value: unknown): string {
  * Fetches an x402-protected resource, paying for it from the Capital Circle wallet if the server
  * responds 402. Guardrails run before any signature is produced, checked against the server's own
  * stated requirements — never a caller-supplied amount:
- *   1. The URL's host must be on X402_ALLOWED_HOSTS (fails closed if unset).
- *   2. The price must be at or under X402_PAYMENT_CAP_USDC.
+ *   1. The URL's host must be on X402_ALLOWED_HOSTS, which also names its approved category (fails closed if unset).
+ *   2. The price must be at or under that category's cap (capForCategory — its own X402_CATEGORY_CAPS_USDC entry, or the flat X402_PAYMENT_CAP_USDC default).
  *   3. If that host has a pinned payTo configured, the requirement's payTo must match it.
  * Unlike the Binance/Circle-withdraw guardrails elsewhere in Capital Circle, this is NOT
  * destination-pinning by default — the resource server always names its own payTo in the 402
@@ -105,7 +158,8 @@ function base64EncodeJson(value: unknown): string {
  * Every attempt is audit-logged before signing and again after the paid request resolves.
  */
 export async function payForResource(url: string, init?: RequestInit): Promise<Response> {
-  if (!isHostAllowed(url)) {
+  const entry = allowlistEntryForUrl(url);
+  if (!entry) {
     throw new Error(`Host for ${url} is not on X402_ALLOWED_HOSTS — refusing to pay.`);
   }
   if (!circleWalletAddress) {
@@ -130,13 +184,13 @@ export async function payForResource(url: string, init?: RequestInit): Promise<R
   if (!Number.isFinite(amountUsdc) || amountUsdc <= 0) {
     throw new Error(`Could not parse a positive amount from payment requirements: "${requirement.amount}".`);
   }
-  if (amountUsdc > X402_PAYMENT_CAP_USDC) {
-    throw new Error(`Requested payment $${amountUsdc.toFixed(4)} exceeds the app-level cap of $${X402_PAYMENT_CAP_USDC} per call.`);
+  const cap = capForCategory(entry.category);
+  if (amountUsdc > cap) {
+    throw new Error(`Requested payment $${amountUsdc.toFixed(4)} exceeds the $${cap} per-call cap for the "${entry.category}" category.`);
   }
 
   const host = new URL(url).hostname;
-  const pinnedPayTo = PINNED_PAY_TO_BY_HOST.get(host.toLowerCase());
-  if (pinnedPayTo && requirement.payTo.toLowerCase() !== pinnedPayTo) {
+  if (entry.pinnedPayTo && requirement.payTo.toLowerCase() !== entry.pinnedPayTo) {
     throw new Error(`Payment requirements named payTo ${requirement.payTo}, which doesn't match the pinned address configured for ${host}.`);
   }
 
@@ -153,8 +207,8 @@ export async function payForResource(url: string, init?: RequestInit): Promise<R
     action: "x402.payment.attempt",
     entityType: "x402_payment",
     entityId: host,
-    summary: `Requesting x402 payment of $${amountUsdc.toFixed(4)} USDC to ${url}.`,
-    metadata: { url, amountUsdc, payTo: requirement.payTo, network: requirement.network },
+    summary: `Requesting x402 payment of $${amountUsdc.toFixed(4)} USDC to ${url} (category: ${entry.category}).`,
+    metadata: { url, amountUsdc, payTo: requirement.payTo, network: requirement.network, category: entry.category },
   });
 
   // Signing and the paid request share one try/catch: a network-level throw from the paid fetch
