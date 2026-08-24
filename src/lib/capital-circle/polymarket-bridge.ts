@@ -38,6 +38,32 @@ export async function requestBridgeDepositAddress(walletAddress: string): Promis
   return body as BridgeDepositAddresses;
 }
 
+/**
+ * Requests a fresh withdrawal address: send USDC.e here and the bridge auto-converts + delivers
+ * to recipientAddr on toChainId/toTokenAddress — the same bridge infrastructure as
+ * requestBridgeDepositAddress, run in reverse. Deliberately requested fresh every time rather
+ * than cached, per the bridge docs' own explicit instruction for this endpoint specifically:
+ * "Do not pre-generate withdrawal addresses. Generate them only when ready to execute."
+ */
+export async function requestBridgeWithdrawAddress(
+  walletAddress: string,
+  toChainId: string,
+  toTokenAddress: string,
+  recipientAddr: string,
+): Promise<BridgeDepositAddresses> {
+  const response = await fetch(`${BRIDGE_BASE_URL}/withdraw`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ address: walletAddress, toChainId, toTokenAddress, recipientAddr }),
+  });
+  if (!response.ok) {
+    throw new Error(`Polymarket bridge /withdraw returned HTTP ${response.status}: ${await response.text().catch(() => "")}`);
+  }
+  const body = (await response.json()) as Partial<BridgeDepositAddresses>;
+  if (!body.evm) throw new Error("Polymarket bridge /withdraw response had no evm address.");
+  return body as BridgeDepositAddresses;
+}
+
 export type BridgeTransactionStatus = "DEPOSIT_DETECTED" | "PROCESSING" | "ORIGIN_TX_CONFIRMED" | "SUBMITTED" | "COMPLETED" | "FAILED";
 
 export type BridgeTransaction = {
