@@ -18,10 +18,21 @@ import { prisma } from "@/lib/prisma";
  */
 export const maxDuration = 300;
 
+/**
+ * Accepts either the shared CRON_SECRET (Vercel Cron + the other GCP Scheduler jobs) or a
+ * dedicated MARKET_WATCHER_CRON_SECRET scoped to just the always-on market-watcher worker. Two
+ * secrets rather than reusing the shared one: the watcher runs on different infrastructure
+ * (Cloud Run, not this app's own deploy) that this codebase doesn't fully control the same way,
+ * so if that secret ever needs rotating, it shouldn't force touching Vercel Cron and every other
+ * GCP Scheduler job at the same time — only the one thing that actually needs it.
+ */
 function isAuthorized(request: Request): boolean {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) return false;
-  return constantTimeEqual(request.headers.get("authorization") ?? "", `Bearer ${secret}`);
+  const provided = request.headers.get("authorization") ?? "";
+  const cronSecret = process.env.CRON_SECRET;
+  if (cronSecret && constantTimeEqual(provided, `Bearer ${cronSecret}`)) return true;
+  const marketWatcherSecret = process.env.MARKET_WATCHER_CRON_SECRET;
+  if (marketWatcherSecret && constantTimeEqual(provided, `Bearer ${marketWatcherSecret}`)) return true;
+  return false;
 }
 
 // Arbitrary fixed key for this job's Postgres advisory lock — just needs to be unique among any
