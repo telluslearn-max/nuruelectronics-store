@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { filterAndRankCandidates, toScoringView } from "./candidate-filter";
+import { filterAndRankCandidates } from "./candidate-filter";
 import type { PolymarketMarketSummary } from "./polymarket-client";
 
 const NOW = new Date("2026-08-20T12:00:00Z");
@@ -125,9 +125,37 @@ describe("filterAndRankCandidates", () => {
 
     const result = filterAndRankCandidates([...hourly, ...later], { now: NOW, limit: 12 });
     expect(result.candidates).toHaveLength(12);
-    const longerCount = result.candidates.filter((c) => c.hoursToResolution > 6).length;
-    // Without the horizon reservation, pure volume ranking would have returned zero of these.
-    expect(longerCount).toBe(4);
+    // Pure volume ranking would have returned zero of these — the hourly markets outrank them by
+    // three orders of magnitude. Asserted as "every one that existed got in" rather than a fixed
+    // count, so re-weighting the buckets doesn't read as a broken test.
+    const longer = result.candidates.filter((c) => c.hoursToResolution > 6);
+    expect(longer).toHaveLength(later.length);
+  });
+
+  it("no longer hands most of the slate to markets resolving within hours", () => {
+    // The near bucket used to reserve 30% of the slate for markets the scoring prompt itself
+    // calls close to unpredictable, so those slots could never produce a trade. Against a live
+    // 72h window that was 16 of 48 slots. Pinned as a ceiling: the exact share can be retuned,
+    // but the near bucket must never again be the largest claim on the slate.
+    //
+    // All three horizons are populated on purpose. With the far bucket empty the top-up below
+    // the buckets refills the slate from raw volume — which is the intended behaviour (an empty
+    // bucket should cost diversity, not slate size) but it hands those spare slots straight back
+    // to the hourly markets, so a fixture missing a horizon tests the fallback, not the split.
+    const hourly = Array.from({ length: 40 }, (_, i) =>
+      market({ conditionId: `hourly-${i}`, volume24hr: 1_000_000 - i, endDate: new Date(NOW.getTime() + 1 * 3_600_000) }),
+    );
+    const mid = Array.from({ length: 40 }, (_, i) =>
+      market({ conditionId: `mid-${i}`, volume24hr: 5_000 - i, endDate: new Date(NOW.getTime() + 12 * 3_600_000) }),
+    );
+    const far = Array.from({ length: 40 }, (_, i) =>
+      market({ conditionId: `far-${i}`, volume24hr: 4_000 - i, endDate: new Date(NOW.getTime() + 48 * 3_600_000) }),
+    );
+
+    const candidates = filterAndRankCandidates([...hourly, ...mid, ...far], { now: NOW, limit: 40 }).candidates;
+    const nearCount = candidates.filter((c) => c.hoursToResolution <= 6).length;
+    expect(nearCount).toBeLessThanOrEqual(Math.floor(40 * 0.15));
+    expect(candidates.length - nearCount).toBeGreaterThan(nearCount * 3);
   });
 
   it("never returns more than the limit", () => {
@@ -136,18 +164,5 @@ describe("filterAndRankCandidates", () => {
   });
 });
 
-describe("toScoringView", () => {
-  it("exposes exactly the fields that should bear on a probability estimate", () => {
-    const [candidate] = filterAndRankCandidates([market({ conditionId: "a", description: "Resolves YES if..." })], { now: NOW }).candidates;
-    const view = toScoringView(candidate);
-    expect(view).toMatchObject({
-      marketId: "a",
-      category: "crypto",
-      liquidityUsd: 5_000,
-      volume24hUsd: 10_000,
-      resolutionCriteria: "Resolves YES if...",
-    });
-    expect(view.outcomes).toHaveLength(2);
-    expect(view.outcomes[0]).toMatchObject({ outcome: "Yes", marketPrice: 0.55 });
-  });
-});
+// The model-facing projection of a screened market moved to scoring-slate.ts, and
+// is covered by scoring-slate.test.ts — including the fields asserted here before.

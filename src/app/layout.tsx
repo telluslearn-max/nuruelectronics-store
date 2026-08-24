@@ -45,6 +45,14 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   themeColor: "#0a0a0a",
   viewportFit: "cover",
+  // Next.js only fills these in when there's no `viewport` export at all — once you add one
+  // (themeColor/viewportFit above), it replaces the default rather than merging with it, so
+  // width/initialScale have to be spelled out here too. Missing them meant every page (including
+  // the content-heavy admin reports) rendered at the desktop-ish default viewport width and got
+  // shrunk to fit, forcing a pinch-zoom-out to read anything — not specific to Capital Circle,
+  // just most noticeable there.
+  width: "device-width",
+  initialScale: 1,
 };
 
 const WHATSAPP_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER;

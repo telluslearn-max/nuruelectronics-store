@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { requireAdminSession } from "@/lib/admin-auth";
 import {
+  getCapitalCircleCycleStatus,
   getCapitalCircleIntelligenceReport,
   getCapitalCircleReport,
   getCapitalCircleWallets,
@@ -9,9 +10,11 @@ import {
 } from "@/lib/reports/capital-circle";
 import { confirmSweep } from "@/lib/capital-circle/sweep-actions";
 import { clearCapitalCirclePause } from "@/lib/capital-circle/wallet-actions";
-import { formatPrice } from "@/lib/format";
+import { isPushConfigured } from "@/lib/push";
+import { formatPrice, formatEatDate, formatEatDateTime } from "@/lib/format";
 import { FeedbackBanner } from "@/components/admin/feedback-banner";
 import { PushSubscribeButton } from "@/components/admin/push-subscribe-button";
+import { ScanStatus } from "@/components/admin/scan-status";
 import { WalletSection } from "./wallet-section";
 
 export const metadata: Metadata = { title: "Capital Circle" };
@@ -114,7 +117,7 @@ function IntelligenceSection({ report, pausedWalletId }: { report: CapitalCircle
           <div className="font-medium">Trading is paused</div>
           <p className="mt-1">{report.circuitBreaker.reason}</p>
           <p className="mt-1 text-xs text-red-700">
-            Since {report.circuitBreaker.since?.toLocaleString() ?? "unknown"}. Look at why the losses happened before resuming —
+            Since {report.circuitBreaker.since ? formatEatDateTime(report.circuitBreaker.since) : "unknown"}. Look at why the losses happened before resuming —
             the pause exists because a losing run and a broken thesis generator look identical from the inside.
           </p>
           {pausedWalletId && (
@@ -159,6 +162,40 @@ function IntelligenceSection({ report, pausedWalletId }: { report: CapitalCircle
         </p>
       ) : (
         <>
+          {report.inversion.inverted && (
+            // Placed above the scores rather than beside them: if this is showing, the numbers
+            // below are measuring something other than what they claim to, and tuning any
+            // threshold against them makes the desk worse rather than better.
+            <div className="mt-3 rounded-card border border-red-300 bg-red-50 p-4">
+              <div className="text-xs font-medium uppercase tracking-wide text-red-800">
+                Integrity failure — read before the scores below
+              </div>
+              <p className="mt-1 text-sm text-red-900">
+                {(report.inversion.invertedShare * 100).toFixed(0)}% of {report.inversion.sampleCount} off-centre scored
+                predictions fit the flipped assignment better than the one
+                they were recorded against. That is the signature of probabilities scored against the wrong outcome of a market,
+                not of a badly calibrated forecaster — so the Brier score, the skill score and the threshold table below are all
+                describing the wrong thing.
+              </p>
+              <p className="mt-2 text-xs text-red-800">
+                Trading trust is pinned to its floor while this holds. Run{" "}
+                <code className="rounded bg-red-100 px-1 py-0.5">npx tsx scripts/audit-capital-circle-integrity.ts</code> to
+                separate a settlement-labeling fault from a scoring-stage mis-pairing before changing any threshold.
+              </p>
+            </div>
+          )}
+
+          {calibration.passthroughShare != null && calibration.passthroughShare >= 0.5 && (
+            <div className="mt-3 rounded-card border border-amber-300 bg-amber-50 p-4">
+              <div className="text-xs font-medium uppercase tracking-wide text-amber-800">No independent forecast</div>
+              <p className="mt-1 text-sm text-amber-900">
+                {(calibration.passthroughShare * 100).toFixed(0)}% of scored predictions were the market price the model was
+                shown, returned unchanged. Those measure the market rather than the model: edge on them is −costs by
+                construction, so no threshold setting can produce a trade from them.
+              </p>
+            </div>
+          )}
+
           <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div className="rounded-card border border-border-subtle p-4">
               <div className="text-xs text-neutral-500">Brier score ({calibration.sampleCount} scored)</div>
@@ -198,31 +235,54 @@ function IntelligenceSection({ report, pausedWalletId }: { report: CapitalCircle
           )}
 
           {calibration.buckets.length > 0 && (
-            <div className="mt-4 overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-left text-xs uppercase tracking-wide text-neutral-400">
-                    <th className="py-2 pr-4 font-medium">Said</th>
-                    <th className="py-2 pr-4 font-medium">Actually happened</th>
-                    <th className="py-2 pr-4 font-medium">Gap</th>
-                    <th className="py-2 font-medium">n</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {calibration.buckets.map((bucket) => (
-                    <tr key={bucket.label} className="border-t border-border-subtle">
-                      <td className="py-2 pr-4 tabular-nums">{bucket.label}</td>
-                      <td className="py-2 pr-4 tabular-nums">{(bucket.actualRate * 100).toFixed(0)}%</td>
-                      <td className={`py-2 pr-4 tabular-nums ${Math.abs(bucket.gap) > 0.15 ? "text-red-700" : "text-neutral-600"}`}>
+            <>
+              {/* Cards on mobile — a 4-column table forced into overflow-x-auto is a sideways-scroll
+                  puzzle on a phone; the same data reads at a glance stacked. */}
+              <div className="mt-4 space-y-2 sm:hidden">
+                {calibration.buckets.map((bucket) => (
+                  <div key={bucket.label} className="rounded-card border border-border-subtle p-3 text-sm">
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium tabular-nums">Said {bucket.label}</span>
+                      <span className="text-xs text-neutral-400">n={bucket.count}</span>
+                    </div>
+                    <div className="mt-1.5 flex items-center justify-between text-xs">
+                      <span className="text-neutral-500">
+                        Actually happened <span className="tabular-nums text-neutral-700">{(bucket.actualRate * 100).toFixed(0)}%</span>
+                      </span>
+                      <span className={`tabular-nums font-medium ${Math.abs(bucket.gap) > 0.15 ? "text-red-700" : "text-neutral-500"}`}>
                         {bucket.gap > 0 ? "+" : ""}
-                        {(bucket.gap * 100).toFixed(0)}
-                      </td>
-                      <td className="py-2 tabular-nums text-neutral-500">{bucket.count}</td>
+                        {(bucket.gap * 100).toFixed(0)} gap
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-4 hidden overflow-x-auto sm:block">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-xs uppercase tracking-wide text-neutral-400">
+                      <th className="py-2 pr-4 font-medium">Said</th>
+                      <th className="py-2 pr-4 font-medium">Actually happened</th>
+                      <th className="py-2 pr-4 font-medium">Gap</th>
+                      <th className="py-2 font-medium">n</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {calibration.buckets.map((bucket) => (
+                      <tr key={bucket.label} className="border-t border-border-subtle">
+                        <td className="py-2 pr-4 tabular-nums">{bucket.label}</td>
+                        <td className="py-2 pr-4 tabular-nums">{(bucket.actualRate * 100).toFixed(0)}%</td>
+                        <td className={`py-2 pr-4 tabular-nums ${Math.abs(bucket.gap) > 0.15 ? "text-red-700" : "text-neutral-600"}`}>
+                          {bucket.gap > 0 ? "+" : ""}
+                          {(bucket.gap * 100).toFixed(0)}
+                        </td>
+                        <td className="py-2 tabular-nums text-neutral-500">{bucket.count}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
           )}
 
           {report.categories.filter((category) => category.count >= 5).length > 0 && (
@@ -247,7 +307,50 @@ function IntelligenceSection({ report, pausedWalletId }: { report: CapitalCircle
             this isn&apos;t filtered by its own judgement. Read the trade count alongside the return: a setting that traded twice
             proves nothing, and a setting that only works at one exact threshold is fitted to noise.
           </p>
-          <div className="mt-3 overflow-x-auto">
+          {report.policyEvaluation && (
+            // The ranked table is a search, and the top row is picked partly for its luck. This is
+            // the same search scored on markets it had no hand in choosing, which is the only line
+            // here anyone should act on — it sits above the table for that reason.
+            <div className="mt-3 rounded-card border border-border-subtle bg-neutral-50 p-4">
+              <div className="text-xs font-medium uppercase tracking-wide text-neutral-500">Held out of sample</div>
+              <p className="mt-1 text-sm text-neutral-700">{report.policyEvaluation.caveat}</p>
+            </div>
+          )}
+          {/* Cards on mobile — 6 columns has no honest table layout under ~400px; the same numbers
+              read at a glance stacked, with the one that matters (return) up top. */}
+          <div className="mt-3 space-y-2 sm:hidden">
+            {report.policySweep.map((outcome) => (
+              <div key={`${outcome.params.minEdge}-${outcome.params.lambda}`} className="rounded-card border border-border-subtle p-3 text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="font-medium tabular-nums">
+                    edge {outcome.params.minEdge} · λ {outcome.params.lambda}
+                  </span>
+                  <span
+                    className={`tabular-nums font-medium ${
+                      outcome.returnOnStake == null ? "" : outcome.returnOnStake >= 0 ? "text-green-700" : "text-red-700"
+                    }`}
+                  >
+                    {outcome.returnOnStake != null ? `${(outcome.returnOnStake * 100).toFixed(1)}%` : "—"}
+                  </span>
+                </div>
+                <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
+                  <div>
+                    <div className="text-neutral-400">Trades</div>
+                    <div className="tabular-nums text-neutral-700">{outcome.tradeCount}</div>
+                  </div>
+                  <div>
+                    <div className="text-neutral-400">Win rate</div>
+                    <div className="tabular-nums text-neutral-700">{outcome.tradeCount > 0 ? `${(outcome.winRate * 100).toFixed(0)}%` : "—"}</div>
+                  </div>
+                  <div>
+                    <div className="text-neutral-400">Staked</div>
+                    <div className="tabular-nums text-neutral-700">{formatPrice(outcome.stakedUsd.toFixed(2), "USD")}</div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="mt-3 hidden overflow-x-auto sm:block">
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-xs uppercase tracking-wide text-neutral-400">
@@ -291,7 +394,7 @@ function IntelligenceSection({ report, pausedWalletId }: { report: CapitalCircle
             {report.recentCycles.map((cycle) => (
               <li key={cycle.id} className="rounded-card border border-border-subtle p-3 text-sm">
                 <div className="flex flex-wrap items-center gap-2 text-xs text-neutral-500">
-                  <span className="tabular-nums">{cycle.startedAt.toLocaleString()}</span>
+                  <span className="tabular-nums">{formatEatDateTime(cycle.startedAt)}</span>
                   <StatusPill status={cycle.action} />
                   <span>{cycle.candidateCount} candidates</span>
                   {cycle.hadNews && <span className="text-neutral-400">news grounded</span>}
@@ -312,11 +415,12 @@ export default async function CapitalCirclePage({
   searchParams: Promise<{ success?: string; error?: string }>;
 }) {
   await requireAdminSession();
-  const [report, pendingSweeps, wallets, intelligence] = await Promise.all([
+  const [report, pendingSweeps, wallets, intelligence, cycleStatus] = await Promise.all([
     getCapitalCircleReport(),
     getPendingSweeps(),
     getCapitalCircleWallets(),
     getCapitalCircleIntelligenceReport(),
+    getCapitalCircleCycleStatus(),
   ]);
   const { success, error } = await searchParams;
 
@@ -333,17 +437,19 @@ export default async function CapitalCirclePage({
       </p>
 
       <div
-        className={`mt-4 inline-flex items-center gap-2 rounded-control border px-3 py-2 text-sm ${
+        className={`mt-4 flex items-center gap-2 rounded-card border p-4 text-sm ${
           report.live ? "border-green-200 bg-green-50 text-green-800" : "border-border-subtle text-neutral-600"
         }`}
       >
-        <span className={`h-2 w-2 rounded-full ${report.live ? "bg-green-500" : "bg-neutral-400"}`} />
+        <span className={`h-2 w-2 shrink-0 rounded-full ${report.live ? "bg-green-500" : "bg-neutral-400"}`} />
         {report.live
           ? "Live — a configured Circle wallet can execute real orders."
           : "Simulation mode — no Circle wallet configured yet. Real markets, real reasoning, no real funds."}
       </div>
 
-      <PushSubscribeButton />
+      <ScanStatus status={cycleStatus} />
+
+      <PushSubscribeButton serverConfigured={isPushConfigured} />
 
       <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className="rounded-card border border-border-subtle p-4">
@@ -394,7 +500,7 @@ export default async function CapitalCirclePage({
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="font-medium">{p.question}</div>
                   <div className="flex shrink-0 items-center gap-2">
-                    <StatusPill status={p.status} />
+                    <StatusPill status={p.exitReason === "take_profit" || p.exitReason === "stop" ? "exited" : p.status} />
                     {p.status !== "rejected" &&
                       (p.resolvedAt && p.resultUsd != null ? <ResultBadge resultUsd={p.resultUsd} /> : <LiveBadge />)}
                   </div>
@@ -415,10 +521,8 @@ export default async function CapitalCirclePage({
                 </div>
 
                 <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-neutral-400">
-                  <span>{p.createdAt.toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })}</span>
-                  {p.resolvedAt && (
-                    <span>resolved {p.resolvedAt.toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })}</span>
-                  )}
+                  <span>{formatEatDateTime(p.createdAt)}</span>
+                  {p.resolvedAt && <span>resolved {formatEatDateTime(p.resolvedAt)}</span>}
                   {p.txHash && <span className="font-mono">{p.txHash}</span>}
                 </div>
               </li>
@@ -448,7 +552,7 @@ export default async function CapitalCirclePage({
               <li key={sweep.id} className="rounded-card border border-border-subtle p-4">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="font-medium">
-                    Week of {sweep.weekStart.toLocaleDateString("en-US", { dateStyle: "medium" })}
+                    Week of {formatEatDate(sweep.weekStart)}
                   </div>
                   <span className="inline-flex items-center rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-700">
                     pending
@@ -461,7 +565,7 @@ export default async function CapitalCirclePage({
                 {sweep.detectedUsdcAmount != null && (
                   <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700">
                     {formatPrice(sweep.detectedUsdcAmount.toFixed(2), "USD")} USDC detected — landed{" "}
-                    {sweep.detectedAt?.toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })}
+                    {sweep.detectedAt && formatEatDateTime(sweep.detectedAt)}
                   </p>
                 )}
                 <form action={confirmSweep.bind(null, sweep.id)} className="mt-3 flex flex-wrap items-end gap-3">

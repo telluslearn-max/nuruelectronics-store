@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { requireAdminSession } from "@/lib/admin-auth";
 import { getWeeklyComparisonReport } from "@/lib/reports/capital-circle";
-import { formatPrice } from "@/lib/format";
+import { formatEatDate, formatPrice } from "@/lib/format";
 import { moneyColorClass } from "@/components/admin/money-colors";
 
 export const metadata: Metadata = { title: "Capital Circle Performance" };
@@ -24,7 +24,40 @@ export default async function CapitalCirclePerformancePage() {
         or shut the pot down. Trailing 8 weeks, most recent first.
       </p>
 
-      <div className="mt-6 overflow-x-auto">
+      {/* Cards on mobile — 5 columns with a min-w-[720px] floor was a guaranteed sideways scroll
+          on any phone (max ~430px wide), not just a cramped one. The table itself is untouched
+          and still renders as-is at sm:+. */}
+      <div className="mt-6 space-y-2 sm:hidden">
+        {rows.map((row) => (
+          <div key={row.weekStart.toISOString()} className="rounded-card border border-border-subtle p-3 text-sm">
+            <div className="flex items-center justify-between">
+              <span className="font-medium tabular-nums">{formatEatDate(row.weekStart)}</span>
+              <span className="text-xs text-neutral-400">{SWEEP_STATUS_LABEL[row.sweepStatus]}</span>
+            </div>
+            <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
+              <div>
+                <div className="text-neutral-400">Core business profit</div>
+                <div className={`tabular-nums ${moneyColorClass(row.corePnlUsd)}`}>{formatPrice(row.corePnlUsd.toFixed(2), "USD")}</div>
+              </div>
+              <div>
+                <div className="text-neutral-400">Swept to Circle</div>
+                <div className="tabular-nums text-neutral-700">{formatPrice(row.sweptUsd.toFixed(2), "USD")}</div>
+              </div>
+              <div>
+                <div className="text-neutral-400">AI pot result (realized)</div>
+                <div className={`tabular-nums ${moneyColorClass(row.aiPositionsResultUsd)}`}>
+                  {formatPrice(row.aiPositionsResultUsd.toFixed(2), "USD")}
+                </div>
+              </div>
+              <div>
+                <div className="text-neutral-400">AI pot open exposure</div>
+                <div className="tabular-nums text-neutral-700">{formatPrice(row.aiPositionsOpenUsd.toFixed(2), "USD")}</div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="mt-6 hidden overflow-x-auto sm:block">
         <table className="w-full min-w-[720px] text-sm tabular-nums">
           <thead>
             <tr className="border-b border-border-subtle text-left text-xs text-neutral-500">
@@ -39,7 +72,7 @@ export default async function CapitalCirclePerformancePage() {
             {rows.map((row) => (
               <tr key={row.weekStart.toISOString()} className="border-b border-border-subtle/60">
                 <td className="py-2">
-                  <div>{row.weekStart.toLocaleDateString("en-US", { dateStyle: "medium" })}</div>
+                  <div>{formatEatDate(row.weekStart)}</div>
                   <div className="text-xs text-neutral-400">{SWEEP_STATUS_LABEL[row.sweepStatus]}</div>
                 </td>
                 <td className={`py-2 text-right ${moneyColorClass(row.corePnlUsd)}`}>

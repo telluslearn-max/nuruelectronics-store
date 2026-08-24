@@ -3,7 +3,7 @@ import type { FunctionDeclaration } from "@google/genai";
 import { sizePosition } from "./sizing-tool";
 import { recordPosition, type RecordPositionInput } from "./executor-tool";
 import { getOrderBookSummary, getPricesHistoryForModel } from "./polymarket-client";
-import { payForResource } from "./x402-pay";
+import { payForResource, approvedCategories } from "./x402-pay";
 import { logAdminAction } from "../audit-log";
 
 /**
@@ -78,14 +78,24 @@ const recordPositionDeclaration: FunctionDeclaration = {
   },
 };
 
+/**
+ * Categories listed in the description (not just "an allowlist exists") so the model knows what
+ * kind of paid service is actually worth reaching for, without being able to name a host itself —
+ * every host still has to already be on X402_ALLOWED_HOSTS; this only tells the model what's there.
+ */
+const approvedCategoriesText = (() => {
+  const categories = approvedCategories();
+  return categories.length > 0 ? `Approved categories right now: ${categories.join(", ")}.` : "No categories are currently approved — this tool will always refuse.";
+})();
+
 const fetchPaidMarketDataDeclaration: FunctionDeclaration = {
   name: "fetch_paid_market_data",
   description:
-    "Fetch data from a paid market-intelligence service via x402 (pay-per-call USDC), for services the app has explicitly allowlisted. Use this when public Polymarket data alone isn't enough to check a thesis. Calling a non-allowlisted URL or exceeding the per-call price cap fails with a clear error — never invent data in place of a failed call.",
+    `Fetch data from a paid market-intelligence service via x402 (pay-per-call USDC), for services the app has explicitly allowlisted under an approved category. ${approvedCategoriesText} Use this when public Polymarket data alone isn't enough to check a thesis. Calling a non-allowlisted URL, or exceeding that category's per-call price cap, fails with a clear error — never invent data in place of a failed call.`,
   parametersJsonSchema: {
     type: "object",
     properties: {
-      url: { type: "string", description: "Full URL of the paid endpoint to call. Must be on the app's X402_ALLOWED_HOSTS allowlist." },
+      url: { type: "string", description: "Full URL of the paid endpoint to call. Must be on the app's X402_ALLOWED_HOSTS allowlist, under one of the approved categories named above." },
     },
     required: ["url"],
   },
@@ -115,6 +125,12 @@ export type ApprovedTrade = {
   question: string;
   /** Optional ceiling. Null means "no ceiling beyond the pool's own caps". */
   sizeUsd: number | null;
+  /**
+   * The confidence-adjusted λ this specific trade was selected at (see disagreementAdjustedLambda).
+   * Falls back to the cycle-wide λ when absent. Present so record_position's independent re-price
+   * applies the same trust level that approved the trade rather than the more generous global one.
+   */
+  lambda?: number;
   eventId: string | null;
   category: string | null;
   marketEndDate: Date | null;
@@ -179,7 +195,7 @@ export async function dispatchTool(
         thesis,
         sizeUsd: typeof args.sizeUsd === "number" ? args.sizeUsd : (approved.sizeUsd ?? undefined),
         confidencePct,
-        lambda: context.lambda,
+        lambda: approved.lambda ?? context.lambda,
         minEdge: context.minEdge,
         eventId: approved.eventId,
         category: approved.category,

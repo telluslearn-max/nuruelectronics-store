@@ -20,10 +20,13 @@ type Status = "checking" | "unsupported" | "unconfigured" | "subscribed" | "unsu
 
 /** Whether this browser can even attempt push — only meaningful once actually running client-side
  * (checked from an effect, never during render), since `navigator`/`window` don't exist on the
- * server. */
-function supportStatus(): "unconfigured" | "unsupported" | "ok" {
+ * server. Checking Notification.permission here (not just service worker support) means a
+ * browser-level "denied" from a previous visit is recognized up front, instead of only being
+ * discovered by calling requestPermission() again and getting the same answer silently. */
+function supportStatus(): "unconfigured" | "unsupported" | "ok" | "denied" {
   if (!VAPID_PUBLIC_KEY) return "unconfigured";
   if (!("serviceWorker" in navigator) || !("PushManager" in window)) return "unsupported";
+  if (typeof Notification !== "undefined" && Notification.permission === "denied") return "denied";
   return "ok";
 }
 
@@ -35,7 +38,7 @@ function supportStatus(): "unconfigured" | "unsupported" | "ok" {
  * Renders null until mounted, always — the server can't evaluate supportStatus() at all (no
  * navigator/window), so the only hydration-safe first paint is the same "nothing yet" on both
  * sides. Anything status-specific only appears after the client has actually mounted and checked. */
-export function PushSubscribeButton() {
+export function PushSubscribeButton({ serverConfigured }: { serverConfigured: boolean }) {
   const [mounted, setMounted] = useState(false);
   const [status, setStatus] = useState<Status>("checking");
   const [error, setError] = useState<string | null>(null);
@@ -110,6 +113,25 @@ export function PushSubscribeButton() {
     }
   }
 
+  // Browsers require a real user gesture before they'll show the permission prompt at all — a
+  // bare useEffect calling requestPermission() on mount is reliably ignored or auto-denied by
+  // Chrome/Firefox/Safari's abuse heuristics, which would make "on by default" actively worse
+  // (a silent, hard-to-reverse "denied" instead of a working toggle). This is the honest
+  // approximation instead: the *first* click or keypress anywhere on the page — not necessarily
+  // this toggle — counts as that gesture and fires the same subscribe() flow immediately. On an
+  // internal, single-admin tool the person experiencing this is the same person who asked for
+  // it, which is what separates this from the dark-pattern version of the same technique.
+  useEffect(() => {
+    if (status !== "unsubscribed") return;
+    const trigger = () => subscribe();
+    document.addEventListener("pointerdown", trigger, { once: true });
+    document.addEventListener("keydown", trigger, { once: true });
+    return () => {
+      document.removeEventListener("pointerdown", trigger);
+      document.removeEventListener("keydown", trigger);
+    };
+  }, [status]);
+
   if (status === "checking") return null;
 
   const disabled = status === "unconfigured" || status === "unsupported";
@@ -135,11 +157,29 @@ export function PushSubscribeButton() {
           </p>
         )}
         {status === "unsupported" && <p className="mt-1 text-xs text-neutral-500">This browser doesn&apos;t support push notifications.</p>}
+        {status === "unsubscribed" && (
+          <p className="mt-1 text-xs text-neutral-500">
+            Turns on the moment you click anywhere on this page — or flip it here directly.
+          </p>
+        )}
         {status === "denied" && (
           <p className="mt-1 text-xs text-red-600">Blocked in your browser&apos;s site settings — allow notifications there, then try again.</p>
         )}
+        {/* The browser only knows its own NEXT_PUBLIC_VAPID_PUBLIC_KEY, so it can show
+            "subscribed" while the server-side VAPID_PRIVATE_KEY is missing and every send
+            silently no-ops — from here that looks identical to "notifications just don't
+            arrive." Surface the server's own view so that state isn't invisible. */}
+        {status === "subscribed" && !serverConfigured && (
+          <p className="mt-1 text-xs text-red-600">
+            Subscribed here, but the server can&apos;t send yet — <code className="rounded bg-red-50 px-1 py-0.5">VAPID_PRIVATE_KEY</code> is
+            missing or doesn&apos;t match. Nothing will arrive until that&apos;s fixed.
+          </p>
+        )}
         {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
       </div>
+      {/* The button is the tap target (44px, a real touch-target minimum); the pill inside it is
+          the visual toggle, unchanged from before — padding the hit area rather than growing the
+          pill itself keeps the existing, already-reviewed look exactly as it was. */}
       <button
         type="button"
         role="switch"
@@ -147,13 +187,13 @@ export function PushSubscribeButton() {
         aria-label="Notify me when a position is taken"
         disabled={disabled}
         onClick={toggle}
-        className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
-          disabled ? "cursor-not-allowed bg-neutral-100" : on ? "bg-foreground" : "bg-neutral-200"
-        }`}
+        className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-control ${disabled ? "cursor-not-allowed" : ""}`}
       >
-        <span
-          className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${on ? "translate-x-5" : "translate-x-0"}`}
-        />
+        <span className={`relative h-6 w-11 rounded-full transition-colors ${disabled ? "bg-neutral-100" : on ? "bg-foreground" : "bg-neutral-200"}`}>
+          <span
+            className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${on ? "translate-x-5" : "translate-x-0"}`}
+          />
+        </span>
       </button>
     </div>
   );

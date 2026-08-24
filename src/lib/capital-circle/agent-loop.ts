@@ -7,17 +7,30 @@ import {
   ENSEMBLE_MAX_DISAGREEMENT,
   ENSEMBLE_SAMPLES,
   ENSEMBLE_TEMPERATURE,
+  EXTREMIZE_FACTOR,
+  KELLY_SHRINKAGE,
   MAX_POSITIONS_PER_CYCLE,
   MAX_TOOL_ITERATIONS,
+  MIN_EDGE,
+  SHOW_MARKET_PRICE_TO_MODEL,
   THINKING_BUDGET,
 } from "./config";
 import { getGenAIClient, isCapitalCircleConfigured } from "./vertex-client";
 import { buildDeepDiveSystemInstruction, buildNewsSearchPrompt, buildScoringSystemInstruction } from "./system-prompt";
 import { dispatchTool, functionDeclarations, logCandidateSlate, type ApprovedTrade, type ToolContext } from "./tools";
 import { listActivePolymarketMarkets } from "./polymarket-client";
-import { filterAndRankCandidates, toScoringView, type ScreenedMarket } from "./candidate-filter";
-import { ensembleProbabilities, type ProbabilitySample } from "./ensemble";
-import { selectTrades, type SelectionCandidate } from "./trade-policy";
+import { filterAndRankCandidates, type ScreenedMarket } from "./candidate-filter";
+import {
+  buildScoringSlate,
+  describeResolutionIssues,
+  mergeResolutions,
+  resolveScoringEstimates,
+  type ScoringSlate,
+  type SlateResolution,
+} from "./scoring-slate";
+import { checkComplementCoherence, describeCoherence } from "./estimate-integrity";
+import { ensembleProbabilities, extremizeEstimates, measureMarketAnchoring, type ProbabilitySample } from "./ensemble";
+import { requiredDeviation, selectTrades, type SelectionCandidate } from "./trade-policy";
 import { getTrackRecord, getTradingUrgency, renderTrackRecordForPrompt } from "./track-record";
 
 export type CapitalCircleCycleResult = {
@@ -124,7 +137,10 @@ export async function runCapitalCircleCycle(): Promise<CapitalCircleCycleResult>
   const newsContext = await fetchNewsContext(screened.candidates.map((market) => market.question));
 
   // --- C. Score ------------------------------------------------------------
-  const scoringViews = screened.candidates.map(toScoringView);
+  // Outcomes are addressed by short refs the model echoes back with the outcome's
+  // own name, which code verifies — see scoring-slate.ts for why identity here is
+  // structural rather than trusted.
+  const slate = buildScoringSlate(screened.candidates, { showMarketPrice: SHOW_MARKET_PRICE_TO_MODEL });
   const contextBlock = [
     trackRecord ? renderTrackRecordForPrompt(trackRecord) : null,
     newsContext ? `Recent news search results:\n${newsContext}` : null,
@@ -132,37 +148,108 @@ export async function runCapitalCircleCycle(): Promise<CapitalCircleCycleResult>
     .filter(Boolean)
     .join("\n\n");
 
-  const samples = await scoreCandidates(scoringViews, contextBlock);
+  const { samples, integrity } = await scoreCandidates(slate, contextBlock);
+  const integrityNote = describeResolutionIssues(integrity);
+  if (integrityNote) console.warn(`[capital-circle] ${integrityNote}`);
+
   if (samples.length === 0) {
     return finish(
-      { ran: true, summary: "The scoring pass returned no usable probabilities this cycle — no trade.", toolCallCount: 0 },
+      {
+        ran: true,
+        summary: `The scoring pass returned no usable probabilities this cycle — no trade.${integrityNote ? ` ${integrityNote}` : ""}`,
+        toolCallCount: 0,
+      },
       "error",
       { candidateCount: screened.candidates.length, contextSnapshot: trackRecord, newsContext },
     );
   }
 
-  const estimates = ensembleProbabilities(samples);
-  await persistSnapshots(cycle.id, screened.candidates, estimates);
+  const allEstimates = ensembleProbabilities(samples);
+
+  // Whether the model actually forecast anything, or just handed back the prices it was shown.
+  // Checked every cycle because the failure is silent everywhere else — see measureMarketAnchoring.
+  // Deliberately measured against the pre-extremization estimates: this is a diagnostic on what
+  // the model actually said, and transforming it first would blur the exact signal (byte-identical
+  // to the input price) the check exists to catch.
+  const marketPriceByToken = new Map<string, number>();
+  for (const market of screened.candidates) {
+    for (const token of market.tokens) marketPriceByToken.set(token.tokenId, token.price);
+  }
+  const anchoring = measureMarketAnchoring(allEstimates, marketPriceByToken);
+  const anchoringNote =
+    anchoring.compared > 0 && anchoring.share >= 0.9
+      ? ` The model returned the quoted market price on ${anchoring.copied} of ${anchoring.compared} outcomes, so it is not forecasting — edge is −costs by construction and no gate setting can produce a trade until that changes.`
+      : "";
+  if (anchoringNote) {
+    console.warn(`[capital-circle] scoring returned the market price on ${anchoring.copied}/${anchoring.compared} outcomes — no independent forecast this cycle.`);
+  }
+
+  // A market whose outcome probabilities don't sum to 1 is one the model contradicted itself
+  // about; those are barred from trading for the cycle. They are still persisted below — the
+  // snapshot table is the audit record of what the model actually said, and dropping the
+  // inconvenient rows from it would hide the fault rather than fix it. Quarantine rather than
+  // repair is deliberate (see estimate-integrity.ts's own comment) — an earlier version of this
+  // pipeline rescaled incoherent pairs back to sum 1 instead, which invents a belief the model
+  // never stated; quarantining and refusing to trade the market this hour is the more conservative
+  // choice and the one that survived here.
+  const questionByMarketId = new Map(screened.candidates.map((market) => [market.conditionId, market.question]));
+  const coherence = checkComplementCoherence(allEstimates, slate, questionByMarketId);
+  const coherenceNote = describeCoherence(coherence);
+  if (coherenceNote) console.warn(`[capital-circle] ${coherenceNote}`);
+
+  // Log-odds extremization corrects median-of-samples under-confidence (see its own comment in
+  // ensemble.ts / EXTREMIZE_FACTOR in config.ts). Applied after the coherence check (which reads
+  // the model's own raw numbers) but before persistence, so the snapshot — and therefore every
+  // future calibration/Brier measurement — reflects the same number the trade decision actually
+  // uses, rather than a pre-transform figure they'd silently disagree about once extremization is
+  // ever turned on. d=1 by default, so this is a no-op today.
+  const extremizedEstimates = extremizeEstimates(allEstimates, EXTREMIZE_FACTOR);
+  await persistSnapshots(cycle.id, screened.candidates, extremizedEstimates);
+
+  const estimates = extremizedEstimates.filter((estimate) => !coherence.quarantinedTokenIds.has(estimate.tokenId));
+
+  // A halted track record is the one condition that outranks everything else in the
+  // summary: it means the desk's own history describes something other than what it
+  // thinks it does, so "no trade" this hour is a deliberate stop rather than a thin market.
+  const haltNote = trackRecord?.shrinkage.halted ? ` HALTED: ${trackRecord.shrinkage.reason}` : "";
+  const diagnosticsNote = [anchoringNote.trim(), integrityNote, coherenceNote, haltNote.trim()]
+    .filter(Boolean)
+    .map((note) => ` ${note}`)
+    .join("");
 
   // --- D. Select -----------------------------------------------------------
   const selectionCandidates = buildSelectionCandidates(screened.candidates, estimates);
   const openPositions = trackRecord?.openPositions ?? [];
+  const categoryLambdas = trackRecord
+    ? Object.fromEntries(Object.entries(trackRecord.categoryShrinkage).map(([category, entry]) => [category, entry.lambda]))
+    : undefined;
   const selection = selectTrades({
     candidates: selectionCandidates,
     openMarketIds: new Set(openPositions.map((position) => position.marketId)),
     openEventIds: new Set(openPositions.map((position) => position.eventId).filter((id): id is string => Boolean(id))),
     maxPositions: MAX_POSITIONS_PER_CYCLE,
     lambda,
+    categoryLambdas,
     minEdge,
     maxDisagreement: ENSEMBLE_MAX_DISAGREEMENT,
   });
 
   if (selection.selected.length === 0) {
     const closest = [...selection.rejected].sort((a, b) => b.edge - a.edge)[0];
+    // A quiet hour has two very different causes that used to read identically: nothing good was
+    // on offer, or the bar itself has become unreachable because measured calibration dropped λ
+    // (see requiredDeviation). Naming the deviation the bar is actually demanding distinguishes
+    // "unlucky hour" from "this desk is switched off until calibration recovers".
+    const effectiveLambda = lambda ?? KELLY_SHRINKAGE;
+    const needed = requiredDeviation(minEdge ?? MIN_EDGE, effectiveLambda);
+    const barNote =
+      needed == null
+        ? `λ is 0, so no forecast can clear the bar at all.`
+        : `At λ=${effectiveLambda} the bar needs the model ${(needed * 100).toFixed(1)} points away from the market price${needed >= 0.15 ? " — a gap an honest forecast of a liquid market will essentially never produce, so this is calibration holding the desk back, not a thin hour" : ""}.`;
     return finish(
       {
         ran: true,
-        summary: `Priced ${estimates.length} outcomes across ${screened.candidates.length} markets; none cleared the ${(minEdge ?? 0).toFixed(4)} edge bar${urgency?.hungry ? " (already relaxed — " + urgency.reason + ")" : ""}. Closest was ${closest ? `edge ${closest.edge.toFixed(4)} — ${closest.reason}` : "not measurable"}. No trade this hour.`,
+        summary: `Priced ${estimates.length} outcomes across ${screened.candidates.length} markets; none cleared the ${(minEdge ?? 0).toFixed(4)} edge bar${urgency?.hungry ? " (already relaxed — " + urgency.reason + ")" : ""}. ${barNote} Closest was ${closest ? `edge ${closest.edge.toFixed(4)} — ${closest.reason}` : "not measurable"}.${diagnosticsNote} No trade this hour.`,
         toolCallCount: 0,
         candidateCount: screened.candidates.length,
         selectedCount: 0,
@@ -184,6 +271,9 @@ export async function runCapitalCircleCycle(): Promise<CapitalCircleCycleResult>
       // No ceiling from this stage — recordPosition derives the real size from the trade's
       // own edge and the pool's caps, which is strictly tighter than anything guessed here.
       sizeUsd: null,
+      // The trust level this trade was actually selected at, not the cycle-wide one — the
+      // executor's re-price must not be more generous than the gate that approved it.
+      lambda: trade.lambda,
       eventId: trade.eventId ?? null,
       category: trade.category ?? null,
       marketEndDate: market?.endDate ?? null,
@@ -208,7 +298,7 @@ export async function runCapitalCircleCycle(): Promise<CapitalCircleCycleResult>
   return finish(
     {
       ran: true,
-      summary: verification.summary,
+      summary: `${verification.summary}${diagnosticsNote}`,
       toolCallCount: verification.toolCallCount,
       candidateCount: screened.candidates.length,
       selectedCount: selection.selected.length,
@@ -255,6 +345,15 @@ async function fetchNewsContext(questions: string[]): Promise<string | null> {
 // Stage C — batch scoring with self-consistency
 // ---------------------------------------------------------------------------
 
+/**
+ * `outcome` is required, not optional, and that is the point of the schema.
+ *
+ * It is the field code checks the `ref` against — an estimate that cannot be
+ * verified against the outcome it claims to describe is exactly the case this
+ * pipeline stopped trusting. Making it optional would let the model quietly
+ * return the unverifiable shape whenever it was under output pressure, which is
+ * precisely when a mis-pairing is most likely.
+ */
 const scoringResponseSchema = {
   type: Type.OBJECT,
   properties: {
@@ -263,12 +362,12 @@ const scoringResponseSchema = {
       items: {
         type: Type.OBJECT,
         properties: {
-          marketId: { type: Type.STRING },
-          tokenId: { type: Type.STRING },
+          ref: { type: Type.STRING },
+          outcome: { type: Type.STRING },
           probability: { type: Type.NUMBER },
           rationale: { type: Type.STRING },
         },
-        required: ["marketId", "tokenId", "probability"],
+        required: ["ref", "outcome", "probability"],
       },
     },
   },
@@ -276,17 +375,49 @@ const scoringResponseSchema = {
 } as const;
 
 /**
+ * The scoring call returns one JSON estimate per outcome, so its output length scales with the
+ * slate. Estimates used to echo a 77-digit tokenId and a 66-character hex marketId, which
+ * tokenize badly enough that the identifiers alone cost roughly 70 tokens apiece before any
+ * content; they now carry a short ref and the outcome's name instead (see scoring-slate.ts),
+ * which is a large reduction in output pressure. The headroom below is kept regardless — it costs
+ * nothing unused, and truncation is the failure mode that silently drops candidates.
+ *
+ * This was set to 16_384 when CANDIDATE_LIMIT was widened, on the assumption that naming a limit
+ * was safer than inheriting one. It was the opposite: the model's own default is far higher, so
+ * the explicit value *lowered* the ceiling, and the first production cycles on the wider slate
+ * truncated mid-string at ~24.5k characters. All three ensemble samples failed to parse and the
+ * cycle recorded "no usable probabilities — no trade", which is strictly worse than the narrow
+ * slate it replaced.
+ *
+ * Pinned to Gemini 2.5 Flash's actual maximum, which is headroom of roughly 6x what the current
+ * slate needs. Note this budget is shared with thinking tokens (THINKING_BUDGET), so it is a
+ * ceiling on both, not on the JSON alone. parseScoringResponse also salvages whatever completed
+ * before a truncation point, so overflowing this degrades to a partial slate rather than a lost
+ * cycle.
+ */
+const SCORING_MAX_OUTPUT_TOKENS = 65_536;
+
+/**
  * Runs the scoring prompt ENSEMBLE_SAMPLES times at a non-zero temperature.
  * The samples are independent draws, so a market where the model is genuinely
  * uncertain produces visibly scattered numbers — which is information the
  * selection stage uses, not noise to be averaged away silently.
+ *
+ * Every sample is resolved back through the slate before it counts, so an
+ * estimate whose outcome label doesn't match the ref it arrived with never
+ * becomes a ProbabilitySample at all. The rejections are merged and returned
+ * alongside, because a slate that lost a third of its estimates to mis-pairing
+ * and one that priced cleanly are indistinguishable from the estimate list.
  */
-async function scoreCandidates(views: ReturnType<typeof toScoringView>[], contextBlock: string): Promise<ProbabilitySample[][]> {
+async function scoreCandidates(
+  slate: ScoringSlate,
+  contextBlock: string,
+): Promise<{ samples: ProbabilitySample[][]; integrity: Omit<SlateResolution, "estimates"> }> {
   const ai = getGenAIClient();
   const prompt = [
     contextBlock,
-    "Price every outcome in the following markets. Return one estimate per outcome token.",
-    JSON.stringify(views, null, 2),
+    "Price every outcome in the following markets. Return one estimate per outcome, each carrying the ref and the outcome name from the same line.",
+    JSON.stringify(slate.views, null, 2),
   ]
     .filter(Boolean)
     .join("\n\n");
@@ -301,6 +432,7 @@ async function scoreCandidates(views: ReturnType<typeof toScoringView>[], contex
           temperature: ENSEMBLE_TEMPERATURE,
           responseMimeType: "application/json",
           responseSchema: scoringResponseSchema as never,
+          maxOutputTokens: SCORING_MAX_OUTPUT_TOKENS,
           thinkingConfig: { thinkingBudget: THINKING_BUDGET },
         },
       }),
@@ -308,34 +440,90 @@ async function scoreCandidates(views: ReturnType<typeof toScoringView>[], contex
   );
 
   const samples: ProbabilitySample[][] = [];
+  const resolutions: SlateResolution[] = [];
   for (const run of runs) {
     if (run.status !== "fulfilled") {
       console.error("[capital-circle] a scoring sample failed:", run.reason);
       continue;
     }
-    const parsed = parseScoringResponse(run.value.text);
-    if (parsed.length > 0) samples.push(parsed);
+    const resolution = resolveScoringEstimates(parseScoringResponse(run.value.text), slate);
+    resolutions.push(resolution);
+    if (resolution.estimates.length > 0) samples.push(resolution.estimates);
   }
-  return samples;
+  return { samples, integrity: mergeResolutions(resolutions) };
 }
 
-function parseScoringResponse(text: string | undefined): ProbabilitySample[] {
+/**
+ * Pulls the estimate objects out of a response that stopped mid-flight.
+ *
+ * A truncated response is not a malformed one — everything before the cut is perfectly good, and
+ * the whole slate up to that point is exactly what the cycle needs. JSON.parse is all-or-nothing,
+ * so a single unterminated string at the tail used to discard every estimate that had already
+ * arrived, turning a long slate into a silent "the model had no opinion on anything".
+ *
+ * Walks the text tracking brace depth (string-aware, so braces inside a rationale don't count)
+ * and parses each object nested one level inside the root — the elements of the estimates array.
+ * The trailing partial object never closes, so it is simply never captured.
+ *
+ * Returns raw objects rather than validated estimates: whether an entry is usable depends on the
+ * slate it was priced against, and that check belongs in one place (resolveScoringEstimates) so
+ * the salvage path and the happy path can never disagree about what counts as a valid estimate.
+ */
+export function salvageScoringEstimates(text: string): Record<string, unknown>[] {
+  const objects: Record<string, unknown>[] = [];
+  let depth = 0;
+  let start = -1;
+  let inString = false;
+  let escaped = false;
+
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (char === "\\") escaped = true;
+      else if (char === '"') inString = false;
+      continue;
+    }
+    if (char === '"') {
+      inString = true;
+    } else if (char === "{") {
+      if (depth === 1) start = i;
+      depth++;
+    } else if (char === "}") {
+      depth--;
+      if (depth === 1 && start >= 0) {
+        try {
+          const parsed: unknown = JSON.parse(text.slice(start, i + 1));
+          if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+            objects.push(parsed as Record<string, unknown>);
+          }
+        } catch {
+          // One unparseable element shouldn't cost the rest of the slate.
+        }
+        start = -1;
+      }
+    }
+  }
+  return objects;
+}
+
+function parseScoringResponse(text: string | undefined): Record<string, unknown>[] {
   if (!text) return [];
   try {
     const parsed = JSON.parse(text) as { estimates?: unknown };
     if (!Array.isArray(parsed.estimates)) return [];
-    return parsed.estimates
-      .map((entry) => {
-        const record = entry as Record<string, unknown>;
-        return {
-          marketId: typeof record.marketId === "string" ? record.marketId : "",
-          tokenId: typeof record.tokenId === "string" ? record.tokenId : "",
-          probability: Number(record.probability),
-          rationale: typeof record.rationale === "string" ? record.rationale : undefined,
-        };
-      })
-      .filter((sample) => sample.marketId && sample.tokenId && Number.isFinite(sample.probability));
+    return parsed.estimates.filter(
+      (entry): entry is Record<string, unknown> => Boolean(entry) && typeof entry === "object" && !Array.isArray(entry),
+    );
   } catch (error) {
+    const salvaged = salvageScoringEstimates(text);
+    if (salvaged.length > 0) {
+      console.warn(
+        `[capital-circle] scoring response was truncated (${text.length} chars) — recovered ${salvaged.length} complete estimate(s) from it:`,
+        error instanceof Error ? error.message : error,
+      );
+      return salvaged;
+    }
     console.error("[capital-circle] could not parse a scoring response:", error);
     return [];
   }
@@ -397,6 +585,13 @@ async function persistSnapshots(
         hoursToResolution: market.hoursToResolution,
         modelProbability: estimate.probability,
         disagreement: estimate.disagreement,
+        // The two fields that make a snapshot self-describing after the fact. Without the
+        // outcome's own name a resolved row cannot be checked for the mis-pairing that
+        // scoring-slate.ts guards against, and without the price the model was actually shown
+        // there is no way to tell an estimate it reasoned to from one it copied — the whole
+        // difference between measuring the model and measuring the market.
+        outcomeLabel: token.outcome,
+        shownPrice: token.price,
       },
     ];
   });
@@ -457,7 +652,7 @@ async function runDeepDive(
       model: CAPITAL_CIRCLE_MODEL,
       contents,
       config: {
-        systemInstruction: buildDeepDiveSystemInstruction(urgency),
+        systemInstruction: buildDeepDiveSystemInstruction(urgency, toolContext.minEdge ?? MIN_EDGE),
         tools: [{ functionDeclarations }],
         toolConfig: { functionCallingConfig: { mode: FunctionCallingConfigMode.AUTO } },
         thinkingConfig: { thinkingBudget: THINKING_BUDGET },

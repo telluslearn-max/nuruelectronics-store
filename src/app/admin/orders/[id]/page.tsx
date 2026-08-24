@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireAdminSession } from "@/lib/admin-auth";
 import { formatPrice } from "@/lib/format";
+import { displayEmail } from "@/lib/customer-email";
 import { StatusPill } from "@/components/admin/status-pill";
 import { getShopifyOrderById } from "@/lib/shopify/admin-api";
 import { ConfirmPendingSubmitButton } from "@/components/admin/confirm-submit-button";
@@ -101,8 +102,16 @@ export default async function AdminOrderHubPage({
           {order.shopifyOrderName ?? `Manual order ${order.id.slice(0, 8)}`}
         </h2>
         <p className="mt-1 text-sm text-neutral-500">
-          {order.customer.name ?? order.customer.email} · {order.customer.email} · {formatDate(order.createdAt)} ·{" "}
-          {order.source}
+          {[
+            order.customer.name ?? displayEmail(order.customer.email) ?? order.customer.phone ?? "Customer",
+            // Only show email as a second segment if the name already took the primary slot —
+            // otherwise it would just repeat whatever the primary slot fell back to.
+            order.customer.name ? displayEmail(order.customer.email) : null,
+            formatDate(order.createdAt),
+            order.source,
+          ]
+            .filter(Boolean)
+            .join(" · ")}
         </p>
         {liveShopifyOrder && (
           <div

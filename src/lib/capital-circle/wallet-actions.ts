@@ -7,8 +7,10 @@ import { requireAdminSession } from "../admin-auth";
 import { logAdminAction } from "../audit-log";
 import { redirectWithError, redirectWithSuccess } from "../admin-feedback";
 import { CAPITAL_CIRCLE_WALLET_STATUSES, parseEnumField } from "../parse-enum";
-import { DEFAULT_ALLOWED_CHAINS, evaluateIdentityChange, normalizeAddress } from "./wallet-identity";
+import { evaluateIdentityChange, normalizeAddress } from "./wallet-identity";
 import { getWalletBalanceSnapshot, WALLET_ONCHAIN_TAG } from "../reports/capital-circle-wallet";
+import { circleWalletAddress, circleWalletId as configuredCircleWalletId } from "./circle-wallet-client";
+import { CAPITAL_CIRCLE_NETWORK } from "./chain";
 
 const REPORT_PATH = "/admin/reports/capital-circle";
 
@@ -23,27 +25,22 @@ function parseOptionalUsd(formData: FormData, field: string): number | null {
 }
 
 /**
- * Create-only. A wallet with no address or no Circle id can't be used for anything, so both are
- * required here — unlike the caps/identity actions below, which each touch a strict subset of
- * fields specifically so neither can null out what the other doesn't ask about.
+ * Registers what's already true on Circle's side — never sets caps or a non-"pending" status
+ * here. Both are a separate decision with a separate timing (you might register today and want
+ * to think about spending limits before this wallet does anything real), so cramming them into
+ * one form was compound complexity nobody needed at registration time; the caps form already
+ * sitting on each wallet row handles that once this exists. Chain is never asked for either — a
+ * wallet on any chain but CAPITAL_CIRCLE_NETWORK would immediately fail the address-agreement
+ * check the readiness panel already runs, so there's no legitimate reason to let it vary.
  */
 export async function registerCapitalCircleWallet(formData: FormData): Promise<void> {
   await requireAdminSession();
 
   const circleWalletId = String(formData.get("circleWalletId") ?? "").trim();
   const rawAddress = String(formData.get("address") ?? "").trim();
-  const chain = String(formData.get("chain") ?? "").trim() || "polygon";
-  const status = parseEnumField(formData, "status", CAPITAL_CIRCLE_WALLET_STATUSES, REPORT_PATH);
-  const perTxCapUsd = parseOptionalUsd(formData, "perTxCapUsd");
-  const dailyCapUsd = parseOptionalUsd(formData, "dailyCapUsd");
-  const weeklyCapUsd = parseOptionalUsd(formData, "weeklyCapUsd");
-  const monthlyCapUsd = parseOptionalUsd(formData, "monthlyCapUsd");
 
   if (!circleWalletId) redirectWithError(REPORT_PATH, "Circle wallet id is required.");
   if (!rawAddress) redirectWithError(REPORT_PATH, "Address is required.");
-  if (!DEFAULT_ALLOWED_CHAINS.includes(chain as (typeof DEFAULT_ALLOWED_CHAINS)[number])) {
-    redirectWithError(REPORT_PATH, `Unrecognized chain "${chain}".`);
-  }
 
   const normalized = normalizeAddress(rawAddress);
   if (!normalized.ok) redirectWithError(REPORT_PATH, normalized.reason);
@@ -57,23 +54,56 @@ export async function registerCapitalCircleWallet(formData: FormData): Promise<v
   }
 
   const wallet = await prisma.capitalCircleWallet.create({
-    data: {
-      circleWalletId,
-      address,
-      chain,
-      status,
-      perTxCapUsd: perTxCapUsd?.toFixed(2) ?? null,
-      dailyCapUsd: dailyCapUsd?.toFixed(2) ?? null,
-      weeklyCapUsd: weeklyCapUsd?.toFixed(2) ?? null,
-      monthlyCapUsd: monthlyCapUsd?.toFixed(2) ?? null,
-    },
+    data: { circleWalletId, address, chain: CAPITAL_CIRCLE_NETWORK.key, status: "pending" },
   });
   await logAdminAction({
     action: "capital-circle.wallet.register",
     entityType: "capital_circle_wallet",
     entityId: wallet.id,
-    summary: `Capital Circle wallet ${circleWalletId} registered — status: ${status}.`,
-    metadata: { circleWalletId, address, chain, status, perTxCapUsd, dailyCapUsd, weeklyCapUsd, monthlyCapUsd },
+    summary: `Capital Circle wallet ${circleWalletId} registered.`,
+    metadata: { circleWalletId, address, chain: CAPITAL_CIRCLE_NETWORK.key },
+  });
+
+  revalidatePath(REPORT_PATH);
+  redirectWithSuccess(REPORT_PATH, "Wallet registered.");
+}
+
+/**
+ * The one-click path: CIRCLE_WALLET_ID/CIRCLE_WALLET_ADDRESS are already env-configured and
+ * already the values every other part of this app (the QR, live trading, Binance withdrawals)
+ * actually uses — asking someone to retype them into a form is asking for exactly the kind of
+ * mismatch the readiness panel's address-agreement check exists to catch. Takes no user input at
+ * all; nothing here can be tampered with client-side because nothing here comes from the client.
+ */
+export async function registerConfiguredCircleWallet(): Promise<void> {
+  await requireAdminSession();
+
+  if (!circleWalletAddress || !configuredCircleWalletId) {
+    redirectWithError(REPORT_PATH, "No Circle wallet is configured in the environment yet.");
+  }
+
+  // Normalized the same way every other path stores an address (checksummed) — CIRCLE_WALLET_ADDRESS
+  // is whatever case an operator happened to paste into .env, and comparing it raw against
+  // already-checksummed DB rows could miss a real match on case alone.
+  const normalized = normalizeAddress(circleWalletAddress);
+  if (!normalized.ok) redirectWithError(REPORT_PATH, `CIRCLE_WALLET_ADDRESS isn't a valid address: ${normalized.reason}`);
+
+  const existing = await prisma.capitalCircleWallet.findFirst({
+    where: { OR: [{ circleWalletId: configuredCircleWalletId }, { address: normalized.address }] },
+  });
+  if (existing) {
+    redirectWithError(REPORT_PATH, "This wallet is already registered.");
+  }
+
+  const wallet = await prisma.capitalCircleWallet.create({
+    data: { circleWalletId: configuredCircleWalletId, address: normalized.address, chain: CAPITAL_CIRCLE_NETWORK.key, status: "pending" },
+  });
+  await logAdminAction({
+    action: "capital-circle.wallet.register",
+    entityType: "capital_circle_wallet",
+    entityId: wallet.id,
+    summary: `Capital Circle wallet ${configuredCircleWalletId} registered from environment configuration.`,
+    metadata: { circleWalletId: configuredCircleWalletId, address: normalized.address, chain: CAPITAL_CIRCLE_NETWORK.key, source: "env" },
   });
 
   revalidatePath(REPORT_PATH);

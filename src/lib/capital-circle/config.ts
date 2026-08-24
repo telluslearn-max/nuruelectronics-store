@@ -63,12 +63,48 @@ export const MAX_SPREAD = Number(process.env.CAPITAL_CIRCLE_MAX_SPREAD ?? 0.08);
  * Entry-price band. Above MAX: the payoff is a few cents against a full-size
  * downside, so a single surprise wipes out dozens of wins. Below MIN: a
  * lottery ticket whose probability we cannot estimate to that precision.
+ *
+ * MAX lowered from 0.97, for two reasons that point the same way.
+ *
+ * The first is arithmetic, and it makes most of the old band unreachable rather than merely
+ * unwise. Clearing the edge gate needs the model (minEdge + COST_BUFFER)/λ above the entry price
+ * — see requiredDeviation in trade-policy.ts — and a probability cannot exceed 1, so the highest
+ * entry the gate can ever accept is 1 − that same quantity. At the λ measured in production
+ * today (0.287) the strict bar cannot reach any entry above 0.861, and the relaxed bar cannot
+ * reach above 0.923. Everything between there and 0.97 was advertised as tradeable, priced by the
+ * model every cycle, and structurally incapable of producing a trade.
+ *
+ * The second is risk. Buying at 0.90 stakes ninety cents to win ten: one loss erases nine wins,
+ * and a forecast error of a couple of points flips the sign of the edge outright. That is exactly
+ * the regime where an imperfectly calibrated estimate does the most damage.
+ *
+ * Costs nothing in coverage, which is why it is worth doing: verified against a live 72h window,
+ * the screened universe was unchanged at 178 markets and the slate still filled to 48. Binary
+ * markets always carry a cheap side, so tightening the ceiling steers the desk to the side of the
+ * book with a real payoff rather than removing the market.
  */
-export const MAX_ENTRY_PRICE = Number(process.env.CAPITAL_CIRCLE_MAX_ENTRY_PRICE ?? 0.97);
+export const MAX_ENTRY_PRICE = Number(process.env.CAPITAL_CIRCLE_MAX_ENTRY_PRICE ?? 0.9);
 export const MIN_ENTRY_PRICE = Number(process.env.CAPITAL_CIRCLE_MIN_ENTRY_PRICE ?? 0.03);
 
-/** How many screened markets get priced by the model each cycle. */
-export const CANDIDATE_LIMIT = Number(process.env.CAPITAL_CIRCLE_CANDIDATE_LIMIT ?? 24);
+/**
+ * How many screened markets get priced by the model each cycle — the real width of the funnel,
+ * and the one number that decides how many chances the desk gets per hour.
+ *
+ * Raising MARKET_FETCH_LIMIT alone does almost nothing: fetching 300 markets to price 24 only
+ * changes *which* 24 get picked, not how many shots on goal there are. Clearing the edge bar
+ * requires the model to disagree with a liquid market by several percentage points (see
+ * requiredDeviation in trade-policy.ts), which is rare per market — so the number of tradeable
+ * candidates found per cycle scales with how many get priced, and 24 markets (~48 outcomes) was
+ * the binding constraint on a desk asked to find three positions a day.
+ *
+ * 48 rather than higher because the ceiling here is the scoring call's *output* budget, not its
+ * input: one JSON estimate per outcome token, so this many markets is roughly 96 estimates per
+ * sample and three samples per cycle. Input cost is negligible on Flash (well under a dollar a
+ * day at hourly cycles); output truncation is the failure mode that would silently drop
+ * candidates, which is why agent-loop.ts sets an explicit maxOutputTokens rather than trusting
+ * the default.
+ */
+export const CANDIDATE_LIMIT = Number(process.env.CAPITAL_CIRCLE_CANDIDATE_LIMIT ?? 48);
 
 /**
  * How far out to hunt. A 24-hour horizon was the original short-feedback-loop
@@ -78,8 +114,16 @@ export const CANDIDATE_LIMIT = Number(process.env.CAPITAL_CIRCLE_CANDIDATE_LIMIT
  */
 export const SEARCH_HORIZON_HOURS = Number(process.env.CAPITAL_CIRCLE_SEARCH_HORIZON_HOURS ?? 72);
 
-/** Raw markets pulled from Gamma before code-side screening. Screening is cheap; missing a market isn't. */
-export const MARKET_FETCH_LIMIT = Number(process.env.CAPITAL_CIRCLE_MARKET_FETCH_LIMIT ?? 150);
+/**
+ * Raw markets pulled from Gamma before code-side screening. Screening is cheap; missing a market
+ * isn't. Gamma caps a single request at 100 rows regardless of the limit requested — verified
+ * live — so listActivePolymarketMarkets paginates via offset to actually reach this number; it
+ * previously silently topped out at 100 no matter what this was set to. Raised from 150 now that
+ * more is actually reachable: the horizon-bucketed ranking in candidate-filter.ts most needs
+ * depth in whichever bucket isn't dominated by a handful of huge crypto/political markets, and a
+ * shallow raw pull starves exactly that bucket first.
+ */
+export const MARKET_FETCH_LIMIT = Number(process.env.CAPITAL_CIRCLE_MARKET_FETCH_LIMIT ?? 300);
 
 // ---------------------------------------------------------------------------
 // Edge and sizing — the code-side decision layer. The model estimates
@@ -149,6 +193,17 @@ export const DEFAULT_SPREAD_ASSUMPTION = Number(process.env.CAPITAL_CIRCLE_DEFAU
 export const KELLY_SHRINKAGE = Number(process.env.CAPITAL_CIRCLE_KELLY_SHRINKAGE ?? 0.5);
 
 /**
+ * Log-odds extremization factor applied to each ensembled probability before shrinkage (see
+ * extremizeProbability in ensemble.ts). d=1 is the identity — ships inert by default. Forecasting
+ * literature (Good Judgment Project) suggests d≈1.25-1.35 corrects real under-confidence in
+ * aggregated estimates, but that range hasn't been backtested against this desk's own calibration
+ * history, and turning it on measurably increases apparent edge (and therefore trade size and
+ * frequency) with no data yet to justify a specific value. Deliberately left at 1 until someone
+ * backtests it against CapitalCircleCandidateSnapshot and picks a value on purpose.
+ */
+export const EXTREMIZE_FACTOR = Number(process.env.CAPITAL_CIRCLE_EXTREMIZE_FACTOR ?? 1);
+
+/**
  * Fraction of full Kelly. Half-Kelly rather than quarter: full Kelly is only
  * optimal when the probability is known exactly and it drawdowns brutally when
  * it isn't, but quarter-Kelly on a $25 cap produces stakes so small that the
@@ -198,6 +253,24 @@ export const SETTLEMENT_STALE_HOURS = Number(process.env.CAPITAL_CIRCLE_SETTLEME
 // of a few independent samples is the cheapest available variance reduction.
 // ---------------------------------------------------------------------------
 
+/**
+ * Whether the scoring model is shown each outcome's current market price.
+ *
+ * Defaults to true, which is how the desk has always run, but the default is worth
+ * understanding rather than inheriting. The price is a genuine base rate — and the code
+ * already blends the model's estimate with it in shrinkProbability (p' = λ·model + (1−λ)·market),
+ * so a model that anchors on the price has it counted twice, and one that simply hands it back
+ * produces an estimate with no information in it at all. Production does the latter: the
+ * passthrough detector reports the quoted price returned verbatim on 90-96 of 96 outcomes, cycle
+ * after cycle, which makes edge equal to −costs by construction and no gate setting can rescue it.
+ *
+ * Setting this to false makes the scoring stage blind, so its estimates are the model's own and
+ * the blend happens once, in code, where it is measurable. It is off by default because it is a
+ * behavioural change to what the desk trades and deserves to be turned on deliberately and watched
+ * on its own — not bundled into a correctness fix and credited with its results.
+ */
+export const SHOW_MARKET_PRICE_TO_MODEL = process.env.CAPITAL_CIRCLE_SHOW_MARKET_PRICE !== "false";
+
 export const ENSEMBLE_SAMPLES = Number(process.env.CAPITAL_CIRCLE_ENSEMBLE_SAMPLES ?? 3);
 export const ENSEMBLE_TEMPERATURE = Number(process.env.CAPITAL_CIRCLE_ENSEMBLE_TEMPERATURE ?? 0.7);
 
@@ -206,3 +279,14 @@ export const ENSEMBLE_MAX_DISAGREEMENT = Number(process.env.CAPITAL_CIRCLE_ENSEM
 
 /** Resolved predictions needed before measured calibration replaces the KELLY_SHRINKAGE prior. */
 export const MIN_SAMPLES_FOR_ADAPTIVE_SHRINKAGE = Number(process.env.CAPITAL_CIRCLE_MIN_CALIBRATION_SAMPLES ?? 30);
+
+/**
+ * How many resolved candidate snapshots calibration is measured over.
+ *
+ * Shared by the agent's own track record and the admin report on purpose. They previously
+ * used different windows — the report read 500 rows, the cycle read 200 — and each then called
+ * computeAdaptiveShrinkage independently, so the λ displayed on the dashboard was not the λ the
+ * desk was actually gating trades with. Two numbers with the same name and different values is
+ * the kind of thing that survives a long time precisely because both look right on their own.
+ */
+export const CALIBRATION_SAMPLE_LIMIT = Number(process.env.CAPITAL_CIRCLE_CALIBRATION_SAMPLE_LIMIT ?? 500);

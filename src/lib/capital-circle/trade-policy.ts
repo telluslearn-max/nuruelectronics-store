@@ -93,27 +93,121 @@ export function shrinkProbability(modelProbability: number, marketPrice: number,
  * following the market. This is the loop that makes the system self-correcting
  * rather than merely instrumented.
  */
+// 0 error → 0.60 (trust it); 0.30+ error → 0.15 (barely trust it). Linear between.
+const WELL_CALIBRATED_LAMBDA = 0.6;
+const BADLY_CALIBRATED_LAMBDA = 0.15;
+const WORST_CALIBRATION_ERROR = 0.3;
+
 export function computeAdaptiveShrinkage(input: {
   sampleCount: number;
   meanAbsCalibrationError: number | null;
-}): { lambda: number; reason: string } {
+  /**
+   * Set when the track record shows the flipped-assignment signature (see
+   * detectAssignmentInversion). This is an integrity failure, not a calibration
+   * one, and it has to be handled before the error term is even looked at.
+   */
+  inverted?: boolean;
+  invertedDetail?: string | null;
+}): { lambda: number; reason: string; halted: boolean } {
   const { sampleCount, meanAbsCalibrationError } = input;
+
+  // Ordered first on purpose. An inverted track record makes the calibration
+  // error term meaningless — it is measuring the distance to the wrong label —
+  // so deriving a λ from it produces a confident-looking number built on
+  // nothing. Pinned to the floor rather than to the prior because the prior is
+  // the *more* trusting value: falling back to it would answer a data-integrity
+  // failure by betting more freely on the data that failed.
+  if (input.inverted) {
+    return {
+      lambda: BADLY_CALIBRATED_LAMBDA,
+      reason:
+        `Assignment inversion detected across ${sampleCount} resolved prediction(s), so measured calibration cannot be used to set trust. ` +
+        `λ is pinned to the ${BADLY_CALIBRATED_LAMBDA} floor, which in practice keeps the desk out of the market until the pipeline is fixed and a clean track record rebuilds. ` +
+        `${input.invertedDetail ?? ""}`.trim(),
+      halted: true,
+    };
+  }
+
   if (sampleCount < MIN_SAMPLES_FOR_ADAPTIVE_SHRINKAGE || meanAbsCalibrationError == null) {
     return {
       lambda: KELLY_SHRINKAGE,
       reason: `Only ${sampleCount} resolved prediction(s) — holding the ${KELLY_SHRINKAGE} prior until there are ${MIN_SAMPLES_FOR_ADAPTIVE_SHRINKAGE}.`,
+      halted: false,
     };
   }
-  // 0 error → 0.60 (trust it); 0.30+ error → 0.15 (barely trust it). Linear between.
-  const WELL_CALIBRATED = 0.6;
-  const BADLY_CALIBRATED = 0.15;
-  const WORST_ERROR = 0.3;
-  const errorShare = Math.min(1, Math.max(0, meanAbsCalibrationError / WORST_ERROR));
-  const lambda = WELL_CALIBRATED - errorShare * (WELL_CALIBRATED - BADLY_CALIBRATED);
+
+  const errorShare = Math.min(1, Math.max(0, meanAbsCalibrationError / WORST_CALIBRATION_ERROR));
+  const lambda = WELL_CALIBRATED_LAMBDA - errorShare * (WELL_CALIBRATED_LAMBDA - BADLY_CALIBRATED_LAMBDA);
   return {
     lambda: round4(lambda),
     reason: `Calibration error ${meanAbsCalibrationError.toFixed(3)} over ${sampleCount} resolved predictions — trusting the model's estimate at λ=${lambda.toFixed(2)}.`,
+    halted: false,
   };
+}
+
+/**
+ * How much to trust one specific estimate, given how much the ensemble's own samples disagreed
+ * about it.
+ *
+ * λ has always been a single global number: how much independent evidence one flash call is
+ * credited with, measured across the whole track record. But stability is also a *per-estimate*
+ * property — the same model on the same slate is rock-solid on one market and scattered on the
+ * next, and the ensemble already measures exactly that and then threw it away on everything below
+ * the reject threshold.
+ *
+ * Folding it into λ separates the two things the old binary filter conflated: a confident
+ * disagreement (tight samples, far from the price) is sized on its merits, while a noisy one (wide
+ * samples, same distance from the price) is pulled back toward the market until it no longer
+ * clears the bar on its own. That is the distinction that actually predicts whether a deviation is
+ * edge or noise, and it is the whole reason ensembling exists.
+ *
+ * Linear and anchored on the existing ENSEMBLE_MAX_DISAGREEMENT, so it adds no new tunable: trust
+ * reaches zero exactly where the hard filter already rejected. The old cliff becomes the limit of
+ * the ramp rather than a separate rule — nothing changes at the boundary, and a candidate at 0.24
+ * stops being treated identically to one at 0.00 purely for landing on the tolerable side of a
+ * threshold.
+ */
+export function disagreementAdjustedLambda(
+  baseLambda: number,
+  disagreement: number | null | undefined,
+  maxDisagreement: number,
+): number {
+  const base = Math.min(1, Math.max(0, baseLambda));
+  const spread = toFinite(disagreement ?? null);
+  if (spread == null || spread <= 0 || maxDisagreement <= 0) return round4(base);
+  const trust = Math.min(1, Math.max(0, 1 - spread / maxDisagreement));
+  return round4(base * trust);
+}
+
+/**
+ * How far the model's probability must sit from the market price for a trade to clear the bar.
+ *
+ * The algebra nobody had written down. Substituting shrinkProbability into the edge definition
+ * collapses the whole gate to one term:
+ *
+ *   edge = λ·p + (1−λ)·a − a − cost  =  λ·(p − a) − cost
+ *
+ * So the edge gate is not a gate on "edge" as anyone reading MIN_EDGE would picture it — it is a
+ * gate on λ × (deviation from price). Inverting it gives what the model actually has to produce:
+ *
+ *   Δ ≥ (minEdge + cost) / λ
+ *
+ * This matters because λ moves. At the defaults (λ=0.5, minEdge=0.03, cost=0.01) the model has to
+ * disagree with a liquid market by 8 percentage points. When measured calibration pulls λ down to
+ * 0.15, the same untouched settings quietly demand 27 points — a deviation no honest forecast of a
+ * deep market will ever produce, so the desk stops trading entirely.
+ *
+ * That behaviour is defensible (a model that cannot forecast should not be betting) and is left
+ * exactly as it is. What was not defensible is that it happened invisibly: every cycle reported
+ * only "below the 0.03 minimum", which reads as bad luck rather than "calibration has effectively
+ * paused this desk". Callers use this to say which of the two is happening.
+ *
+ * Returns null when λ is 0 — the model is being ignored outright and no deviation can ever clear.
+ */
+export function requiredDeviation(minEdge: number, lambda: number, costBuffer = COST_BUFFER): number | null {
+  const l = Math.min(1, Math.max(0, lambda));
+  if (l <= 0) return null;
+  return round4((minEdge + costBuffer) / l);
 }
 
 // ---------------------------------------------------------------------------
@@ -217,6 +311,7 @@ export function evaluateEdge(input: {
   minEdge?: number;
 }): EdgeEvaluation {
   const minEdge = input.minEdge ?? MIN_EDGE;
+  const lambda = input.lambda ?? KELLY_SHRINKAGE;
   const effectiveEntry = effectiveEntryPrice(input.pricing);
 
   if (effectiveEntry == null) {
@@ -229,7 +324,7 @@ export function evaluateEdge(input: {
     };
   }
 
-  const shrunk = shrinkProbability(input.modelProbability, effectiveEntry, input.lambda);
+  const shrunk = shrinkProbability(input.modelProbability, effectiveEntry, lambda);
   const feeCost = effectiveEntry * (FEE_BPS / 10_000);
   const edge = round4(shrunk - effectiveEntry - COST_BUFFER - feeCost);
 
@@ -244,12 +339,20 @@ export function evaluateEdge(input: {
   }
 
   if (edge < minEdge) {
+    // Say what the bar actually demanded, not just that it wasn't met — see requiredDeviation.
+    // "below the 0.03 minimum" reads as a near miss; "needed 8.0 points of disagreement and had
+    // 1.5" is the number that tells you whether the desk is unlucky or structurally switched off.
+    const needed = requiredDeviation(minEdge, lambda);
+    const actual = clamp01(input.modelProbability) - effectiveEntry;
     return {
       accepted: false,
       edge,
       effectiveEntry,
       shrunkProbability: shrunk,
-      reason: `Edge ${edge.toFixed(4)} is below the ${minEdge} minimum (shrunk probability ${shrunk.toFixed(4)} vs entry ${effectiveEntry.toFixed(4)} plus costs).`,
+      reason:
+        `Edge ${edge.toFixed(4)} is below the ${minEdge} minimum. At λ=${lambda} that needs the model ` +
+        `${needed == null ? "infinitely far from" : `${(needed * 100).toFixed(1)} points away from`} the ` +
+        `${effectiveEntry.toFixed(4)} entry; it was ${(actual * 100).toFixed(1)}.`,
     };
   }
 
@@ -388,6 +491,13 @@ export type SelectedTrade = SelectionCandidate & {
   edge: number;
   effectiveEntry: number;
   shrunkProbability: number;
+  /**
+   * The confidence-adjusted λ this trade was actually selected at — carried so the executor's
+   * final re-price against the live book uses the same trust level that approved it. Re-gating at
+   * the unadjusted global λ would be strictly more generous, which quietly re-opens the door for
+   * a scattered estimate whose price has since moved against it.
+   */
+  lambda: number;
 };
 
 export type SelectionResult = {
@@ -408,6 +518,17 @@ export function selectTrades(input: {
   openEventIds: Set<string>;
   maxPositions: number;
   lambda?: number;
+  /**
+   * Per-category λ (see track-record.ts's categoryShrinkage), keyed by the same category string
+   * candidates carry. A candidate whose category has one here uses it instead of `lambda` — the
+   * model is not equally trustworthy in every domain (a chronically-overconfident crypto-ticks
+   * record shouldn't drag down trust in a well-calibrated politics record, and vice versa).
+   * Falls back to `lambda` for an uncategorized candidate or a category with too little history
+   * to have its own entry — same MIN_SAMPLES_FOR_ADAPTIVE_SHRINKAGE floor computeAdaptiveShrinkage
+   * already applies globally, so an under-sampled category degrades to exactly today's behavior
+   * rather than a guess.
+   */
+  categoryLambdas?: Record<string, number>;
   minEdge?: number;
   maxDisagreement: number;
 }): SelectionResult {
@@ -416,11 +537,29 @@ export function selectTrades(input: {
   const takenEventIds = new Set(input.openEventIds);
   const takenMarketIds = new Set(input.openMarketIds);
 
+  const globalLambda = input.lambda ?? KELLY_SHRINKAGE;
+  const baseLambdaFor = (candidate: SelectionCandidate): number => {
+    const key = candidate.category;
+    if (key && input.categoryLambdas?.[key] != null) return input.categoryLambdas[key];
+    return globalLambda;
+  };
+
+  // λ is adjusted per candidate — first by its category's own track record, then by how much the
+  // ensemble disagreed about that specific estimate — so the ranking below is by confidence- and
+  // topic-adjusted edge rather than raw edge — a tight estimate 6 points off the price now
+  // outranks a scattered one 8 points off, which is the correct ordering and was not the old one.
   const scored = input.candidates
-    .map((candidate) => ({ candidate, evaluation: evaluateEdge({ modelProbability: candidate.modelProbability, pricing: candidate.pricing, lambda: input.lambda, minEdge: input.minEdge }) }))
+    .map((candidate) => {
+      const lambda = disagreementAdjustedLambda(baseLambdaFor(candidate), candidate.disagreement, input.maxDisagreement);
+      return {
+        candidate,
+        lambda,
+        evaluation: evaluateEdge({ modelProbability: candidate.modelProbability, pricing: candidate.pricing, lambda, minEdge: input.minEdge }),
+      };
+    })
     .sort((a, b) => b.evaluation.edge - a.evaluation.edge);
 
-  for (const { candidate, evaluation } of scored) {
+  for (const { candidate, lambda, evaluation } of scored) {
     const reject = (reason: string) => rejected.push({ marketId: candidate.marketId, tokenId: candidate.tokenId, reason, edge: evaluation.edge });
 
     if (selected.length >= input.maxPositions) {
@@ -451,6 +590,7 @@ export function selectTrades(input: {
       edge: evaluation.edge,
       effectiveEntry: evaluation.effectiveEntry,
       shrunkProbability: evaluation.shrunkProbability,
+      lambda,
     });
     takenMarketIds.add(candidate.marketId);
     if (eventId) takenEventIds.add(eventId);

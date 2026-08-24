@@ -3,6 +3,7 @@ import { formatPrice } from "@/lib/format";
 import { BrandWordmark, DocumentFooter, PhoneIcon, WarrantyTerms, type Moneyish } from "./document-layout";
 import type { Letterhead } from "./letterhead";
 import type { Customer, Invoice, OrderItem, Receipt } from "@prisma/client";
+import { displayEmail } from "@/lib/customer-email";
 
 function formatDate(date: Date) {
   return new Intl.DateTimeFormat("en-KE", { dateStyle: "medium" }).format(date);
@@ -39,6 +40,7 @@ const s = StyleSheet.create({
     borderBottomColor: "#eeeeee",
   },
   itemTitle: { fontSize: 11, fontFamily: "Helvetica-Bold" },
+  itemDescription: { fontSize: 8, color: "#888888", marginTop: 2 },
   totalsRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 4 },
   totalsLabel: { color: "#666666" },
   totalRow: {
@@ -100,7 +102,7 @@ export function ReceiptDocument({
         </View>
 
         <Text style={s.customerLabel}>Customer</Text>
-        <Text style={s.customerValue}>{customer.name ?? customer.email}</Text>
+        <Text style={s.customerValue}>{customer.name ?? displayEmail(customer.email) ?? customer.phone ?? "Customer"}</Text>
 
         <View style={s.hr} />
 
@@ -111,7 +113,10 @@ export function ReceiptDocument({
         </View>
         {items.map((item) => (
           <View style={s.itemRow} key={item.id}>
-            <Text style={[s.colItem, s.itemTitle]}>{item.title}</Text>
+            <View style={s.colItem}>
+              <Text style={s.itemTitle}>{item.title}</Text>
+              {item.description && <Text style={s.itemDescription}>{item.description}</Text>}
+            </View>
             <Text style={s.colQty}>{item.quantity}</Text>
             <Text style={[s.colPrice, s.itemTitle]}>{formatMoney(item.lineTotal.toString())}</Text>
           </View>

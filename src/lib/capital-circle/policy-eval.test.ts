@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { evaluatePolicy, sweepPolicies, type LabeledCandidate } from "./policy-eval";
+import { evaluatePolicy, splitChronologically, sweepPolicies, sweepPoliciesHonestly, type LabeledCandidate } from "./policy-eval";
 
 const PARAMS = { minEdge: 0.05, lambda: 1, capUsd: 25, bankrollUsd: 500 };
 
@@ -92,5 +92,111 @@ describe("sweepPolicies", () => {
     const [loose] = sweepPolicies(rows, { capUsd: 25, bankrollUsd: 500, minEdges: [0.02], lambdas: [1] });
     const [strict] = sweepPolicies(rows, { capUsd: 25, bankrollUsd: 500, minEdges: [0.15], lambdas: [1] });
     expect(strict.tradeCount).toBeLessThan(loose.tradeCount);
+  });
+});
+
+describe("splitChronologically", () => {
+  const at = (day: number) => new Date(`2026-08-${String(day).padStart(2, "0")}T00:00:00Z`);
+
+  it("puts earlier resolutions in train and later ones in validate, whatever order they arrive", () => {
+    const rows = [{ resolvedAt: at(5) }, { resolvedAt: at(1) }, { resolvedAt: at(9) }, { resolvedAt: at(3) }];
+    const { train, validate } = splitChronologically(rows, 0.5);
+    expect(train.map((r) => r.resolvedAt)).toEqual([at(1), at(3)]);
+    expect(validate.map((r) => r.resolvedAt)).toEqual([at(5), at(9)]);
+  });
+
+  it("sorts undated rows last rather than guessing a position for them", () => {
+    // Guessing would leak later markets into the slice the parameters are chosen on,
+    // which is the exact thing the split exists to prevent.
+    const rows = [{ resolvedAt: null }, { resolvedAt: at(2) }, { resolvedAt: at(1) }];
+    const { train } = splitChronologically(rows, 0.67);
+    expect(train.map((r) => r.resolvedAt)).toEqual([at(1), at(2)]);
+  });
+});
+
+describe("sweepPoliciesHonestly", () => {
+  const at = (i: number) => new Date(2026, 7, 1 + Math.floor(i / 4));
+
+  /** Candidates whose outcomes are pure noise — no threshold can genuinely profit from these. */
+  function noiseRows(n: number): LabeledCandidate[] {
+    return Array.from({ length: n }, (_, i) =>
+      candidate({
+        marketId: `m${i}`,
+        tokenId: `t${i}`,
+        modelProbability: 0.55 + ((i * 7) % 40) / 100,
+        bestAsk: 0.5,
+        outcome: (i % 2) as 0 | 1,
+        resolvedAt: at(i),
+      }),
+    );
+  }
+
+  it("carries the best training cell through to data it was not chosen on", () => {
+    const result = sweepPoliciesHonestly(noiseRows(200), {
+      capUsd: 25,
+      bankrollUsd: 500,
+      minEdges: [0.02, 0.08],
+      lambdas: [0.35, 1],
+    });
+
+    expect(result.combinationsTried).toBe(4);
+    expect(result.trainCount + result.validateCount).toBe(200);
+    expect(result.selected).not.toBeNull();
+    // The held-out number is computed on later markets, not on the ones that chose the cell.
+    expect(result.selected?.validate.tradeCount).toBeGreaterThan(0);
+    expect(result.caveat).toContain("4 parameter combinations");
+  });
+
+  it("refuses to endorse a cell that traded too little to mean anything", () => {
+    // The live report's top row was 11 trades at a 100% win rate, which is eleven coin
+    // flips landing the same way and reads as overwhelming evidence in a ranked table.
+    const rows: LabeledCandidate[] = Array.from({ length: 12 }, (_, i) =>
+      candidate({ marketId: `m${i}`, tokenId: `t${i}`, modelProbability: 0.95, bestAsk: 0.5, outcome: 1, resolvedAt: at(i) }),
+    );
+
+    const result = sweepPoliciesHonestly(rows, { capUsd: 25, bankrollUsd: 500, minEdges: [0.02], lambdas: [1] });
+    expect(result.selected).toBeNull();
+    expect(result.caveat).toContain("nothing here has enough behind it to act on");
+    expect(result.caveat).toContain("not what they earn");
+  });
+
+  it("flags a winner that traded enough in training but barely at all out of sample", () => {
+    // The other way a thin result sneaks through: the training slice looks substantial and
+    // the held-out one has almost nothing in it, so the confirmation is not a confirmation.
+    const rows: LabeledCandidate[] = Array.from({ length: 100 }, (_, i) =>
+      candidate({
+        marketId: `m${i}`,
+        tokenId: `t${i}`,
+        // Only the training slice carries any edge at all; later candidates are priced at the model's number.
+        modelProbability: i < 80 ? 0.9 : 0.5,
+        bestAsk: 0.5,
+        outcome: 1,
+        resolvedAt: at(i),
+      }),
+    );
+
+    const result = sweepPoliciesHonestly(rows, { capUsd: 25, bankrollUsd: 500, minEdges: [0.02], lambdas: [1], trainShare: 0.8 });
+    expect(result.selected?.validate.tradeCount).toBeLessThan(20);
+    expect(result.caveat).toContain("unverified");
+  });
+
+  it("says plainly when the in-sample winner did not survive out of sample", () => {
+    // Wins concentrated entirely in the training slice, losses entirely after it — the
+    // textbook shape of a threshold fitted to noise.
+    const rows: LabeledCandidate[] = Array.from({ length: 120 }, (_, i) =>
+      candidate({
+        marketId: `m${i}`,
+        tokenId: `t${i}`,
+        modelProbability: 0.9,
+        bestAsk: 0.5,
+        outcome: (i < 72 ? 1 : 0) as 0 | 1,
+        resolvedAt: at(i),
+      }),
+    );
+
+    const result = sweepPoliciesHonestly(rows, { capUsd: 25, bankrollUsd: 500, minEdges: [0.02], lambdas: [1], trainShare: 0.6 });
+    expect(result.selected?.train.returnOnStake ?? 0).toBeGreaterThan(0);
+    expect(result.selected?.validate.returnOnStake ?? 0).toBeLessThan(0);
+    expect(result.caveat).toContain("did not hold up out of sample");
   });
 });

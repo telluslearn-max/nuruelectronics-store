@@ -45,11 +45,27 @@ export type ScreeningOptions = {
  * language model has the least to add. Reserving space for markets resolving
  * further out keeps genuinely researchable questions on the list, which is
  * where any real edge is going to come from.
+ *
+ * The near bucket used to reserve 30% of the slate, which fought that goal instead of serving
+ * it. The scoring prompt tells the model outright that markets resolving within a couple of
+ * hours are close to unpredictable and that the price is the honest answer for them — so a
+ * reserved near slot is a slot spent on a market the system has already decided it will have no
+ * opinion about, and its estimate lands on the price, which is an edge of exactly zero minus
+ * costs. Measured against a live 72h window: 16 of 48 slate slots went to sub-6h markets (a
+ * Dota 2 match, three esports maps, two Elon-tweet-count bands, two ETH hourlies), none of them
+ * reachable by the edge gate.
+ *
+ * Cut to 10%, with the slots going mostly to the 6–24h band. That band is both the deepest
+ * (70 screened markets in the same window against 46 beyond 24h) and the best-shaped: 62 of
+ * those 70 had a side priced between 0.15 and 0.85, where a forecast error costs a fraction of
+ * the position rather than all of it. Near is kept non-zero rather than removed because an
+ * occasional short-horizon market is genuinely mispriced and the bucket costs little at this
+ * share.
  */
 const HORIZON_BUCKETS: { label: string; maxHours: number; share: number }[] = [
-  { label: "near", maxHours: 6, share: 0.3 },
-  { label: "mid", maxHours: 24, share: 0.35 },
-  { label: "far", maxHours: Number.POSITIVE_INFINITY, share: 0.35 },
+  { label: "near", maxHours: 6, share: 0.1 },
+  { label: "mid", maxHours: 24, share: 0.5 },
+  { label: "far", maxHours: Number.POSITIVE_INFINITY, share: 0.4 },
 ];
 
 export function filterAndRankCandidates(
@@ -141,25 +157,13 @@ export function filterAndRankCandidates(
   return { candidates, dropped };
 }
 
-/**
- * The compact shape handed to the model for scoring — every field is something
- * that should bear on a probability estimate, and nothing else, since context
- * spent on boilerplate is context not spent on the question.
+/*
+ * The model-facing view of a screened market now lives in scoring-slate.ts,
+ * which addresses outcomes by short refs and verifies the model's answer back
+ * against them. It used to be built here as a direct projection carrying raw
+ * 66-character market ids and 77-digit token ids for the model to echo, which
+ * is the mechanism that let a probability end up recorded against the wrong
+ * outcome of the right market — see that module's header for the production
+ * evidence. Building it there keeps encoding and decoding in one place, so the
+ * two can't drift apart.
  */
-export function toScoringView(market: ScreenedMarket) {
-  return {
-    marketId: market.conditionId,
-    question: market.question,
-    category: market.category,
-    hoursToResolution: Number(market.hoursToResolution.toFixed(2)),
-    resolutionCriteria: market.description,
-    liquidityUsd: market.liquidity,
-    volume24hUsd: market.volume24hr,
-    spread: market.spread,
-    outcomes: market.tokens.map((token) => ({
-      tokenId: token.tokenId,
-      outcome: token.outcome,
-      marketPrice: token.price,
-    })),
-  };
-}

@@ -7,10 +7,10 @@
   },
   "scripts": {
     "dev": "next dev",
-    "build": "prisma migrate deploy && prisma db seed && next build",
+    "build": "node scripts/migrate-deploy-with-retry.mjs && prisma db seed && next build",
     "start": "next start",
     "lint": "eslint",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "node --max-old-space-size=6144 ./node_modules/typescript/bin/tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "postinstall": "prisma generate",
