@@ -69,6 +69,11 @@ export function Nav({
   }
 
   useEffect(() => {
+    // Intentional: this is the standard "reset UI state on navigation" pattern, not derived
+    // render state — there's no render-time equivalent to "close the dropdown when the route
+    // changes." eslint-disable rather than restructured, to avoid touching working nav behavior
+    // with no test coverage over it.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setOpenId(null);
   }, [pathname]);
 

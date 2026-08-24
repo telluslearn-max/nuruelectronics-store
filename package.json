@@ -10,9 +10,19 @@
     "build": "prisma migrate deploy && prisma db seed && next build",
     "start": "next start",
     "lint": "eslint",
+    "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "quality:churn": "node scripts/quality/churn.mjs",
+    "quality:dup": "jscpd --config .jscpd.json",
+    "quality:graph": "madge --json src > docs/quality/raw/madge.json",
+    "quality:baseline:circular": "madge --circular --json src > docs/quality/circular-baseline.json",
+    "quality:passthrough": "node scripts/quality/find-passthrough-files.mjs",
+    "quality:comments": "node scripts/quality/comment-repeats-code.mjs",
+    "quality:collect": "npm run quality:churn && npm run quality:graph && npm run quality:dup && npm run quality:passthrough && npm run quality:comments && npm run quality:score",
+    "quality:score": "node scripts/quality/quality-score.mjs",
+    "quality:fast": "npm run lint && npm run typecheck && node scripts/quality/check-circular.mjs && node scripts/quality/check-commit-comment-ratio.mjs"
   },
   "dependencies": {
     "@circle-fin/developer-controlled-wallets": "^10.8.0",
@@ -44,6 +54,9 @@
     "dotenv": "^17.4.2",
     "eslint": "^9",
     "eslint-config-next": "16.2.10",
+    "eslint-plugin-jsdoc": "^63.3.3",
+    "jscpd": "^5.0.16",
+    "madge": "^8.0.0",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^4.1.11"

@@ -20,7 +20,7 @@ export default async function CapitalCirclePerformancePage() {
     <div>
       <h2 className="text-lg font-medium">Capital Circle — Performance</h2>
       <p className="mt-2 max-w-2xl text-neutral-500">
-        The core business's weekly profit next to the AI pot's weekly result — the signal for whether to grow, shrink,
+        The core business&apos;s weekly profit next to the AI pot&apos;s weekly result — the signal for whether to grow, shrink,
         or shut the pot down. Trailing 8 weeks, most recent first.
       </p>
 

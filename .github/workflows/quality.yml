@@ -1,0 +1,51 @@
+name: Quality gate
+
+# Deterministic-only per-PR gate. No step here invokes an LLM or Claude Code — the deep,
+# book-rubric design review runs separately as a weekly scheduled agent (see
+# docs/quality/README.md, Phase B/C). Keeping those two paths separate is deliberate: this job
+# must be fast, cheap, and reproducible, which an LLM call in the hot path of every PR isn't.
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history — churn/circular-baseline scripts need git log, not a shallow clone
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - run: npm ci
+
+      - name: Typecheck (hard gate)
+        run: npm run typecheck
+
+      - name: Lint (hard gate)
+        run: npm run lint
+
+      - name: Circular-import baseline check (hard gate)
+        run: node scripts/quality/check-circular.mjs
+
+      - name: Commit-comment ratio (report-only)
+        run: node scripts/quality/check-commit-comment-ratio.mjs
+        continue-on-error: true
+
+      - name: Duplication collector (report-only)
+        run: npm run quality:dup
+        continue-on-error: true
+
+      - name: Upload quality reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quality-reports
+          path: docs/quality/raw/
+          if-no-files-found: ignore

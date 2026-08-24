@@ -13,7 +13,7 @@ export function ExUkBrandOnboarding({ onChoose }: { onChoose: (brand: ExUkBrand)
     <div className="flex flex-1 flex-col items-center justify-center gap-6 px-6 text-center">
       <div>
         <h1 className="text-xl font-semibold tracking-tight">What are you into?</h1>
-        <p className="mt-1.5 text-sm text-neutral-500">Pick a lane — you can switch anytime once you're in.</p>
+        <p className="mt-1.5 text-sm text-neutral-500">Pick a lane — you can switch anytime once you&apos;re in.</p>
       </div>
 
       <div className="grid w-full max-w-sm grid-cols-2 gap-3">

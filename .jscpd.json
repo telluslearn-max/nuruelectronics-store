@@ -1,0 +1,11 @@
+{
+  "path": ["src"],
+  "ignore": ["**/*.test.ts", "**/*.test.tsx"],
+  "reporters": ["json"],
+  "output": "docs/quality/raw/jscpd",
+  "minTokens": 30,
+  "minLines": 5,
+  "format": ["typescript", "tsx"],
+  "absolute": false,
+  "gitignore": true
+}
