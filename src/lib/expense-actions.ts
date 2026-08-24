@@ -3,10 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "./prisma";
 import { requireAdminSession } from "./admin-auth";
-import { ACCOUNTS, postJournalEntry } from "./ledger";
+import { ACCOUNTS, cashAccountForMethod, postJournalEntry } from "./ledger";
 import { redirectWithError, redirectWithSuccess } from "./admin-feedback";
 import { logAdminAction } from "./audit-log";
-import type { ExpenseCategory, ExpensePaymentSource } from "@prisma/client";
+import type { ExpenseCategory } from "@prisma/client";
 import { EXPENSE_CATEGORIES, EXPENSE_PAYMENT_SOURCES, parseEnumField } from "./parse-enum";
 
 const EXPENSE_ACCOUNT_BY_SUBCATEGORY: Record<string, string> = {
@@ -18,12 +18,6 @@ function expenseAccountFor(category: ExpenseCategory, subcategory: string): stri
   if (category === "cogs") return ACCOUNTS.COGS;
   if (category === "sga") return EXPENSE_ACCOUNT_BY_SUBCATEGORY[subcategory] ?? ACCOUNTS.PERSONNEL_EXPENSE;
   return ACCOUNTS.OTHER_OPERATING_EXPENSES;
-}
-
-function cashAccountForSource(source: ExpensePaymentSource): string {
-  if (source === "cash") return ACCOUNTS.CASH;
-  if (source === "mpesa") return ACCOUNTS.MPESA;
-  return ACCOUNTS.PETTY_CASH;
 }
 
 export async function createExpense(formData: FormData): Promise<void> {
@@ -86,7 +80,7 @@ export async function createExpense(formData: FormData): Promise<void> {
         sourceId: expense.id,
         lines: [
           { accountCode: expenseAccountFor(category, subcategory), debit: amount },
-          { accountCode: cashAccountForSource(paidFrom), credit: amount },
+          { accountCode: cashAccountForMethod(paidFrom), credit: amount },
         ],
       });
       await logAdminAction(
@@ -176,7 +170,7 @@ export async function importXprizePlExpenses(): Promise<void> {
         sourceId: expense.id,
         lines: [
           { accountCode: expenseAccountFor(entry.category, entry.subcategory), debit: entry.amount },
-          { accountCode: cashAccountForSource("mpesa"), credit: entry.amount },
+          { accountCode: cashAccountForMethod("mpesa"), credit: entry.amount },
         ],
       });
       await logAdminAction(

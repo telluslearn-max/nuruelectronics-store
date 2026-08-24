@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getProductReadinessViolations } from "@/lib/shopify/admin-api";
 import { sendProductReadinessEmail } from "@/lib/email";
 import { constantTimeEqual } from "@/lib/admin-session-token";
+import { jsonError } from "@/lib/api-response";
 
 function isAuthorized(request: Request): boolean {
   const secret = process.env.CRON_SECRET;
@@ -24,7 +25,7 @@ export async function GET(request: Request) {
     return NextResponse.json(await run());
   } catch (error) {
     console.error("[cron:product-readiness] failed:", error);
-    return NextResponse.json({ error: error instanceof Error ? error.message : "Unknown error" }, { status: 500 });
+    return jsonError(500, error);
   }
 }
 

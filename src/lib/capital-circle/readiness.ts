@@ -1,3 +1,4 @@
+import { formatPrice } from "../format";
 import { addressesEqual, truncateAddress } from "./wallet-identity";
 import type { OnchainResult } from "./onchain";
 
@@ -126,7 +127,7 @@ export function evaluateReadiness(input: ReadinessInput): ReadinessItem[] {
     input.collateralBalance,
     (value) => value <= 0,
     "blocked",
-    (value) => `$${value.toFixed(2)} available.`,
+    (value) => `${formatPrice(String(value), "USD")} available.`,
     "Deposit collateral — see the deposit card below.",
   );
 

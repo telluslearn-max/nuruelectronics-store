@@ -3,6 +3,7 @@ import { runCapitalCircleCycle } from "@/lib/capital-circle/agent-loop";
 import { settleResolvedPositions } from "@/lib/capital-circle/settlement";
 import { sendCapitalCircleCycleEmail } from "@/lib/email";
 import { constantTimeEqual } from "@/lib/admin-session-token";
+import { jsonError } from "@/lib/api-response";
 import { prisma } from "@/lib/prisma";
 
 /**
@@ -94,7 +95,7 @@ export async function GET(request: Request) {
     return NextResponse.json(result);
   } catch (error) {
     console.error("[cron:capital-circle-cycle] failed:", error);
-    return NextResponse.json({ ran: false, error: error instanceof Error ? error.message : "Unknown error" }, { status: 500 });
+    return jsonError(500, error, { ran: false });
   }
 }
 

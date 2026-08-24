@@ -13,6 +13,8 @@
  * keeping it importable anywhere is what makes it testable.
  */
 
+import { formatPrice } from "../format"; // pure (no server-only/Prisma) — safe in this module, see the file comment above
+
 import {
   COST_BUFFER,
   DEFAULT_SPREAD_ASSUMPTION,
@@ -407,11 +409,11 @@ export function kellySize(input: {
   }
 
   let recommended = fraction * rawKelly * input.bankrollUsd;
-  const reasons: string[] = [`${fraction}×Kelly on f*=${rawKelly.toFixed(4)} of a $${input.bankrollUsd.toFixed(2)} bankroll`];
+  const reasons: string[] = [`${fraction}×Kelly on f*=${rawKelly.toFixed(4)} of a ${formatPrice(String(input.bankrollUsd), "USD")} bankroll`];
 
   if (recommended > input.capUsd) {
     recommended = input.capUsd;
-    reasons.push(`clamped to the $${input.capUsd.toFixed(2)} per-position cap`);
+    reasons.push(`clamped to the ${formatPrice(String(input.capUsd), "USD")} per-position cap`);
   }
 
   const depth = toFinite(input.bookDepthUsd);
@@ -419,7 +421,7 @@ export function kellySize(input: {
     const depthCap = depth * MAX_BOOK_DEPTH_SHARE;
     if (recommended > depthCap) {
       recommended = depthCap;
-      reasons.push(`clamped to ${MAX_BOOK_DEPTH_SHARE * 100}% of $${depth.toFixed(2)} resting ask depth`);
+      reasons.push(`clamped to ${MAX_BOOK_DEPTH_SHARE * 100}% of ${formatPrice(String(depth), "USD")} resting ask depth`);
     }
   }
 
@@ -451,7 +453,7 @@ export function applyCaps(input: {
 
   if (approvedUsd > input.perTxCapUsd) {
     approvedUsd = input.perTxCapUsd;
-    reason = `exceeds the per-position cap of $${input.perTxCapUsd.toFixed(2)}`;
+    reason = `exceeds the per-position cap of ${formatPrice(String(input.perTxCapUsd), "USD")}`;
   }
 
   for (const window of input.windows) {
@@ -460,7 +462,7 @@ export function applyCaps(input: {
     if (approvedUsd > headroom) {
       approvedUsd = headroom;
       bindingCapUsd = window.capUsd;
-      reason = `only $${headroom.toFixed(2)} of headroom remains under the ${window.label} cap of $${window.capUsd.toFixed(2)} ($${window.spentUsd.toFixed(2)} already committed)`;
+      reason = `only ${formatPrice(String(headroom), "USD")} of headroom remains under the ${window.label} cap of ${formatPrice(String(window.capUsd), "USD")} (${formatPrice(String(window.spentUsd), "USD")} already committed)`;
     }
   }
 
@@ -626,7 +628,7 @@ export function computeSettlement(input: {
     const shares = sizeUsd / entryPrice;
     return {
       resultUsd: round2(shares * finalPrice - sizeUsd - fees),
-      note: `entry ${entryPrice}, final ${finalPrice}${fees ? `, fees $${fees.toFixed(2)}` : ""}`,
+      note: `entry ${entryPrice}, final ${finalPrice}${fees ? `, fees ${formatPrice(String(fees), "USD")}` : ""}`,
     };
   }
 

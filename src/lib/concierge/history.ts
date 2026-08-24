@@ -27,6 +27,9 @@ export async function getConversationHistory(customerId: string): Promise<Concie
         typeof (m as { text?: unknown }).text === "string",
     );
   } catch (error) {
+    // Swallowed on purpose: a history-load failure shouldn't block the concierge from starting a
+    // turn, and there's no error UI for "couldn't load your past messages" — starting fresh is
+    // strictly better than failing the request.
     console.error("Failed to load concierge conversation history:", error);
     return [];
   }
@@ -42,6 +45,9 @@ export async function saveConversationHistory(customerId: string, messages: Conc
       .doc(toDocId(customerId))
       .set({ messages: trimmed, updatedAt: new Date() });
   } catch (error) {
+    // Swallowed on purpose: this is a best-effort persistence step at the end of a turn the user
+    // has already seen the result of — surfacing a save failure here would mean failing a
+    // conversation turn that already succeeded, over something the user can't act on anyway.
     console.error("Failed to save concierge conversation history:", error);
   }
 }

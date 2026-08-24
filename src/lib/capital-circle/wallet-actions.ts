@@ -2,6 +2,7 @@
 
 import { revalidatePath, updateTag } from "next/cache";
 import { prisma } from "../prisma";
+import { formatPrice } from "../format";
 import { requireAdminSession } from "../admin-auth";
 import { logAdminAction } from "../audit-log";
 import { redirectWithError, redirectWithSuccess } from "../admin-feedback";
@@ -280,8 +281,8 @@ export async function refreshWalletOnchainData(): Promise<void> {
       entityType: "capital_circle_wallet",
       entityId: snapshot.address ?? "circle-wallet",
       summary:
-        `On-chain collateral ($${snapshot.onchainCollateral.value.toFixed(2)}) and Circle's reported balance ` +
-        `($${snapshot.circleCollateral.amount.toFixed(2)}) disagree by $${Math.abs(snapshot.discrepancyUsd).toFixed(2)}.`,
+        `On-chain collateral (${formatPrice(String(snapshot.onchainCollateral.value), "USD")}) and Circle's reported balance ` +
+        `(${formatPrice(String(snapshot.circleCollateral.amount), "USD")}) disagree by ${formatPrice(String(Math.abs(snapshot.discrepancyUsd)), "USD")}.`,
       metadata: { onchain: snapshot.onchainCollateral.value, circle: snapshot.circleCollateral.amount, discrepancyUsd: snapshot.discrepancyUsd },
     }).catch(() => {}); // never let a log failure break the refresh itself
   }

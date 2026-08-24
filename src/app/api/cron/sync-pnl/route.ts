@@ -3,6 +3,7 @@ import { computePnl } from "@/lib/reports/pnl";
 import { isGoogleSheetsConfigured, writePnlToSheet } from "@/lib/google-sheets";
 import { postMonthlyDepreciation } from "@/lib/depreciation";
 import { constantTimeEqual } from "@/lib/admin-session-token";
+import { jsonError } from "@/lib/api-response";
 
 function isAuthorized(request: Request): boolean {
   const secret = process.env.CRON_SECRET;
@@ -36,7 +37,7 @@ export async function GET(request: Request) {
     return NextResponse.json(await runSync());
   } catch (error) {
     console.error("[cron:sync-pnl] failed:", error);
-    return NextResponse.json({ synced: false, error: error instanceof Error ? error.message : "Unknown error" }, { status: 500 });
+    return jsonError(500, error, { synced: false });
   }
 }
 

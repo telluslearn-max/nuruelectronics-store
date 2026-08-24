@@ -177,7 +177,7 @@ export async function recordPosition(input: RecordPositionInput): Promise<Record
       action: "capital-circle.position.simulate",
       entityType: "capital_circle_position",
       entityId: position.id,
-      summary: `Capital Circle would size $${sizeUsd.toFixed(2)} into "${input.question}" at ${effectiveEntry.toFixed(4)} (edge ${edge.edge.toFixed(4)}) — simulated (${CAPITAL_CIRCLE_LIVE ? "no live-eligible Circle wallet configured yet" : "CAPITAL_CIRCLE_LIVE is false"}).`,
+      summary: `Capital Circle would size ${formatPrice(String(sizeUsd), "USD")} into "${input.question}" at ${effectiveEntry.toFixed(4)} (edge ${edge.edge.toFixed(4)}) — simulated (${CAPITAL_CIRCLE_LIVE ? "no live-eligible Circle wallet configured yet" : "CAPITAL_CIRCLE_LIVE is false"}).`,
       metadata: { conditionId: input.conditionId, tokenId: input.tokenId, sizeUsd, thesis: input.thesis, edge: edge.edge, effectiveEntry, spread: pricing.spread },
     });
     await notifyPositionTaken(input.question, sizeUsd, "simulated");
@@ -226,7 +226,7 @@ export async function recordPosition(input: RecordPositionInput): Promise<Record
       action: "capital-circle.position.execute",
       entityType: "capital_circle_position",
       entityId: position.id,
-      summary: `Capital Circle executed $${sizeUsd.toFixed(2)} into "${input.question}" at ${fillPrice.toFixed(4)} (quoted ${effectiveEntry.toFixed(4)}) — tx ${txHash}.`,
+      summary: `Capital Circle executed ${formatPrice(String(sizeUsd), "USD")} into "${input.question}" at ${fillPrice.toFixed(4)} (quoted ${effectiveEntry.toFixed(4)}) — tx ${txHash}.`,
       metadata: { conditionId: input.conditionId, tokenId: input.tokenId, sizeUsd, thesis: input.thesis, txHash, fillPrice, quotedEntry: effectiveEntry, edge: edge.edge },
     });
     await notifyPositionTaken(input.question, sizeUsd, "executed");

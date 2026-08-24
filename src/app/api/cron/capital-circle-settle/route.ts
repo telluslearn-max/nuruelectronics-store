@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { settleResolvedPositions } from "@/lib/capital-circle/settlement";
 import { manageOpenPositions } from "@/lib/capital-circle/position-manager";
 import { constantTimeEqual } from "@/lib/admin-session-token";
+import { jsonError } from "@/lib/api-response";
 
 function isAuthorized(request: Request): boolean {
   const secret = process.env.CRON_SECRET;
@@ -36,7 +37,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ ...result, managed });
   } catch (error) {
     console.error("[cron:capital-circle-settle] failed:", error);
-    return NextResponse.json({ checked: 0, settled: 0, error: error instanceof Error ? error.message : "Unknown error" }, { status: 500 });
+    return jsonError(500, error, { checked: 0, settled: 0 });
   }
 }
 

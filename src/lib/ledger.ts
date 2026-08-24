@@ -1,5 +1,5 @@
 import "server-only";
-import type { Prisma } from "@prisma/client";
+import type { Prisma, ExpensePaymentSource } from "@prisma/client";
 
 /**
  * Chart of Accounts codes, seeded once via prisma/seed.ts. Referenced by code
@@ -28,8 +28,18 @@ export const ACCOUNTS = {
   DEPRECIATION_EXPENSE: "5300",
 } as const;
 
-export function cashAccountForMethod(method: "cash" | "mpesa"): string {
-  return method === "cash" ? ACCOUNTS.CASH : ACCOUNTS.MPESA;
+/**
+ * Maps a payment method/source to its ledger cash account. Widened to the full
+ * `ExpensePaymentSource` enum (cash/mpesa/petty_cash) rather than just "cash" | "mpesa" — the
+ * narrower two-case version used to live here while expense-actions.ts kept its own third-case
+ * duplicate (`cashAccountForSource`) for `petty_cash`, which this replaces. Also directly closes
+ * the risk parse-enum.ts already calls out by name: an unchecked value silently falling through
+ * to the wrong account (see the comment there).
+ */
+export function cashAccountForMethod(method: ExpensePaymentSource): string {
+  if (method === "cash") return ACCOUNTS.CASH;
+  if (method === "mpesa") return ACCOUNTS.MPESA;
+  return ACCOUNTS.PETTY_CASH;
 }
 
 type JournalLineInput = { accountCode: string; debit?: number; credit?: number };

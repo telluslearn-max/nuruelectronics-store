@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "../prisma";
+import { formatPrice } from "../format";
 import { logAdminAction } from "../audit-log";
 import { getPolymarketMarketByConditionId, getPolymarketHistoricalPrice } from "./polymarket-client";
 import { computeSettlement } from "./trade-policy";
@@ -78,7 +79,7 @@ export async function settleResolvedPositions(): Promise<SettlementResult> {
       action: "capital-circle.position.settle",
       entityType: "capital_circle_position",
       entityId: position.id,
-      summary: `Capital Circle settled "${position.question}": ${resultUsd >= 0 ? "+" : ""}$${resultUsd.toFixed(2)} (${note}).`,
+      summary: `Capital Circle settled "${position.question}": ${resultUsd >= 0 ? "+" : ""}${formatPrice(String(resultUsd), "USD")} (${note}).`,
       metadata: { conditionId: position.marketId, tokenId: position.tokenId, entryPrice, finalPrice: token.price, sizeUsd: Number(position.sizeUsd), resultUsd },
     });
     settled++;

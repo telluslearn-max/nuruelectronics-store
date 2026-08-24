@@ -5,7 +5,7 @@ import { requireAdminSession } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
 import { formatPrice } from "@/lib/format";
 import { addPayslip, finalizePayRun, sendPayslipEmail } from "@/lib/payroll-actions";
-import { ConfirmSubmitButton } from "@/components/admin/confirm-submit-button";
+import { ConfirmPendingSubmitButton } from "@/components/admin/confirm-submit-button";
 import { FeedbackBanner } from "@/components/admin/feedback-banner";
 import { StatusPill } from "@/components/admin/status-pill";
 
@@ -141,13 +141,13 @@ export default async function AdminPayRunDetailPage({
                     <option value="mpesa">M-Pesa</option>
                   </select>
                 </div>
-                <ConfirmSubmitButton
+                <ConfirmPendingSubmitButton
                   confirmMessage="Finalize this pay run? This posts net pay to the ledger and can't be undone."
                   className={secondaryButtonClass}
                   pendingText="Finalizing…"
                 >
                   Finalize (posts to ledger)
-                </ConfirmSubmitButton>
+                </ConfirmPendingSubmitButton>
               </form>
             </details>
           )}

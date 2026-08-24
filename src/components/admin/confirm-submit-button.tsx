@@ -1,8 +1,17 @@
 "use client";
 
 import { useFormStatus } from "react-dom";
+import { makeConfirmClickHandler } from "../confirm-click-handler";
 
-export function ConfirmSubmitButton({
+/**
+ * Confirm-then-submit button for forms using a server-action `formAction` — needs
+ * `useFormStatus` (only usable inside such a form) to disable itself and show `pendingText`
+ * while the action runs. For a plain string-`action` form, use the non-admin
+ * `ConfirmSubmitButton` in `components/confirm-submit-button.tsx` instead — that one can't use
+ * this hook at all, which is why this is a separate, distinctly-named component rather than the
+ * same one wearing two hats (see confirm-click-handler.ts for the reasoning).
+ */
+export function ConfirmPendingSubmitButton({
   confirmMessage,
   className,
   formAction,
@@ -22,9 +31,7 @@ export function ConfirmSubmitButton({
       formAction={formAction}
       disabled={pending}
       className={className}
-      onClick={(event) => {
-        if (!confirm(confirmMessage)) event.preventDefault();
-      }}
+      onClick={makeConfirmClickHandler(confirmMessage)}
     >
       {pending ? pendingText : children}
     </button>

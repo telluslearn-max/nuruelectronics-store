@@ -50,3 +50,17 @@ next-env.d.ts
 .circle-testnet-entity-secret.tmp
 
 recovery_file_*.dat
+
+# Code-quality collector output — fully regenerable from source via `npm run quality:collect`,
+# so committing it would just be diff noise on every run. docs/quality/circular-baseline.json,
+# docs/quality/trend.md, docs/quality/audit-*.md, and docs/quality/raw/red-flag-counts.json ARE
+# committed deliberately (see docs/quality/README.md) — persisted loop history/state, not scratch
+# output. Ignoring individual files rather than the whole raw/ directory because git can't
+# re-include a file whose parent directory is excluded.
+/docs/quality/raw/churn.json
+/docs/quality/raw/madge.json
+/docs/quality/raw/madge-circular.json
+/docs/quality/raw/passthrough.json
+/docs/quality/raw/comment-overlap.json
+/docs/quality/raw/jscpd/
+/docs/quality/complexity-score.json

@@ -22,6 +22,10 @@ export function useMediaQuery(query: string): boolean | undefined {
 
   useEffect(() => {
     const mediaQueryList = window.matchMedia(query);
+    // Intentional: window.matchMedia doesn't exist during SSR/pre-hydration (see the function
+    // comment above on why `undefined` is the deliberate initial value), so there is no
+    // render-time way to read this — it has to happen in an effect on mount.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMatches(mediaQueryList.matches);
     function handleChange(event: MediaQueryListEvent) {
       setMatches(event.matches);
