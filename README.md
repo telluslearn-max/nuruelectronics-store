@@ -232,7 +232,10 @@ src/lib/ledger.ts             Double-entry journal posting shared by every money
 src/lib/search/               Semantic product search (Vertex embeddings + cosine similarity)
 src/proxy.ts                  Edge-level admin auth redirect + site-wide maintenance-mode gate
 prisma/                       Schema (31 models) + migrations + seed
-scripts/                      One-off verification/setup scripts (Circle wallet provisioning, testnet checks, product readiness)
+scripts/                      One-off verification/setup scripts (Circle wallet provisioning, testnet checks, product readiness) + quality/ collectors (churn, duplication, dependency graph, scoring)
+docs/quality/                 Code-quality rubric, reports, and trend log — see docs/quality/README.md
+.github/workflows/quality.yml Per-PR deterministic quality gate (typecheck, lint, circular-import check)
+.claude/skills/code-quality-audit/  The weekly/on-demand deep design-review skill
 ```
 
 ## Getting started
@@ -325,11 +328,24 @@ Relatedly: `gcloud scheduler jobs create` fails safely with `ALREADY_EXISTS` if 
 
 `prisma migrate status` reporting drift on a database with real data is not a green light for `prisma migrate dev` — that command's fix for drift is to offer a **reset**, which is destructive. If migrations are missing from history but their columns/tables/indexes already exist (checkable via `information_schema.columns`/`.tables`), the safe repair is `prisma migrate resolve --applied <migration_name>` for each one, confirmed individually against `information_schema` first — never assumed. Only after history is reconciled should `prisma migrate deploy` run for the genuinely new migration. This is exactly the sequence used to apply `20260820120000_add_capital_circle_intelligence` safely to a branch with pre-existing divergence.
 
+## Code quality
+
+Two speeds, deliberately separated. A per-PR gate (`.github/workflows/quality.yml`) runs
+typecheck, lint, and a circular-import check against a checked-in baseline — fast, deterministic,
+no LLM in the hot path. A weekly scheduled agent runs a deep design review against the 14 named
+red flags from *A Philosophy of Software Design* (Ousterhout), prioritized by an implementation
+of the book's own complexity formula (C = cp·tp — duplication/fan-in weighted by git churn, not
+an invented severity table). Findings land as a committed report plus GitHub issues.
+
+Full rubric, scoring formula, and the loop's cadence: [docs/quality/README.md](docs/quality/README.md).
+Run it yourself: `npm run quality:fast` (what the PR gate runs) or `/code-quality-audit diff` in
+Claude Code (the deeper review, on your current branch, on demand).
+
 ## Known limitations
 
 Documented deliberately rather than glossed over:
 
-- **Test coverage is partial.** Vitest covers the pure decision logic in `src/lib/capital-circle/` (edge gating, Kelly sizing, settlement math, calibration) — business-critical and specifically written as pure functions to make this cheap. Nothing else in the app has test coverage yet: no integration tests against the database, no route tests, no coverage for the return/refund policy or other ERP logic.
+- **Test coverage is partial.** Vitest covers the pure decision logic in `src/lib/capital-circle/` (edge gating, Kelly sizing, settlement math, calibration) — business-critical and specifically written as pure functions to make this cheap. Nothing else in the app has test coverage yet: no integration tests against the database, no route tests, no coverage for the return/refund policy or other ERP logic. `docs/quality/trend.md` now tracks known-debt files over time as the weekly audit reviews them, rather than leaving this gap purely anecdotal.
 - **One scheduled cron entry currently has no implementation.** `vercel.json` schedules `/api/cron/whatsapp-review-followup` daily, but no route file exists at that path — that entry 404s on every fire until either the route is built or the schedule entry is removed.
 - **Capital Circle's webhook path is unverified against a real payload.** Circle can't deliver webhooks to a localhost endpoint, so the signature-verification and pre-fill logic have been reviewed and unit-reasoned through but not exercised against a live notification.
 - **The concierge's per-IP rate limiter is approximate under concurrency** — it does a count-then-insert without row locking, which is an accepted tradeoff for a cost guardrail on an unauthenticated endpoint, not a guarantee.
