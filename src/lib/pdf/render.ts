@@ -1,5 +1,7 @@
 import "server-only";
 import { renderToBuffer } from "@react-pdf/renderer";
+import type { DocumentProps } from "@react-pdf/renderer";
+import type { ReactElement } from "react";
 import type {
   Customer,
   DeliveryNote,
@@ -18,7 +20,22 @@ import { InvoiceDocument } from "./invoice-document";
 import { ReceiptDocument } from "./receipt-document";
 import { DeliveryNoteDocument } from "./delivery-note-document";
 import { PayslipDocument } from "./payslip-document";
-import { getLetterhead } from "./letterhead";
+import { getLetterhead, type Letterhead } from "./letterhead";
+
+/**
+ * Fetches the current letterhead and renders `Document` with it merged into its own props, then
+ * buffers the PDF. Every `render*Pdf` export below does exactly this — factored out once so each
+ * of them stays a thin, still-distinctly-typed one-liner instead of five copies of the same two
+ * lines (A Philosophy of Software Design, Ch. 6/7: shared scaffolding pulled out, per-document
+ * prop shapes — which genuinely differ, e.g. only invoices take `receipts` — left alone).
+ */
+async function renderWithLetterhead<P extends { letterhead?: Letterhead }>(
+  Document: (props: P) => ReactElement<DocumentProps>,
+  props: Omit<P, "letterhead">,
+): Promise<Buffer> {
+  const letterhead = await getLetterhead();
+  return renderToBuffer(Document({ ...props, letterhead } as P));
+}
 
 export async function renderEstimatePdf(
   estimate: Estimate,
@@ -26,8 +43,7 @@ export async function renderEstimatePdf(
   customer: Customer,
   items: OrderItem[],
 ): Promise<Buffer> {
-  const letterhead = await getLetterhead();
-  return renderToBuffer(EstimateDocument({ estimate, order, customer, items, letterhead }));
+  return renderWithLetterhead(EstimateDocument, { estimate, order, customer, items });
 }
 
 export async function renderInvoicePdf(
@@ -37,8 +53,7 @@ export async function renderInvoicePdf(
   items: OrderItem[],
   receipts: Receipt[],
 ): Promise<Buffer> {
-  const letterhead = await getLetterhead();
-  return renderToBuffer(InvoiceDocument({ invoice, order, customer, items, receipts, letterhead }));
+  return renderWithLetterhead(InvoiceDocument, { invoice, order, customer, items, receipts });
 }
 
 export async function renderReceiptPdf(
@@ -47,13 +62,11 @@ export async function renderReceiptPdf(
   customer: Customer,
   items: OrderItem[],
 ): Promise<Buffer> {
-  const letterhead = await getLetterhead();
-  return renderToBuffer(ReceiptDocument({ receipt, invoice, customer, items, letterhead }));
+  return renderWithLetterhead(ReceiptDocument, { receipt, invoice, customer, items });
 }
 
 export async function renderDeliveryNotePdf(note: DeliveryNote, order: Order, items: OrderItem[]): Promise<Buffer> {
-  const letterhead = await getLetterhead();
-  return renderToBuffer(DeliveryNoteDocument({ note, order, items, letterhead }));
+  return renderWithLetterhead(DeliveryNoteDocument, { note, order, items });
 }
 
 export async function renderPayslipPdf(
@@ -62,6 +75,5 @@ export async function renderPayslipPdf(
   deductions: PayslipDeduction[],
   payRun: PayRun,
 ): Promise<Buffer> {
-  const letterhead = await getLetterhead();
-  return renderToBuffer(PayslipDocument({ payslip, employee, deductions, payRun, letterhead }));
+  return renderWithLetterhead(PayslipDocument, { payslip, employee, deductions, payRun });
 }
