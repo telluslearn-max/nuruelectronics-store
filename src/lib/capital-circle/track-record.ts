@@ -47,6 +47,56 @@ const HISTORY_LIMIT = 200;
 const CALIBRATION_LIMIT = CALIBRATION_SAMPLE_LIMIT;
 const RECENT_LOSSES_SHOWN = 5;
 
+export type ResolvedCandidateSnapshot = {
+  marketId: string;
+  tokenId: string;
+  question: string;
+  category: string | null;
+  eventId: string | null;
+  bestAsk: number | null;
+  bestBid: number | null;
+  spread: number | null;
+  modelProbability: number;
+  resolvedOutcome: number;
+  resolvedAt: Date;
+  createdAt: Date;
+  shownPrice: number | null;
+};
+
+/**
+ * Resolved, scored candidate snapshots — deduplicated to one row per (market, outcome token): the
+ * latest scoring before that token left the candidate pool.
+ *
+ * A market that stays live across several consecutive cycles gets re-screened and re-scored every
+ * one of them, so CapitalCircleCandidateSnapshot holds many highly-correlated rows per real-world
+ * event rather than one — measured directly against production data, 11,969 resolved+scored rows
+ * cover only 808 distinct tokens (~15x duplication on average, and one specific token was re-scored
+ * 98 times in ~2 hours). Feeding those raw rows into calibration means a single market that happened
+ * to resolve against a stable-but-wrong price gets counted as dozens or hundreds of "predictions,"
+ * which reads as severe miscalibration in that probability band even though it is really one event.
+ * Deduplicating first, then taking the most recent `limit` distinct events by resolution time, is
+ * what makes the sample actually independent.
+ */
+export async function getResolvedCandidateSnapshots(limit: number): Promise<ResolvedCandidateSnapshot[]> {
+  return prisma.$queryRaw<ResolvedCandidateSnapshot[]>`
+    SELECT * FROM (
+      SELECT DISTINCT ON ("tokenId")
+        "marketId", "tokenId", "question", "category", "eventId",
+        "bestAsk"::float8 AS "bestAsk",
+        "bestBid"::float8 AS "bestBid",
+        "spread"::float8 AS "spread",
+        "modelProbability"::float8 AS "modelProbability",
+        "resolvedOutcome", "resolvedAt", "createdAt",
+        "shownPrice"::float8 AS "shownPrice"
+      FROM "CapitalCircleCandidateSnapshot"
+      WHERE "resolvedOutcome" IS NOT NULL AND "modelProbability" IS NOT NULL
+      ORDER BY "tokenId", "createdAt" DESC
+    ) deduped
+    ORDER BY "resolvedAt" DESC
+    LIMIT ${limit}
+  `;
+}
+
 export type OpenPositionSummary = {
   marketId: string;
   eventId: string | null;
@@ -114,11 +164,7 @@ export async function getTrackRecord(): Promise<TrackRecord> {
       where: { resolvedAt: null, status: { in: ["simulated", "executed"] } },
       orderBy: { createdAt: "desc" },
     }),
-    prisma.capitalCircleCandidateSnapshot.findMany({
-      where: { resolvedOutcome: { not: null }, modelProbability: { not: null } },
-      orderBy: { resolvedAt: "desc" },
-      take: CALIBRATION_LIMIT,
-    }),
+    getResolvedCandidateSnapshots(CALIBRATION_LIMIT),
   ]);
 
   const wins = resolved.filter((position) => Number(position.resultUsd ?? 0) > 0).length;
