@@ -10,6 +10,7 @@ import {
 } from "@/lib/reports/capital-circle";
 import { confirmSweep } from "@/lib/capital-circle/sweep-actions";
 import { clearCapitalCirclePause } from "@/lib/capital-circle/wallet-actions";
+import { truncateAddress } from "@/lib/capital-circle/wallet-identity";
 import { isPushConfigured } from "@/lib/push";
 import { formatPrice, formatEatDate, formatEatDateTime } from "@/lib/format";
 import { FeedbackBanner } from "@/components/admin/feedback-banner";
@@ -523,7 +524,11 @@ export default async function CapitalCirclePage({
                 <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-neutral-400">
                   <span>{formatEatDateTime(p.createdAt)}</span>
                   {p.resolvedAt && <span>resolved {formatEatDateTime(p.resolvedAt)}</span>}
-                  {p.txHash && <span className="font-mono">{p.txHash}</span>}
+                  {p.txHash && (
+                    <span className="font-mono" title={p.txHash}>
+                      {truncateAddress(p.txHash, 10, 8)}
+                    </span>
+                  )}
                 </div>
               </li>
             ))}
