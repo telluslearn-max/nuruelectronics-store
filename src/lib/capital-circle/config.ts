@@ -26,8 +26,17 @@ export const DEFAULT_PER_POSITION_CAP_USD = Number(process.env.CAPITAL_CIRCLE_DE
  */
 export const CAPITAL_CIRCLE_SWEEP_PERCENT = Number(process.env.CAPITAL_CIRCLE_SWEEP_PERCENT ?? 40);
 
-/** Pinned explicitly rather than an alias, so a model swap is a deliberate change. */
-export const CAPITAL_CIRCLE_MODEL = "gemini-2.5-flash";
+/**
+ * Pinned explicitly rather than an alias, so a model swap is a deliberate change.
+ *
+ * Upgraded from gemini-2.5-flash to gemini-3.1-pro (GA since Feb 2026) after the simulated
+ * track record showed poor real-world calibration — a genuine reasoning-tier step up, not a
+ * same-generation refresh, in the hope that stronger reasoning produces better-calibrated
+ * probability estimates. Costs meaningfully more per call than Flash; this runs an ensemble of
+ * ENSEMBLE_SAMPLES calls across every screened outcome each cycle, so that cost multiplies
+ * directly. Revisit if the calibration numbers (post-701b71d fix, post-dedup) don't improve.
+ */
+export const CAPITAL_CIRCLE_MODEL = "gemini-3.1-pro";
 
 /**
  * Raised from 5: the cycle's deep-dive stage now screens finalists with
@@ -212,8 +221,20 @@ export const EXTREMIZE_FACTOR = Number(process.env.CAPITAL_CIRCLE_EXTREMIZE_FACT
  */
 export const KELLY_FRACTION = Number(process.env.CAPITAL_CIRCLE_KELLY_FRACTION ?? 0.5);
 
-/** Notional pool size Kelly sizes against, until a funded wallet balance replaces it in Phase B. */
-export const BANKROLL_USD = Number(process.env.CAPITAL_CIRCLE_BANKROLL_USD ?? 500);
+/**
+ * Starting size of the pool Kelly sizes against.
+ *
+ * While simulating (CAPITAL_CIRCLE_LIVE=false), this is the literal starting balance of a
+ * tracked paper account — see getSimulatedAccountState() in track-record.ts — not just a
+ * theoretical sizing input: Kelly sizes against that account's *current* balance (this number
+ * plus realized P&L), and sizePosition() in sizing-tool.ts refuses new positions once it hits
+ * zero, the same way real capital would run out. That's deliberate: the simulation is meant to
+ * be judged as if it actually held this much money, consistent profit against a bounded budget
+ * being the bar for trusting it with real funds, not just a positive skill score in isolation.
+ * Once live, real wallet balance replaces this for sizing (see Phase B), and this constant only
+ * remains as the pre-funding fallback.
+ */
+export const BANKROLL_USD = Number(process.env.CAPITAL_CIRCLE_BANKROLL_USD ?? 800);
 
 /** Never take more than this share of the resting ask-side depth — being the whole book is how you pay the whole spread. */
 export const MAX_BOOK_DEPTH_SHARE = Number(process.env.CAPITAL_CIRCLE_MAX_BOOK_DEPTH_SHARE ?? 0.1);

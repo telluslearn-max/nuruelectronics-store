@@ -97,6 +97,60 @@ export async function getResolvedCandidateSnapshots(limit: number): Promise<Reso
   `;
 }
 
+export type SimulatedAccountState = {
+  startingBudgetUsd: number;
+  /** All-time sum of resultUsd across every resolved simulated position — not windowed, unlike
+   * getCapitalCircleReport's PnL cards, since a bounded account's current balance has to reflect
+   * every result that ever happened to it, not just the most recent page of history. */
+  realizedPnlUsd: number;
+  /** startingBudgetUsd + realizedPnlUsd. The number to judge the simulation by. */
+  currentBalanceUsd: number;
+  /** Size of currently-open simulated positions — capital already committed, not available to size a new one. */
+  openExposureUsd: number;
+  /** currentBalanceUsd - openExposureUsd. What sizePosition() actually has left to allocate. */
+  availableUsd: number;
+  resolvedCount: number;
+  /** True once realized losses have wiped out the whole starting budget — the same "out of money"
+   * state a real funded account would hit, and the point past which sizePosition() refuses every
+   * new position rather than let a bounded simulation go arbitrarily negative. */
+  exhausted: boolean;
+};
+
+/**
+ * The $800 (default) paper account the simulation is judged by, computed fresh from every
+ * resolved simulated position rather than stored as mutable state — a derived read, so it can
+ * never drift from what CapitalCirclePosition actually says happened. `exited` counts as
+ * simulated for the same historical-mislabeling reason getCapitalCircleReport already treats it
+ * that way (see position-manager.ts).
+ */
+export async function getSimulatedAccountState(startingBudgetUsd: number): Promise<SimulatedAccountState> {
+  const [resolved, open] = await Promise.all([
+    prisma.capitalCirclePosition.aggregate({
+      where: { status: { in: ["simulated", "exited"] }, resolvedAt: { not: null } },
+      _sum: { resultUsd: true },
+      _count: true,
+    }),
+    prisma.capitalCirclePosition.aggregate({
+      where: { status: "simulated", resolvedAt: null },
+      _sum: { sizeUsd: true },
+    }),
+  ]);
+
+  const realizedPnlUsd = Number(resolved._sum.resultUsd ?? 0);
+  const openExposureUsd = Number(open._sum.sizeUsd ?? 0);
+  const currentBalanceUsd = round2(startingBudgetUsd + realizedPnlUsd);
+
+  return {
+    startingBudgetUsd,
+    realizedPnlUsd: round2(realizedPnlUsd),
+    currentBalanceUsd,
+    openExposureUsd: round2(openExposureUsd),
+    availableUsd: round2(currentBalanceUsd - openExposureUsd),
+    resolvedCount: resolved._count,
+    exhausted: currentBalanceUsd <= 0,
+  };
+}
+
 export type OpenPositionSummary = {
   marketId: string;
   eventId: string | null;

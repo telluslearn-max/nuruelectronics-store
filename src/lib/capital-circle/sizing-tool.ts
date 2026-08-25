@@ -12,6 +12,7 @@ import {
 } from "./config";
 import { applyCaps, kellySize, type CapWindow } from "./trade-policy";
 import { weekStartOf } from "./sweep";
+import { getSimulatedAccountState } from "./track-record";
 
 export type SizingResult = {
   approvedUsd: number;
@@ -157,6 +158,20 @@ export async function sizePosition(input: SizingInput | number): Promise<SizingR
     return reject(`Circuit breaker tripped — ${breaker.reason}`);
   }
 
+  // While simulating, the desk is judged as if it actually held BANKROLL_USD — Kelly sizes
+  // against the account's current balance below, and this is the "out of money" stop that mirrors
+  // what would happen if it were real: once realized losses wipe out the starting budget, no new
+  // position can be opened, full stop, regardless of how good the next trade's edge looks. Skipped
+  // once live, since a funded wallet balance is the real constraint at that point (see Phase B).
+  const account = CAPITAL_CIRCLE_LIVE ? null : await getSimulatedAccountState(BANKROLL_USD);
+  if (account?.exhausted) {
+    return reject(
+      `Simulated budget exhausted: started at ${formatPrice(String(account.startingBudgetUsd), "USD")}, ` +
+        `currently ${formatPrice(String(account.currentBalanceUsd), "USD")} after ${account.resolvedCount} resolved positions. ` +
+        `No new positions until a human reviews the run.`,
+    );
+  }
+
   // Portfolio limits, which had no equivalent before: only a per-position cap existed, so
   // nothing bounded the number of concurrent bets or the pool's total exposure.
   const [openCount, openExposure] = await Promise.all([
@@ -186,7 +201,10 @@ export async function sizePosition(input: SizingInput | number): Promise<SizingR
       shrunkProbability: normalized.shrunkProbability,
       effectiveEntry: normalized.effectiveEntry,
       capUsd: perTxCapUsd,
-      bankrollUsd: BANKROLL_USD,
+      // The account's actual current balance while simulating, so stakes shrink and grow with
+      // real performance instead of sizing against a number that never moves — the same way a
+      // real trader manages a real, depleting-or-compounding pool of money.
+      bankrollUsd: account?.currentBalanceUsd ?? BANKROLL_USD,
       bookDepthUsd: normalized.bookDepthUsd,
     });
     kellyFraction = kelly.kellyFraction;

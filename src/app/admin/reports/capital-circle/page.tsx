@@ -107,11 +107,49 @@ function PositionStat({ label, value, valueClassName }: { label: string; value: 
  * aren't filtered by the model's own judgement.
  */
 function IntelligenceSection({ report, pausedWalletId }: { report: CapitalCircleIntelligenceReport; pausedWalletId: string | null }) {
-  const { calibration } = report;
+  const { calibration, simulatedAccount } = report;
 
   return (
     <div className="mt-8">
-      <h3 className="text-xs font-medium uppercase tracking-wide text-neutral-400">Forecasting quality</h3>
+      <h3 className="text-xs font-medium uppercase tracking-wide text-neutral-400">Simulated budget</h3>
+      <div
+        className={`mt-3 rounded-card border p-4 ${
+          simulatedAccount.exhausted
+            ? "border-red-300 bg-red-50"
+            : simulatedAccount.realizedPnlUsd >= 0
+              ? "border-green-200 bg-green-50"
+              : "border-border-subtle"
+        }`}
+      >
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <div>
+            <div className="text-xs text-neutral-500">
+              Started at {formatPrice(String(simulatedAccount.startingBudgetUsd), "USD")} · this is the number the desk is judged by before it gets real
+              funds
+            </div>
+            <div className={`mt-1 text-2xl font-medium tabular-nums ${simulatedAccount.exhausted ? "text-red-800" : ""}`}>
+              {formatPrice(String(simulatedAccount.currentBalanceUsd), "USD")}
+            </div>
+          </div>
+          <div className="text-right text-xs tabular-nums text-neutral-600">
+            <div className={simulatedAccount.realizedPnlUsd >= 0 ? "text-green-700" : "text-red-700"}>
+              {simulatedAccount.realizedPnlUsd >= 0 ? "+" : ""}
+              {formatPrice(String(simulatedAccount.realizedPnlUsd), "USD")} realized over {simulatedAccount.resolvedCount} resolved
+            </div>
+            {simulatedAccount.openExposureUsd > 0 && (
+              <div className="mt-0.5">{formatPrice(String(simulatedAccount.openExposureUsd), "USD")} committed to open positions</div>
+            )}
+          </div>
+        </div>
+        {simulatedAccount.exhausted && (
+          <p className="mt-2 text-sm text-red-800">
+            Budget exhausted — realized losses have wiped out the starting {formatPrice(String(simulatedAccount.startingBudgetUsd), "USD")}. No new
+            positions will open until a human reviews the run.
+          </p>
+        )}
+      </div>
+
+      <h3 className="mt-8 text-xs font-medium uppercase tracking-wide text-neutral-400">Forecasting quality</h3>
 
       {report.circuitBreaker.paused && (
         <div className="mt-3 rounded-card border border-red-200 bg-red-50 p-4 text-sm text-red-800">
