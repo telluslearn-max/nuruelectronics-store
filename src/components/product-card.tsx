@@ -34,7 +34,9 @@ export function ProductCard({ product, quickAdd = false }: { product: Product; q
           title={product.title}
           productType={product.productType}
           sizes="(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw"
-          className="object-cover transition duration-300 group-hover:scale-105"
+          className={`object-cover transition duration-300 group-hover:scale-105 ${
+            product.availableForSale ? "" : "opacity-50 grayscale"
+          }`}
         />
         <ProductBadges
           variant="card"
