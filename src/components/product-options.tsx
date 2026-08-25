@@ -344,21 +344,12 @@ export function ProductOptions({ product }: { product: Product }) {
                 <span className="text-xs text-neutral-400" title="VAT is calculated and added at checkout.">excl. VAT</span>
               </p>
             </div>
-            <div className="flex shrink-0 items-center gap-2">
-              <WhatsAppOrderButton
-                productTitle={product.title}
-                variantLabel={variantLabel(selectedVariant)}
-                price={formatPrice(price.amount, price.currencyCode)}
-                productHandle={product.handle}
-                compact
+            <div className="w-36 shrink-0 sm:w-44">
+              <AddToCartButton
+                variantId={selectedVariant?.id}
+                availableForSale={selectedVariant?.availableForSale ?? false}
+                quantity={quantity}
               />
-              <div className="w-36 sm:w-44">
-                <AddToCartButton
-                  variantId={selectedVariant?.id}
-                  availableForSale={selectedVariant?.availableForSale ?? false}
-                  quantity={quantity}
-                />
-              </div>
             </div>
           </div>
         </div>

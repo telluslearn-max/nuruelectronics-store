@@ -27,7 +27,7 @@ export function getProductBadges(params: {
   }
 
   if (!availableForSale) {
-    return [{ key: "sold-out", label: "Sold out", className: "bg-background text-neutral-600" }];
+    return [{ key: "sold-out", label: "Sold out", className: "bg-neutral-900 text-white" }];
   }
 
   const badges: Badge[] = [];

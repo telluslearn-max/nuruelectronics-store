@@ -20,8 +20,20 @@ export function ConciergeDock({ store }: { store: ConciergeMessageStore }) {
   const [input, setInput] = useState("");
   const [isExpanded, setIsExpanded] = useState(false);
   const [hasOpened, setHasOpened] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const wasExpandedRef = useRef(false);
+
+  // Shrinks the launcher once the shopper has scrolled a bit, so it covers less of the page
+  // content passing underneath it — it stays full-size at the top of every page.
+  useEffect(() => {
+    function handleScroll() {
+      setIsScrolled(window.scrollY > 120);
+    }
+    handleScroll();
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
 
   useEffect(() => {
     if (!isExpanded) return;
@@ -85,6 +97,7 @@ export function ConciergeDock({ store }: { store: ConciergeMessageStore }) {
             setHasOpened(true);
           }}
           hasUnread={messages.length > 0 && !hasOpened}
+          compact={isScrolled}
         />
       )}
     </div>

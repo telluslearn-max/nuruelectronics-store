@@ -16,18 +16,23 @@ function ChatBubbleIcon({ className }: { className?: string }) {
 export function ConciergeFab({
   onClick,
   hasUnread,
+  compact = false,
 }: {
   onClick: () => void;
   hasUnread: boolean;
+  /** Shrinks the button once the page is scrolled, so it covers less of whatever content is underneath it. */
+  compact?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
       aria-label="Chat with our AI shopping concierge"
-      className="relative flex h-14 w-14 animate-scale-in items-center justify-center rounded-full bg-accent text-accent-foreground shadow-lg transition hover:brightness-110"
+      className={`relative flex animate-scale-in items-center justify-center rounded-full bg-accent text-accent-foreground shadow-lg transition-[width,height,filter] duration-200 hover:brightness-110 ${
+        compact ? "h-11 w-11" : "h-14 w-14"
+      }`}
     >
-      <ChatBubbleIcon className="h-6 w-6" />
+      <ChatBubbleIcon className={compact ? "h-5 w-5" : "h-6 w-6"} />
       {hasUnread && (
         <span
           aria-hidden="true"

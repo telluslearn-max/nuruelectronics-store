@@ -44,6 +44,12 @@ export default async function ShopPage() {
         <p className="mt-4 text-neutral-500">
           Browse by category, catch what&apos;s new, or jump straight to what you need.
         </p>
+        <Link
+          href="#all-products"
+          className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-accent hover:opacity-80"
+        >
+          Skip to all products &darr;
+        </Link>
       </section>
 
       <section className="mt-10 md:hidden">
@@ -118,7 +124,7 @@ export default async function ShopPage() {
         </div>
       </section>
 
-      <section className="mt-16">
+      <section id="all-products" className="mt-16 scroll-mt-24">
         <SectionHeading eyebrow="Full catalog" title="All products" />
         <div className="mt-6">
           <ProductList
