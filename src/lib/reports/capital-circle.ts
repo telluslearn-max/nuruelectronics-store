@@ -7,7 +7,12 @@ import {
   DAILY_POSITION_TARGET,
   DEFAULT_PER_POSITION_CAP_USD,
 } from "../capital-circle/config";
-import { getResolvedCandidateSnapshots, getTradingUrgency } from "../capital-circle/track-record";
+import {
+  getResolvedCandidateSnapshots,
+  getSimulatedAccountState,
+  getTradingUrgency,
+  type SimulatedAccountState,
+} from "../capital-circle/track-record";
 import { isCircleWalletConfigured } from "../capital-circle/circle-wallet-client";
 import { computeWeeklySweep, weekStartOf } from "../capital-circle/sweep";
 import {
@@ -154,6 +159,8 @@ export async function getCapitalCircleCycleStatus(): Promise<CycleStatus> {
 }
 
 export type CapitalCircleIntelligenceReport = {
+  /** The $800 (default) paper account the simulation is judged by — see getSimulatedAccountState. */
+  simulatedAccount: SimulatedAccountState;
   calibration: CalibrationReport;
   /**
    * Whether the record shows probabilities scored against the wrong outcome. Read this before
@@ -196,7 +203,8 @@ export type CapitalCircleIntelligenceReport = {
  * priced, not only the ones it chose to trade.
  */
 export async function getCapitalCircleIntelligenceReport(): Promise<CapitalCircleIntelligenceReport> {
-  const [snapshots, cycles, edgeRejectedCount, wallet, urgency] = await Promise.all([
+  const [simulatedAccount, snapshots, cycles, edgeRejectedCount, wallet, urgency] = await Promise.all([
+    getSimulatedAccountState(BANKROLL_USD),
     getResolvedCandidateSnapshots(CALIBRATION_SAMPLE_LIMIT),
     prisma.capitalCircleCycleLog.findMany({ orderBy: { startedAt: "desc" }, take: 20 }),
     prisma.capitalCirclePosition.count({ where: { status: "edge_rejected" } }),
@@ -228,6 +236,7 @@ export async function getCapitalCircleIntelligenceReport(): Promise<CapitalCircl
   }));
 
   return {
+    simulatedAccount,
     calibration,
     inversion,
     categories: computeCategoryPerformance(samples),
