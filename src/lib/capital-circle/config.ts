@@ -29,14 +29,19 @@ export const CAPITAL_CIRCLE_SWEEP_PERCENT = Number(process.env.CAPITAL_CIRCLE_SW
 /**
  * Pinned explicitly rather than an alias, so a model swap is a deliberate change.
  *
- * Upgraded from gemini-2.5-flash to gemini-3.1-pro (GA since Feb 2026) after the simulated
- * track record showed poor real-world calibration — a genuine reasoning-tier step up, not a
- * same-generation refresh, in the hope that stronger reasoning produces better-calibrated
- * probability estimates. Costs meaningfully more per call than Flash; this runs an ensemble of
- * ENSEMBLE_SAMPLES calls across every screened outcome each cycle, so that cost multiplies
- * directly. Revisit if the calibration numbers (post-701b71d fix, post-dedup) don't improve.
+ * gemini-2.5-flash -> gemini-3.1-pro -> gemini-3.5-flash. The Pro swap (in the hope that
+ * stronger reasoning fixes calibration) was reverted for cost a day later: at $2.00/$12.00 per
+ * million input/output tokens against an ensemble of ENSEMBLE_SAMPLES calls across every
+ * screened outcome each cycle, the cost multiplied directly and added up fast. gemini-3.5-flash
+ * is a full generation newer than the original 2.5-flash (not just a same-tier refresh) at
+ * $1.50/$9.00 — ~25% cheaper than 3.1-pro, and it outscores 3.1-pro on coding/agentic
+ * benchmarks despite the lower price, so this isn't a pure cost-for-quality tradeoff.
+ * gemini-3.1-flash-lite ($0.25/$1.50) is the next step down if this still isn't cheap enough,
+ * but Lite-tier trades away real reasoning depth, which is risky right after fixing a
+ * calibration problem. Revisit against the calibration numbers (post-701b71d fix, post-dedup)
+ * once enough cycles have run on this model to judge it.
  */
-export const CAPITAL_CIRCLE_MODEL = "gemini-3.1-pro";
+export const CAPITAL_CIRCLE_MODEL = "gemini-3.5-flash";
 
 /**
  * Raised from 5: the cycle's deep-dive stage now screens finalists with
