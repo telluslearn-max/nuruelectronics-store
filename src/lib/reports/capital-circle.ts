@@ -7,7 +7,7 @@ import {
   DAILY_POSITION_TARGET,
   DEFAULT_PER_POSITION_CAP_USD,
 } from "../capital-circle/config";
-import { getTradingUrgency } from "../capital-circle/track-record";
+import { getResolvedCandidateSnapshots, getTradingUrgency } from "../capital-circle/track-record";
 import { isCircleWalletConfigured } from "../capital-circle/circle-wallet-client";
 import { computeWeeklySweep, weekStartOf } from "../capital-circle/sweep";
 import {
@@ -197,11 +197,7 @@ export type CapitalCircleIntelligenceReport = {
  */
 export async function getCapitalCircleIntelligenceReport(): Promise<CapitalCircleIntelligenceReport> {
   const [snapshots, cycles, edgeRejectedCount, wallet, urgency] = await Promise.all([
-    prisma.capitalCircleCandidateSnapshot.findMany({
-      where: { resolvedOutcome: { not: null }, modelProbability: { not: null } },
-      orderBy: { resolvedAt: "desc" },
-      take: CALIBRATION_SAMPLE_LIMIT,
-    }),
+    getResolvedCandidateSnapshots(CALIBRATION_SAMPLE_LIMIT),
     prisma.capitalCircleCycleLog.findMany({ orderBy: { startedAt: "desc" }, take: 20 }),
     prisma.capitalCirclePosition.count({ where: { status: "edge_rejected" } }),
     prisma.capitalCircleWallet.findFirst({ where: { status: "active" }, orderBy: { createdAt: "desc" } }),
