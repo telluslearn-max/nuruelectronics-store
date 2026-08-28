@@ -3,7 +3,7 @@ import { CategoryTiles } from "@/components/category-tiles";
 import { ProductList } from "@/components/product-list";
 import { isSemanticSearchReady, searchProductsSemantic } from "@/lib/search/semantic-search";
 import { boostTitleMatches } from "@/lib/search/title-boost";
-import { getProducts, sanitizeFreeTextSearchTerm } from "@/lib/shopify";
+import { getAllProducts, getProducts, sanitizeFreeTextSearchTerm } from "@/lib/shopify";
 
 type SearchPageProps = {
   searchParams: Promise<{ q?: string }>;
@@ -25,7 +25,10 @@ export async function generateMetadata({ searchParams }: SearchPageProps): Promi
  */
 async function findMatchingProducts(query: string) {
   if (await isSemanticSearchReady()) {
-    const { products } = await getProducts({ first: 100 });
+    // The full catalog, not just the first page — a plain `getProducts` call only sees the first
+    // 100 products in default sort order, so anything past that (e.g. a whole brand added after
+    // the first 100 SKUs already existed) would never even reach the ranking step below.
+    const products = await getAllProducts();
     const ranked = await searchProductsSemantic(query, products);
     return { products: ranked, hasNextPage: false, endCursor: null, isSemantic: true };
   }
