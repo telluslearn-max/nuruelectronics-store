@@ -259,6 +259,27 @@ export async function getProducts(
   };
 }
 
+/**
+ * Pages through the full catalog via cursor, rather than a single `getProducts` call — a plain
+ * `first: 100` only ever sees the first 100 products in the store's default sort order, silently
+ * dropping anything past that (e.g. a whole brand added after the first 100 SKUs already existed).
+ * Mirrors `getAllProductHandles`'s pagination loop.
+ */
+export async function getAllProducts(
+  options: Omit<Parameters<typeof getProducts>[0], "after" | "first"> = {},
+): Promise<Product[]> {
+  const products: Product[] = [];
+  let after: string | undefined;
+  // Cap the loop defensively; the catalog is in the hundreds of products today.
+  for (let page = 0; page < 10; page++) {
+    const result = await getProducts({ ...options, after, first: 100 });
+    products.push(...result.products);
+    if (!result.hasNextPage || !result.endCursor) break;
+    after = result.endCursor;
+  }
+  return products;
+}
+
 export async function getComingSoonProducts(): Promise<Product[]> {
   const { products } = await getProducts({
     searchTerm: "tag:coming-soon",

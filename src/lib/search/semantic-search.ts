@@ -1,7 +1,7 @@
 import "server-only";
 import { cosineSimilarity, embedText, embedTexts, isConciergeConfigured } from "@/lib/concierge/embeddings";
 import { prisma } from "@/lib/prisma";
-import { getProducts } from "@/lib/shopify";
+import { getAllProducts } from "@/lib/shopify";
 import type { Product } from "@/lib/shopify/types";
 
 /** True once Vertex AI is configured AND at least one product has been embedded (the cron has run at least once). */
@@ -27,14 +27,7 @@ const EMBEDDING_BATCH_SIZE = 20;
  * and coming-soon products are included since they're still individually reachable/searchable.
  */
 export async function syncProductEmbeddings(): Promise<{ productsEmbedded: number }> {
-  const allProducts: Product[] = [];
-  let after: string | undefined;
-  for (let page = 0; page < 10; page++) {
-    const result = await getProducts({ after, first: 100, includeSpecs: true, includeExUk: true, includeComingSoon: true });
-    allProducts.push(...result.products);
-    if (!result.hasNextPage || !result.endCursor) break;
-    after = result.endCursor;
-  }
+  const allProducts = await getAllProducts({ includeSpecs: true, includeExUk: true, includeComingSoon: true });
 
   let productsEmbedded = 0;
   for (let i = 0; i < allProducts.length; i += EMBEDDING_BATCH_SIZE) {
