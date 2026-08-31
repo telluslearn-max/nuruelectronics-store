@@ -428,7 +428,7 @@ async function scoreCandidates(
         model: CAPITAL_CIRCLE_MODEL,
         contents: [{ role: "user", parts: [{ text: prompt }] }],
         config: {
-          systemInstruction: buildScoringSystemInstruction(),
+          systemInstruction: buildScoringSystemInstruction(SHOW_MARKET_PRICE_TO_MODEL),
           temperature: ENSEMBLE_TEMPERATURE,
           responseMimeType: "application/json",
           responseSchema: scoringResponseSchema as never,

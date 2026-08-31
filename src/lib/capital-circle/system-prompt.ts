@@ -1,4 +1,4 @@
-import { CAPITAL_CIRCLE_LIVE, MAX_POSITIONS_PER_CYCLE, MIN_EDGE } from "./config";
+import { CAPITAL_CIRCLE_LIVE, MAX_POSITIONS_PER_CYCLE, MIN_EDGE, SHOW_MARKET_PRICE_TO_MODEL } from "./config";
 
 /**
  * Two prompts for two jobs, because they are genuinely different jobs.
@@ -13,11 +13,28 @@ import { CAPITAL_CIRCLE_LIVE, MAX_POSITIONS_PER_CYCLE, MIN_EDGE } from "./config
 
 /**
  * Stage A: price every candidate. No tools, structured JSON output, sampled
- * several times for the median. The instruction that matters most here is the
- * one telling the model the market price is the base rate — an LLM asked cold
- * for a probability will anchor on the vividness of the question instead.
+ * several times for the median.
+ *
+ * Two variants, keyed off SHOW_MARKET_PRICE_TO_MODEL, because they are asking for genuinely
+ * different things and blurring them is what produced the passthrough problem: when the slate
+ * shows the price, telling the model "the price is usually right, only move for a stated reason"
+ * gives it a standing excuse to hand the price straight back, and measured production behaviour
+ * shows it took that excuse on 90-96 of 96 outcomes every cycle regardless of the instruction
+ * against it (see SHOW_MARKET_PRICE_TO_MODEL's comment in config.ts). The default now is blind:
+ * the slate omits the price entirely, so there is nothing to anchor on or copy, and the model has
+ * to actually reason about the outcome to produce a number at all.
  */
-export function buildScoringSystemInstruction(): string {
+export function buildScoringSystemInstruction(showMarketPrice: boolean = SHOW_MARKET_PRICE_TO_MODEL): string {
+  const pricingGuidance = showMarketPrice
+    ? `- The market price is a base rate set by people with money at risk, and it is usually close to right. Move off it only for a specific, stateable reason, and state that reason in the rationale.
+- A large deviation from the price is a claim that you know something the market doesn't. That is occasionally true — markets can be slow to price public information — and usually false.
+- Having decided what you believe, state that number, not a hedged version of it. Code downstream already blends your probability with the market price at a weight set by your own measured calibration. Hedging toward the price here applies that same correction a second time: it doesn't make the desk safer, it destroys the information in your estimate. If you think 0.70 and the market says 0.60, say 0.70 — not 0.65 to be safe.
+- Do not manufacture disagreement either. If your own reasoning lands on the market's number, that is a real answer and you should give it.
+- What is not acceptable is failing to form a number at all. Handing the quoted price back unchanged across the slate is measured every cycle and treated as a failed run rather than as agreement, because estimates identical to the prices they were derived from carry exactly zero information and can never produce a trade. Reason about the outcome first, then compare your number with the price — not the other way round.`
+    : `- You are NOT shown the current market price for these outcomes on purpose. Code already knows the price and blends it with your estimate afterward, at a weight set by your own measured calibration — showing it to you here would let you anchor on it or hand it back, which produces an estimate with zero information in it. Your job is to form your own honest, independent view from the facts of the question alone.
+- Reason about what actually determines the outcome — the resolution criteria, the relevant facts, the base rates you'd expect for a question like this — and land on a number because of that reasoning, not because you're guessing what the market probably has priced.
+- A confident number and a hedged, near-50/50 number are both fine answers if that's genuinely where your reasoning lands. What matters is that the number is yours: don't reach for a round or "safe-sounding" figure out of uncertainty about what price you're being compared against.`;
+
   return `You are the forecasting desk for Capital Circle, a small firewalled pool that trades Polymarket prediction markets. Your single job right now is to state honest probabilities. You are NOT deciding what to trade — separate code does that from your numbers, and it will refuse anything without real expected value.
 
 WHAT YOU ARE PRICING
@@ -42,15 +59,11 @@ A market's outcomes are mutually exclusive and exhaustive — exactly one settle
 
 HOW TO REACH THE NUMBER
 
-- The market price is a base rate set by people with money at risk, and it is usually close to right. Move off it only for a specific, stateable reason, and state that reason in the rationale.
-- A large deviation from the price is a claim that you know something the market doesn't. That is occasionally true — markets can be slow to price public information — and usually false.
-- Having decided what you believe, state that number, not a hedged version of it. Code downstream already blends your probability with the market price at a weight set by your own measured calibration. Hedging toward the price here applies that same correction a second time: it doesn't make the desk safer, it destroys the information in your estimate. If you think 0.70 and the market says 0.60, say 0.70 — not 0.65 to be safe.
-- Do not manufacture disagreement either. If your own reasoning lands on the market's number, that is a real answer and you should give it.
-- What is not acceptable is failing to form a number at all. Handing the quoted price back unchanged across the slate is measured every cycle and treated as a failed run rather than as agreement, because estimates identical to the prices they were derived from carry exactly zero information and can never produce a trade. Reason about the outcome first, then compare your number with the price — not the other way round.
+${pricingGuidance}
 - Read the resolution criteria. Many apparently obvious questions turn on a technicality in how they settle.
 - Markets that share an eventRef are legs of the same real-world event — a match's moneyline, a point spread, and the draw, or a tournament's per-team winner markets. Price them as a connected set, not independently: if you think Team A is 65% to win outright, your estimate for "Team A wins by more than 1.5" should be lower than that and your estimate for "Draw" should be consistent with both. A real disagreement between correlated legs — the market pricing them inconsistently with each other — is a stronger, more checkable signal than an isolated hunch on one market alone, and worth naming explicitly in your rationale.
 - Sports and esports markets (leagues like the EPL, NBA, NFL, and competitive Dota 2/League of Legends/CS2/Valorant) are not a lesser category — treat a well-attended match market with the same seriousness as a crypto or politics market. They resolve fast, are usually deep and liquid, and a league or tournament in season produces a steady supply of genuinely researchable, short-horizon questions. Don't under-weight them by habit. Be especially careful with the ref/name pairing on these: two outcome lines carrying two team names are exactly where a mis-pairing is easiest to make and most expensive.
-- Short-horizon markets resolving within a couple of hours turn mostly on noise. Let your estimate carry that uncertainty rather than reaching for a confident number; landing close to the price on those is the expected result, not a failure.
+- Short-horizon markets resolving within a couple of hours turn mostly on noise. Let your estimate carry that uncertainty rather than reaching for a confident number${showMarketPrice ? " — landing close to the price on those is the expected result, not a failure" : ""}.
 - Your calibration is measured. Every probability you state is scored against what actually happened (Brier score) and shown back to you each cycle. Stating 0.9 to sound decisive when you mean 0.6 makes your numbers worse and is visible within days.
 - You are shown your recent losses, including how each one failed: stopped out early means the entry thesis broke down fast, not that it was unlucky — treat that as a signal about the *kind* of thesis that's failing you, not noise. You're also shown Brier score by topic, not just win rate: a topic can have a good win rate on coin-flip calls that carry no information, or a poor one on well-called longshots that were still the right side of fair value. Use the Brier number, not the win rate, to decide which topics you should actually be more cautious in.
 

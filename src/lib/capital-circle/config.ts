@@ -282,20 +282,24 @@ export const SETTLEMENT_STALE_HOURS = Number(process.env.CAPITAL_CIRCLE_SETTLEME
 /**
  * Whether the scoring model is shown each outcome's current market price.
  *
- * Defaults to true, which is how the desk has always run, but the default is worth
- * understanding rather than inheriting. The price is a genuine base rate — and the code
- * already blends the model's estimate with it in shrinkProbability (p' = λ·model + (1−λ)·market),
- * so a model that anchors on the price has it counted twice, and one that simply hands it back
- * produces an estimate with no information in it at all. Production does the latter: the
- * passthrough detector reports the quoted price returned verbatim on 90-96 of 96 outcomes, cycle
- * after cycle, which makes edge equal to −costs by construction and no gate setting can rescue it.
+ * Used to default to true, on the theory that the price is a genuine base rate worth knowing —
+ * and the code already blends the model's estimate with it in shrinkProbability
+ * (p' = λ·model + (1−λ)·market), so a model that anchors on the price has it counted twice, and
+ * one that simply hands it back produces an estimate with no information in it at all. That is
+ * exactly what production measured: the passthrough detector reported the quoted price returned
+ * verbatim on 90-96 of 96 outcomes, cycle after cycle — despite the scoring prompt explicitly
+ * instructing against it (see system-prompt.ts) — which makes edge equal to −costs by
+ * construction for the vast majority of the slate, and turns the small remainder that do deviate
+ * into a winner's-curse selection over noise: ranking by edge and betting the largest deviations
+ * from an otherwise-copied number is exactly how to find false signal, not real signal. That is a
+ * structural reason for the desk to lose money net of costs, not merely to underperform.
  *
- * Setting this to false makes the scoring stage blind, so its estimates are the model's own and
- * the blend happens once, in code, where it is measurable. It is off by default because it is a
- * behavioural change to what the desk trades and deserves to be turned on deliberately and watched
- * on its own — not bundled into a correctness fix and credited with its results.
+ * Now off by default: the scoring stage is blind, so its estimates are forced to be the model's
+ * own and the blend with the market price happens once, in code, where it is measurable. Flip
+ * back to true only to deliberately re-test whether a later, more capable model still needs the
+ * passthrough guard.
  */
-export const SHOW_MARKET_PRICE_TO_MODEL = process.env.CAPITAL_CIRCLE_SHOW_MARKET_PRICE !== "false";
+export const SHOW_MARKET_PRICE_TO_MODEL = process.env.CAPITAL_CIRCLE_SHOW_MARKET_PRICE === "true";
 
 export const ENSEMBLE_SAMPLES = Number(process.env.CAPITAL_CIRCLE_ENSEMBLE_SAMPLES ?? 3);
 export const ENSEMBLE_TEMPERATURE = Number(process.env.CAPITAL_CIRCLE_ENSEMBLE_TEMPERATURE ?? 0.7);
