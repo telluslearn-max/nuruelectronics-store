@@ -7,8 +7,9 @@ import { mapMetafields } from "@/lib/intelligence/ingest/metafield-map";
 import { INGEST_SAMPLES, isIngestConfigured, researchProductSpecs } from "@/lib/intelligence/ingest/ai";
 import { reconcileRuns } from "@/lib/intelligence/ingest/reconcile";
 import { computeCompleteness } from "@/lib/intelligence/ingest/completeness";
-import { confidenceForSourceType } from "@/lib/intelligence/provenance";
+import { replaceProfileSpecs } from "@/lib/intelligence/ingest/write-specs";
 import { recomputeNuruScore } from "@/lib/intelligence/scoring/recompute";
+import { applySmartphoneSeed } from "@/lib/intelligence/seed/apply";
 import type { CategorySchema } from "@/lib/intelligence/types";
 
 /**
@@ -44,57 +45,23 @@ export type SyncOptions = {
 };
 
 export type SyncResult = {
+  seeded: number;
   profilesSeen: number;
   profilesResearched: number;
+  timedOut: boolean;
   aiConfigured: boolean;
 };
 
+/**
+ * Serverless functions have a hard wall (Vercel: up to 300s). The full catalog
+ * walk plus a few grounded-search passes can approach it, so the loop stops
+ * starting new products once this much wall time has passed and reports
+ * `timedOut: true` — the next run picks up where it left off.
+ */
+const RUN_DEADLINE_MS = 240_000;
+
 function productIdentity(product: Product): { brand: string | null; model: string } {
   return { brand: product.vendor?.trim() || null, model: product.title };
-}
-
-async function replaceSourceValues(
-  profileId: string,
-  sourceType: "shopify_metafield" | "ai_grounded",
-  label: string,
-  reference: string | null,
-  values: { key: string; rawValue: string; normalizedValue: string | null; unit: string | null }[],
-): Promise<void> {
-  await prisma.$transaction(async (tx) => {
-    // Drop this profile's prior values from this source type, and any source
-    // rows that are left referencing nothing, before writing the fresh set —
-    // a re-sync corrects the record rather than accumulating rows in it.
-    const stale = await tx.specValue.findMany({
-      where: { profileId, source: { type: sourceType } },
-      select: { id: true, sourceId: true },
-    });
-    if (stale.length > 0) {
-      await tx.specValue.deleteMany({ where: { id: { in: stale.map((s) => s.id) } } });
-      const staleSourceIds = [...new Set(stale.map((s) => s.sourceId))];
-      for (const sourceId of staleSourceIds) {
-        const remaining = await tx.specValue.count({ where: { sourceId } });
-        if (remaining === 0) await tx.intelSource.delete({ where: { id: sourceId } }).catch(() => undefined);
-      }
-    }
-
-    if (values.length === 0) return;
-
-    const source = await tx.intelSource.create({
-      data: { type: sourceType, label, reference },
-    });
-    const confidence = confidenceForSourceType(sourceType);
-    await tx.specValue.createMany({
-      data: values.map((v) => ({
-        profileId,
-        key: v.key,
-        rawValue: v.rawValue,
-        normalizedValue: v.normalizedValue,
-        unit: v.unit,
-        confidence,
-        sourceId: source.id,
-      })),
-    });
-  });
 }
 
 function needsResearch(
@@ -129,7 +96,7 @@ async function syncOneProduct(
   });
 
   const mapped = mapMetafields(schema.id, product.specs ?? []);
-  await replaceSourceValues(profile.id, "shopify_metafield", "Shopify specs metafield", null, mapped);
+  await replaceProfileSpecs(profile.id, "shopify_metafield", "Shopify specs metafield", null, mapped);
 
   let researched = false;
   if (
@@ -151,7 +118,7 @@ async function syncOneProduct(
         runs.map((r) => r.run),
       );
       const citations = [...new Set(runs.flatMap((r) => r.citations))];
-      await replaceSourceValues(
+      await replaceProfileSpecs(
         profile.id,
         "ai_grounded",
         "Gemini grounded search",
@@ -178,17 +145,29 @@ async function syncOneProduct(
 
 /** Walks the whole catalog and (re)builds product-intelligence records — see the module doc above. */
 export async function syncProductIntelligence(options: SyncOptions = {}): Promise<SyncResult> {
+  const startedAt = Date.now();
+
+  // The curated seed runs first, every time — it's fast, idempotent, and gives
+  // the flagship products verified data immediately rather than waiting on the
+  // grounded-search crawl.
+  const seed = options.handles ? { applied: 0, models: 0 } : await applySmartphoneSeed();
+
   const allProducts = await getAllProducts({ includeSpecs: true, includeExUk: true, includeComingSoon: true });
   const targeted = options.handles
     ? allProducts.filter((p) => options.handles!.includes(p.handle))
     : allProducts;
 
-  const budget = { researched: 0, max: options.maxResearched ?? 40 };
+  const budget = { researched: 0, max: options.maxResearched ?? 6 };
   let profilesSeen = 0;
+  let timedOut = false;
 
   for (const product of targeted) {
     const schema = schemaForShopifyProductType(product.productType);
     if (!schema) continue;
+    if (Date.now() - startedAt > RUN_DEADLINE_MS) {
+      timedOut = true;
+      break;
+    }
     profilesSeen += 1;
     try {
       await syncOneProduct(product, schema, options, budget);
@@ -197,5 +176,11 @@ export async function syncProductIntelligence(options: SyncOptions = {}): Promis
     }
   }
 
-  return { profilesSeen, profilesResearched: budget.researched, aiConfigured: isIngestConfigured };
+  return {
+    seeded: seed.applied,
+    profilesSeen,
+    profilesResearched: budget.researched,
+    timedOut,
+    aiConfigured: isIngestConfigured,
+  };
 }

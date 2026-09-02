@@ -8,6 +8,9 @@ import { constantTimeEqual } from "@/lib/admin-session-token";
  * catalog walks don't overlap.
  */
 
+/** The catalog walk + a few grounded-search passes can run long; give it the platform max. */
+export const maxDuration = 300;
+
 function isAuthorized(request: Request): boolean {
   const secret = process.env.CRON_SECRET;
   if (!secret) return false;

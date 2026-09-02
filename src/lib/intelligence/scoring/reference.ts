@@ -88,11 +88,18 @@ export const CHIPSET_PERFORMANCE_INDEX: Record<string, number> = {
 
   // Apple — indexed on the same 0-100 scale as the Android table above for
   // cross-platform comparison, not on Apple's own generational numbering.
-  "A17 Pro": 100,
-  "A16 Bionic": 92,
-  "A15 Bionic": 84,
-  "A14 Bionic": 72,
-  Bionic: 60, // unqualified "Bionic" from a source that dropped the generation number
+  "A19 Pro": 100,
+  "A18 Pro": 97,
+  A19: 94,
+  A18: 89,
+  "A17 Pro": 91,
+  "A16 Bionic": 84,
+  "A15 Bionic": 76,
+  "A14 Bionic": 66,
+  "A13 Bionic": 56,
+  "A12 Bionic": 46,
+  "A11 Bionic": 38,
+  Bionic: 55, // unqualified "Bionic" from a source that dropped the generation number
 };
 
 /** Linear-map `value` between [worst, best] to a 0-100 score, clamped. Direction follows which anchor is larger. */
