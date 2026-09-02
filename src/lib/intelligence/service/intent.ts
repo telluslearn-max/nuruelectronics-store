@@ -33,6 +33,16 @@ const CATEGORY_KEYWORDS: Record<string, string[]> = {
   smartphone: ["phone", "smartphone", "handset", "mobile"],
 };
 
+/** A whole-token (word-boundary, plural-tolerant) matcher for `keyword`. */
+function wordRe(keyword: string, flags = "i"): RegExp {
+  return new RegExp(`(^|[^a-z0-9])${keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}s?($|[^a-z0-9])`, flags);
+}
+
+/** Removes every whole-token occurrence of `keyword` (and its plural) from `text` — so "photography" isn't mangled into "graphy". */
+function stripWord(text: string, keyword: string): string {
+  return text.replace(new RegExp(wordRe(keyword, "gi").source, "gi"), "$1 $2");
+}
+
 const BRANDS = [
   "Samsung", "Apple", "iPhone", "Google", "Pixel", "Xiaomi", "Redmi", "Poco",
   "OnePlus", "Nothing", "Tecno", "Infinix", "Oppo", "Vivo", "Realme", "Honor", "Huawei",
@@ -132,9 +142,9 @@ export function parseSearchIntent(query: string): SearchIntent {
   let categoryId: string | null = null;
   for (const schema of listCategorySchemas()) {
     const keywords = CATEGORY_KEYWORDS[schema.id] ?? [schema.id];
-    if (keywords.some((k) => remainder.includes(` ${k} `) || remainder.includes(`${k}s `))) {
+    if (keywords.some((k) => wordRe(k).test(remainder))) {
       categoryId = schema.id;
-      for (const k of keywords) remainder = remainder.replaceAll(` ${k} `, " ").replaceAll(`${k}s `, " ");
+      for (const k of keywords) remainder = stripWord(remainder, k);
       break;
     }
   }
@@ -153,15 +163,16 @@ export function parseSearchIntent(query: string): SearchIntent {
   }
 
   // Priority weights — each matching rule contributes its vector once, and every
-  // matched keyword is pulled out of the remainder so free text is what's left.
+  // matched keyword is pulled out of the remainder (as a whole token, so
+  // "photography" isn't mangled into "graphy") so free text is what's left.
   const weights: FitWeights = {};
   for (const rule of INTENT_WEIGHTS) {
-    const matched = rule.keywords.filter((k) => lower.includes(k));
+    const matched = rule.keywords.filter((k) => wordRe(k).test(lower));
     if (matched.length === 0) continue;
     for (const [component, weight] of Object.entries(rule.weights) as [ScoreComponent, number][]) {
       weights[component] = (weights[component] ?? 0) + weight;
     }
-    for (const keyword of matched) remainder = remainder.replaceAll(keyword, " ");
+    for (const keyword of matched) remainder = stripWord(remainder, keyword);
   }
 
   const freeText = remainder
