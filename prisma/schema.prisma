@@ -803,3 +803,161 @@ model CapitalCircleSweep {
   @@unique([weekStart])
   @@index([status, weekStart])
 }
+
+// ---------------------------------------------------------------------------
+// Product Intelligence Layer — NURU's own structured product knowledge, kept
+// deliberately separate from Shopify (the commerce/catalogue system of record)
+// and from the ERP ledger models above. Shopify stays the authority on what's
+// for sale and at what price; these models are the authority on what a product
+// *is* — normalized specifications, where each fact came from, how much it can
+// be trusted, and (added in later migrations) benchmark anchors, NURU scores,
+// and product relationships.
+//
+// Join key to Shopify is the product handle / product id. A ProductProfile is
+// created and refreshed by the nightly catalogue reconcile job; nothing here is
+// edited by hand through an admin screen. See src/lib/intelligence/.
+// ---------------------------------------------------------------------------
+
+/// How much a single stored specification can be trusted. Assigned from the
+/// source it came from, not by a human (there is no verification UI): a value
+/// from NURU's own maintained spec sheet is `verified`; a Shopify `specs`
+/// metafield is `high`; a figure pulled by an AI grounded-search pass is `low`
+/// until something better replaces it. The comparison engine excludes anything
+/// below a per-use floor rather than presenting a guess as fact.
+enum SpecConfidence {
+  verified
+  high
+  medium
+  low
+  unknown
+}
+
+/// Where a stored fact came from. Drives the confidence assigned to every
+/// SpecValue / BenchmarkObservation that cites it (see
+/// confidenceForSourceType in src/lib/intelligence/normalize.ts).
+enum IntelSourceType {
+  /// NURU's own hand-maintained spec sheet (CSV import). Treated as verified.
+  nuru_csv
+  /// A Shopify product metafield in the "specs" namespace.
+  shopify_metafield
+  /// A manufacturer specification page or data sheet.
+  manufacturer
+  /// A third-party benchmark database (Geekbench, AnTuTu, 3DMark, DXOMARK).
+  benchmark_db
+  /// A Gemini grounded-search pass. Lowest confidence — always superseded by a
+  /// real source when one becomes available.
+  ai_grounded
+  /// Reserved: a manual correction. No code path writes this yet (no admin UI).
+  manual
+}
+
+/// One row per Shopify product NURU has built product intelligence for. Created
+/// and kept in sync by the nightly reconcile job (src/lib/intelligence/sync.ts,
+/// added in a later PR); never hand-edited.
+model ProductProfile {
+  id               String   @id @default(cuid())
+  /// Shopify's stable product id (gid). The durable join key.
+  shopifyProductId String   @unique
+  /// Shopify product handle — the id used everywhere else in the app.
+  handle           String   @unique
+  /// Category schema id this profile is scored against, e.g. "smartphone".
+  /// A plain string, not an enum, so a new category is a code change in
+  /// src/lib/intelligence/schema/ with no migration.
+  category         String
+  brand            String?
+  productFamily    String?
+  model            String?
+  generation       String?
+  releaseYear      Int?
+  /// 0.000–1.000: share of the category schema's attributes that have at least
+  /// one SpecValue at `low` confidence or better. Recomputed on every sync.
+  dataCompleteness Decimal  @default(0) @db.Decimal(4, 3)
+  firstSeenAt      DateTime @default(now())
+  lastSyncedAt     DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  specValues SpecValue[]
+  nuruScore  NuruScore?
+
+  @@index([category])
+}
+
+/// A citable origin for one or more stored facts. One import run (a CSV upload,
+/// one product's grounded-search pass) creates one IntelSource that many
+/// SpecValue rows then reference, so provenance is recorded once, not copied
+/// onto every field.
+model IntelSource {
+  id          String          @id @default(cuid())
+  type        IntelSourceType
+  /// Human-readable origin, e.g. "NURU spec sheet (2026-09 import)", "GSMArena".
+  label       String
+  /// URL or bibliographic reference where the fact can be re-checked.
+  reference   String?
+  /// When the data was observed at the source (not when the row was written).
+  retrievedAt DateTime        @default(now())
+  createdAt   DateTime        @default(now())
+
+  specValues SpecValue[]
+
+  @@index([type])
+}
+
+/// One normalized specification for one product, from one source. Multiple
+/// sources for the same (profile, key) coexist as separate rows; readers pick
+/// the highest-confidence one and fall back down the ladder. Re-importing the
+/// same source updates its row in place via the composite unique key.
+model SpecValue {
+  id              String         @id @default(cuid())
+  profileId       String
+  profile         ProductProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  /// Attribute key from the category schema, e.g. "refresh_rate_hz".
+  key             String
+  /// Exactly what the source said, verbatim: "up to 120 Hz".
+  rawValue        String
+  /// Machine-readable form produced by the normalization engine. Numbers are
+  /// stored as their decimal string ("120"), booleans as "true"/"false", enums
+  /// as the canonical token. Null when the raw value could not be normalized —
+  /// which is itself a signal, distinct from the attribute being absent.
+  normalizedValue String?
+  /// Canonical unit for the normalized value ("hz", "mah", "gb"), or null for
+  /// unitless / enum / boolean attributes.
+  unit            String?
+  confidence      SpecConfidence
+  sourceId        String
+  source          IntelSource    @relation(fields: [sourceId], references: [id])
+  /// When this fact was collected at its source — copied from IntelSource at
+  /// write time so a "specs verified N days ago" read needs no join.
+  collectedAt     DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@unique([profileId, key, sourceId])
+  @@index([profileId, key])
+}
+
+
+/// The NURU Score cache for one product — see src/lib/intelligence/scoring/.
+/// Deterministically recomputed (never model-written) whenever a sync writes
+/// new spec values for the product; this row is a cache of that computation,
+/// not a second source of truth for it.
+model NuruScore {
+  profileId        String         @id
+  profile          ProductProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  category         String
+  /// Component scores actually produced, e.g. {"battery": 82.5, "camera": 74}. Components
+  /// with no scoreable data are simply absent, not zero — see nuru-score.ts.
+  components       Json
+  /// Null when nothing on the product could be scored at all.
+  composite        Decimal?       @db.Decimal(5, 2)
+  /// Which components contributed to `composite`, in schema component order.
+  scoredComponents String[]
+  /// Per-component { scoredWeight, totalWeight } — how much of the component's defined
+  /// weight was actually backed by a resolved value, for a "based on N of M known
+  /// factors" confidence read in the UI.
+  coverage         Json
+  /// Bumped when the scoring formulas themselves change, so a stale cached row from an
+  /// old formula version can be told apart from one computed under the current rules.
+  formulaVersion   Int            @default(1)
+  computedAt       DateTime       @default(now())
+
+  @@index([category])
+}

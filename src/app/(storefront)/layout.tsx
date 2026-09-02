@@ -9,6 +9,7 @@ import { Footer } from "@/components/footer";
 import { MobileTabBar } from "@/components/mobile-tab-bar";
 import { Nav } from "@/components/nav";
 import { SeasonalDecoration } from "@/components/seasonal/seasonal-decoration";
+import { WebMcpRegistrar } from "@/components/webmcp/webmcp-registrar";
 import { WishlistProvider } from "@/components/wishlist/wishlist-context";
 import { getCart } from "@/lib/actions";
 import { getConversationHistory } from "@/lib/concierge/history";
@@ -64,6 +65,7 @@ export default async function StorefrontLayout({
             <ConciergeWidget enabled={isConciergeConfigured} initialMessages={conciergeHistory} />
             <MobileTabBar authEnabled={isCustomerAuthConfigured} customerName={customer?.displayName ?? null} />
             <CompareTray />
+            <WebMcpRegistrar />
           </div>
         </WishlistProvider>
       </CompareProvider>

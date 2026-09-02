@@ -2,28 +2,31 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { CompareTable } from "@/components/compare/compare-table";
 import { useCompare } from "@/components/compare/compare-context";
-import { AddToCartButton } from "@/components/cart/add-to-cart-button";
-import { getProductsByHandles } from "@/lib/actions";
-import type { Product } from "@/lib/shopify/types";
+import { ComparisonView } from "@/components/compare/comparison-view";
+import { loadComparison } from "@/lib/intelligence/compare-action";
+import type { ComparisonResultView } from "@/components/compare/comparison-result";
 
 export function ComparePageClient() {
   const { items, removeFromCompare, clearCompare } = useCompare();
-  const [products, setProducts] = useState<Product[] | null>(null);
+  const [loaded, setLoaded] = useState<{ key: string; view: ComparisonResultView } | null>(null);
+
+  const key = items.map((i) => i.handle).join(",");
 
   useEffect(() => {
-    // Empty case is already handled by the items.length === 0 branch below,
-    // before products is ever read — nothing to fetch or set here.
-    if (items.length === 0) return;
+    if (items.length < 2) return;
+    const handles = items.map((i) => i.handle);
     let cancelled = false;
-    getProductsByHandles(items.map((i) => i.handle)).then((result) => {
-      if (!cancelled) setProducts(result);
+    loadComparison(handles).then((view) => {
+      if (!cancelled) setLoaded({ key: handles.join(","), view });
     });
     return () => {
       cancelled = true;
     };
   }, [items]);
+
+  // Only trust a loaded result that matches the current compare list.
+  const view = loaded && loaded.key === key ? loaded.view : null;
 
   return (
     <div>
@@ -31,7 +34,7 @@ export function ComparePageClient() {
         <div>
           <h1 className="text-title">Compare</h1>
           <p className="mt-2 text-neutral-500">
-            Products you&apos;ve chosen to compare, side by side.
+            Side by side, with NURU&apos;s own scoring — and a personalised Fit Score when you tell us what matters.
           </p>
         </div>
         {items.length > 0 && (
@@ -45,10 +48,12 @@ export function ComparePageClient() {
         )}
       </div>
 
-      {items.length === 0 ? (
+      {items.length < 2 ? (
         <div className="flex flex-col items-center justify-center py-24 text-center">
           <p className="text-neutral-500">
-            You haven&apos;t added anything to compare yet.
+            {items.length === 0
+              ? "You haven't added anything to compare yet."
+              : "Add one more product to start comparing."}
           </p>
           <Link
             href="/shop"
@@ -57,8 +62,11 @@ export function ComparePageClient() {
             Browse products
           </Link>
         </div>
-      ) : products === null ? (
-        <div className="mt-10 grid grid-cols-2 gap-4 sm:grid-cols-3">
+      ) : view === null ? (
+        <div
+          className="mt-10 grid gap-4"
+          style={{ gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))` }}
+        >
           {items.map((item) => (
             <div key={item.handle}>
               <div className="aspect-square animate-pulse rounded-card bg-neutral-100" />
@@ -68,34 +76,7 @@ export function ComparePageClient() {
           ))}
         </div>
       ) : (
-        <div className="mt-10">
-          <CompareTable
-            columns={products}
-            renderColumnHeader={(p) => (
-              <div className="mt-2 space-y-3">
-                <Link
-                  href={`/products/${p.handle}`}
-                  className="block text-sm font-semibold hover:text-accent"
-                >
-                  {p.title}
-                </Link>
-                <button
-                  type="button"
-                  onClick={() => removeFromCompare(p.handle)}
-                  className="block text-xs font-medium text-neutral-500 hover:text-foreground"
-                >
-                  Remove
-                </button>
-                <div className="w-36">
-                  <AddToCartButton
-                    variantId={p.variants[0]?.id}
-                    availableForSale={p.availableForSale}
-                  />
-                </div>
-              </div>
-            )}
-          />
-        </div>
+        <ComparisonView view={view} onRemove={removeFromCompare} />
       )}
     </div>
   );

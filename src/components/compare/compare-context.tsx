@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 
 export type CompareItem = { handle: string; title: string; image?: string };
 
@@ -21,21 +21,30 @@ const CompareContext = createContext<CompareContextValue | null>(null);
 
 export function CompareProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<CompareItem[]>([]);
+  // The persist effect below must not run before the hydrate effect has read the stored list —
+  // otherwise it fires on mount with the initial empty `items` and overwrites what's stored, so
+  // the compare list is lost on every full page load. Hydrate captures the stored value into a
+  // local before that can happen, and its `length` guard makes a strict-mode re-read of a
+  // just-cleared key a no-op, so the hydrate still wins.
+  const hydratedRef = useRef(false);
 
-  // Hydrate from localStorage after mount only (localStorage is an external system, and reading
-  // it after mount rather than during render is what avoids a server/client hydration mismatch) —
-  // same convention as useExUkMatches.
+  // Hydrate from localStorage after mount only (reading it during render would mismatch the
+  // server HTML) — same convention as useExUkMatches.
   useEffect(() => {
     try {
       const raw = window.localStorage.getItem(STORAGE_KEY);
+      const parsed: unknown = raw ? JSON.parse(raw) : null;
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      if (raw) setItems(JSON.parse(raw));
+      if (Array.isArray(parsed) && parsed.length > 0) setItems(parsed as CompareItem[]);
     } catch {
       // Corrupt or inaccessible storage — start empty rather than throw.
+    } finally {
+      hydratedRef.current = true;
     }
   }, []);
 
   useEffect(() => {
+    if (!hydratedRef.current) return;
     try {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
     } catch {
