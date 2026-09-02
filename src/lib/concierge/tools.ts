@@ -10,6 +10,15 @@ import { BNPL_PLAN_IDS, explainBnplPlan } from "./bnpl-tool";
 import { addToCartTool, removeCartItem, updateCartItemQuantity } from "./cart-tools";
 import { compareProducts, getProductDetails, listKitsOrEcosystems, searchProducts } from "./catalog-tools";
 import { getExUkSavings } from "./ex-uk-tool";
+import {
+  calculateFitScoreForModel,
+  explainRecommendationForModel,
+  findAlternativesForModel,
+  getProductSpecsForModel,
+  recommendForModel,
+  weightsFrom,
+  whyNotForModel,
+} from "./intelligence-tool";
 import { checkOrderStatus, fileReturnOrRefund } from "./support-tool";
 import type { ConciergeEvent } from "./types";
 import { buildWhatsAppHandoffMessage, isWhatsAppHandoffConfigured } from "./whatsapp-tool";
@@ -220,6 +229,106 @@ const requestReturnOrRefundDeclaration: FunctionDeclaration = {
   },
 };
 
+/**
+ * The shopper's priorities as component weights, 0-10 each — the model fills this from what the
+ * shopper said matters ("camera and battery" → camera: 8, battery: 6, others lower). Only
+ * relative size matters. Omitting a component gives it no weight.
+ */
+const prioritiesSchema = {
+  type: "object",
+  description:
+    "The shopper's priorities as relative weights (0-10) across: performance, camera, battery, display, build, features, software, value. Fill from what the shopper said matters most.",
+  properties: {
+    performance: { type: "number" },
+    camera: { type: "number" },
+    battery: { type: "number" },
+    display: { type: "number" },
+    build: { type: "number" },
+    features: { type: "number" },
+    software: { type: "number" },
+    value: { type: "number" },
+  },
+} as const;
+
+const getProductSpecsDeclaration: FunctionDeclaration = {
+  name: "get_product_specs",
+  description:
+    "Get NURU's normalized, verified specifications and NURU Score for one product by handle — cleaner and deeper than get_product_details' raw fields, with a confidence level per spec. Use this when the shopper wants to understand or dig into a phone's specs. Only smartphones have this today.",
+  parametersJsonSchema: {
+    type: "object",
+    properties: { handle: { type: "string" } },
+    required: ["handle"],
+  },
+};
+
+const recommendProductsDeclaration: FunctionDeclaration = {
+  name: "recommend_products",
+  description:
+    "The core recommendation tool. Given the shopper's priorities (as weights) and optionally a budget/brand, returns up to 3 ranked, in-stock smartphones each with a personalized Fit Score and structured reasoning (strengths, weaknesses, primary reason). Call this once you know what the shopper cares about most and roughly their budget — don't ask more than 2-3 questions first. The reasoning is computed by NURU's engine; narrate it, don't invent your own.",
+  parametersJsonSchema: {
+    type: "object",
+    properties: {
+      category: { type: "string", description: "The category slug, e.g. \"phones\". Only phones are covered today." },
+      priorities: prioritiesSchema,
+      budgetMin: { type: "number", description: "Minimum price in KES, if the shopper gave a range." },
+      budgetMax: { type: "number", description: "Maximum price in KES." },
+      brand: { type: "string", description: "A brand to restrict to, e.g. \"Samsung\", if the shopper has a preference." },
+    },
+    required: ["category", "priorities"],
+  },
+};
+
+const calculateFitScoreDeclaration: FunctionDeclaration = {
+  name: "calculate_fit_score",
+  description:
+    "Compute one product's personalized Fit Score (0-100) for the shopper's priorities, plus its NURU Score components. Use when the shopper asks how well a specific phone suits them.",
+  parametersJsonSchema: {
+    type: "object",
+    properties: { handle: { type: "string" }, priorities: prioritiesSchema },
+    required: ["handle", "priorities"],
+  },
+};
+
+const explainRecommendationDeclaration: FunctionDeclaration = {
+  name: "explain_recommendation",
+  description:
+    "Get the structured reasoning for one product against the shopper's priorities — which weighted components are strengths, which are weaknesses, and which drove the Fit Score. Narrate this rather than inventing reasons.",
+  parametersJsonSchema: {
+    type: "object",
+    properties: { handle: { type: "string" }, priorities: prioritiesSchema },
+    required: ["handle", "priorities"],
+  },
+};
+
+const whyNotDeclaration: FunctionDeclaration = {
+  name: "why_not",
+  description:
+    "When the shopper challenges a recommendation (\"why not the Samsung?\"), get the component-by-component split: which product wins which components, which of the winner's wins are the ones the shopper weighted most, and the Fit Score gap. Use this to answer honestly instead of guessing.",
+  parametersJsonSchema: {
+    type: "object",
+    properties: {
+      rejected_handle: { type: "string", description: "The product the shopper is asking about instead." },
+      winner_handle: { type: "string", description: "The product you recommended." },
+      priorities: prioritiesSchema,
+    },
+    required: ["rejected_handle", "winner_handle", "priorities"],
+  },
+};
+
+const findAlternativesDeclaration: FunctionDeclaration = {
+  name: "find_alternatives",
+  description:
+    "Find up to 3 in-stock phones that keep most of a target phone's capability for this shopper — use when the phone they want is out of stock or over budget. Returns a match score (share of capability retained) and where each alternative falls short.",
+  parametersJsonSchema: {
+    type: "object",
+    properties: {
+      handle: { type: "string", description: "The target product's handle." },
+      priorities: prioritiesSchema,
+    },
+    required: ["handle"],
+  },
+};
+
 const openCheckoutDeclaration: FunctionDeclaration = {
   name: "open_checkout",
   description: "Surface the real checkout link once the shopper is ready to pay. Only call this once they've indicated they're done deciding.",
@@ -241,7 +350,13 @@ const openWhatsAppHandoffDeclaration: FunctionDeclaration = {
 export const functionDeclarations: FunctionDeclaration[] = [
   searchProductsDeclaration,
   getProductDetailsDeclaration,
+  getProductSpecsDeclaration,
   compareProductsDeclaration,
+  recommendProductsDeclaration,
+  calculateFitScoreDeclaration,
+  explainRecommendationDeclaration,
+  whyNotDeclaration,
+  findAlternativesDeclaration,
   listKitsOrEcosystemsDeclaration,
   addToCartDeclaration,
   getCartDeclaration,
@@ -302,6 +417,62 @@ export async function dispatchTool(
     case "list_kits_or_ecosystems": {
       const kind = args.kind === "kits" || args.kind === "ecosystems" ? args.kind : "both";
       return { resultForModel: listKitsOrEcosystems(kind), events: [] };
+    }
+
+    case "get_product_specs": {
+      const handle = typeof args.handle === "string" ? args.handle : "";
+      if (!handle) return { resultForModel: { error: "Missing handle." }, events: [] };
+      return { resultForModel: await getProductSpecsForModel(handle), events: [] };
+    }
+
+    case "recommend_products": {
+      const result = await recommendForModel({
+        category: typeof args.category === "string" ? args.category : "",
+        weights: weightsFrom(args.priorities, args.priorities_text),
+        budgetMin: typeof args.budgetMin === "number" ? args.budgetMin : undefined,
+        budgetMax: typeof args.budgetMax === "number" ? args.budgetMax : undefined,
+        brand: typeof args.brand === "string" ? args.brand : undefined,
+      });
+      if ("error" in result) return { resultForModel: result, events: [] };
+      return {
+        resultForModel: { recommendations: result.recommendations },
+        events: result.products.length ? [{ type: "products", mode: "list", products: result.products }] : [],
+      };
+    }
+
+    case "calculate_fit_score": {
+      const handle = typeof args.handle === "string" ? args.handle : "";
+      if (!handle) return { resultForModel: { error: "Missing handle." }, events: [] };
+      const weights = weightsFrom(args.priorities, args.priorities_text);
+      return { resultForModel: await calculateFitScoreForModel(handle, weights), events: [] };
+    }
+
+    case "explain_recommendation": {
+      const handle = typeof args.handle === "string" ? args.handle : "";
+      if (!handle) return { resultForModel: { error: "Missing handle." }, events: [] };
+      const weights = weightsFrom(args.priorities, args.priorities_text);
+      return { resultForModel: await explainRecommendationForModel(handle, weights), events: [] };
+    }
+
+    case "why_not": {
+      const rejected = typeof args.rejected_handle === "string" ? args.rejected_handle : "";
+      const winner = typeof args.winner_handle === "string" ? args.winner_handle : "";
+      if (!rejected || !winner) {
+        return { resultForModel: { error: "Missing rejected_handle or winner_handle." }, events: [] };
+      }
+      const weights = weightsFrom(args.priorities, args.priorities_text);
+      return { resultForModel: await whyNotForModel(rejected, winner, weights), events: [] };
+    }
+
+    case "find_alternatives": {
+      const handle = typeof args.handle === "string" ? args.handle : "";
+      if (!handle) return { resultForModel: { error: "Missing handle." }, events: [] };
+      const weights = weightsFrom(args.priorities, args.priorities_text);
+      const result = await findAlternativesForModel(handle, weights);
+      return {
+        resultForModel: { alternatives: result.alternatives },
+        events: result.products.length ? [{ type: "products", mode: "list", products: result.products }] : [],
+      };
     }
 
     case "add_to_cart": {

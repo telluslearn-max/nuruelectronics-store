@@ -8,7 +8,18 @@ import type { ConciergeEvent, ConciergeMessage, ConciergePageContext } from "./t
 const MAX_TOOL_ITERATIONS = 6;
 
 /** Read-only lookups safe to force when a message plausibly needs catalog grounding — never a mutating tool like add_to_cart. */
-const CATALOG_LOOKUP_TOOLS = ["search_products", "get_product_details", "compare_products", "list_kits_or_ecosystems"];
+const CATALOG_LOOKUP_TOOLS = [
+  "search_products",
+  "get_product_details",
+  "get_product_specs",
+  "compare_products",
+  "recommend_products",
+  "calculate_fit_score",
+  "explain_recommendation",
+  "why_not",
+  "find_alternatives",
+  "list_kits_or_ecosystems",
+];
 
 /**
  * Catches the C2 hallucination pattern: a shopper naming a specific product/model, or asking
