@@ -31,6 +31,15 @@ describe("parseSearchIntent", () => {
     expect(intent.weights.performance).toBeGreaterThan(0);
   });
 
+  it("strips intent keywords as whole tokens, not substrings", () => {
+    const intent = parseSearchIntent("best iphone for photography under 120k");
+    expect(intent.weights.camera).toBeGreaterThan(0);
+    expect(intent.brand).toBe("Apple");
+    expect(intent.budgetMax).toBe(120000);
+    // "photography" must not be mangled into "graphy" in the free text.
+    expect(intent.freeText).toBe("iphone");
+  });
+
   it("returns empty structure for a bare model search", () => {
     const intent = parseSearchIntent("Galaxy A56");
     expect(intent.categoryId).toBeNull();
