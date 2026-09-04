@@ -86,6 +86,22 @@ export const NUMERIC_BANDS: Record<string, { worst: number; best: number }> = {
   audio_mic_count: { worst: 1, best: 8 },
   audio_battery_life_hours: { worst: 15, best: 40 }, // rated with ANC on, where the device has ANC
   audio_weight_g: { worst: 350, best: 200 }, // lighter is better, so `best` is the lower number
+
+  // --- Camera (dedicated, interchangeable-lens) attributes ----------------
+  // `camera_sensor_mp` is deliberately its own key rather than reusing a
+  // phone's `main_cam_mp`: a 24MP APS-C sensor outresolves a 108MP phone
+  // sensor in real image quality because its individual pixels are so much
+  // larger, so scoring it on the phone-camera-megapixel scale would rank it
+  // backwards.
+  camera_sensor_mp: { worst: 12, best: 45 },
+  camera_iso_max: { worst: 6400, best: 102400 },
+  camera_af_points: { worst: 9, best: 800 },
+  camera_burst_fps: { worst: 3, best: 20 },
+  camera_screen_dots: { worst: 230000, best: 2100000 },
+  camera_viewfinder_dots: { worst: 1000000, best: 5760000 },
+  camera_shots_per_charge: { worst: 200, best: 700 },
+  camera_weight_g: { worst: 700, best: 350 }, // lighter is better, so `best` is the lower number
+  camera_card_slots: { worst: 1, best: 2 },
 };
 
 /**
