@@ -39,7 +39,7 @@ ${ecosystemLines}
 ${kitLines}
 
 ## For AI agents
-NURU exposes its catalog, product-intelligence, and commerce capabilities to in-browser agents via WebMCP (\`navigator.modelContext\`) on every storefront page — search, compare, NURU Score / personalized Fit Score, alternatives, add-to-cart, and a checkout hand-off. The same capabilities are available as a JSON HTTP service under \`${SITE_URL}/api/products/*\`.
+NURU exposes its catalog, product-intelligence, and commerce capabilities to in-browser agents via WebMCP (\`document.modelContext\`) on every storefront page — search, compare, NURU Score / personalized Fit Score, alternatives, add-to-cart, and a checkout hand-off. The same capabilities are available as a JSON HTTP service under \`${SITE_URL}/api/products/*\`.
 
 ## Distinctive to NURU
 - [Ex-UK deals](${SITE_URL}/ex-uk): Unboxed, UK-imported phones at a lower price than new, still covered by a 1-year warranty — not offered by competing Kenyan electronics retailers benchmarked in NURU's own SEO audit.

@@ -2,7 +2,7 @@
  * NURU's WebMCP tool set — the same product-intelligence and commerce
  * capabilities the site's own UI and the AI concierge use, exposed to an
  * in-browser agent (ChatGPT's browser, Chrome's WebMCP) via
- * `navigator.modelContext`.
+ * `document.modelContext` (see register.ts).
  *
  * Every tool is a thin call onto the internal `/api/*` service layer — no
  * business logic is duplicated here (build brief §33). Read tools are
