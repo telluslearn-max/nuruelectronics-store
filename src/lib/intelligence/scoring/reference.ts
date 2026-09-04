@@ -111,6 +111,22 @@ export const NUMERIC_BANDS: Record<string, { worst: number; best: number }> = {
   console_charging_w: { worst: 18, best: 65 },
   console_weight_g: { worst: 600, best: 350 }, // lighter is better, so `best` is the lower number
   console_usb_ports: { worst: 1, best: 3 },
+
+  // --- Television attributes -----------------------------------------
+  tv_peak_brightness_nits: { worst: 300, best: 2000 },
+  tv_hdmi_ports: { worst: 2, best: 4 },
+  tv_usb_ports: { worst: 1, best: 3 },
+  tv_weight_kg: { worst: 25, best: 5 }, // lighter is better, so `best` is the lower number; a rough proxy since it also tracks screen size
+  tv_os_update_years: { worst: 0, best: 4 }, // smart-TV firmware support horizons run much shorter than a phone's
+
+  // --- Power bank attributes -----------------------------------------
+  powerbank_capacity_mah: { worst: 5000, best: 30000 },
+  powerbank_energy_wh: { worst: 18, best: 110 }, // 100Wh is the common airline carry-on ceiling; this band deliberately runs a little past it
+  powerbank_output_w: { worst: 10, best: 140 },
+  powerbank_input_w: { worst: 10, best: 100 },
+  powerbank_port_count: { worst: 1, best: 4 },
+  powerbank_wireless_w: { worst: 0, best: 15 },
+  powerbank_weight_g: { worst: 600, best: 150 }, // lighter is better, so `best` is the lower number
 };
 
 /**

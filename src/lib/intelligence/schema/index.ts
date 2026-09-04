@@ -4,6 +4,8 @@ import { tabletSchema } from "@/lib/intelligence/schema/tablet";
 import { audioSchema } from "@/lib/intelligence/schema/audio";
 import { cameraSchema } from "@/lib/intelligence/schema/camera";
 import { gamingConsoleSchema } from "@/lib/intelligence/schema/gaming-console";
+import { televisionSchema } from "@/lib/intelligence/schema/television";
+import { powerBankSchema } from "@/lib/intelligence/schema/power-bank";
 import type { CategorySchema, SpecAttribute } from "@/lib/intelligence/types";
 
 /**
@@ -19,6 +21,8 @@ const SCHEMAS: Record<string, CategorySchema> = {
   [audioSchema.id]: audioSchema,
   [cameraSchema.id]: cameraSchema,
   [gamingConsoleSchema.id]: gamingConsoleSchema,
+  [televisionSchema.id]: televisionSchema,
+  [powerBankSchema.id]: powerBankSchema,
 };
 
 /** The schema for a category id ("smartphone"), or null if the category is unknown. */
