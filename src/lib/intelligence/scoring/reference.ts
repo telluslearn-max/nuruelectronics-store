@@ -80,6 +80,12 @@ export const NUMERIC_BANDS: Record<string, { worst: number; best: number }> = {
   tablet_battery_wh: { worst: 20, best: 40 },
   tablet_charging_w: { worst: 5, best: 30 },
   tablet_weight_g: { worst: 700, best: 400 }, // lighter is better, so `best` is the lower number
+
+  // --- Audio (headphones/earbuds) attributes ------------------------------
+  driver_size_mm: { worst: 20, best: 50 },
+  audio_mic_count: { worst: 1, best: 8 },
+  audio_battery_life_hours: { worst: 15, best: 40 }, // rated with ANC on, where the device has ANC
+  audio_weight_g: { worst: 350, best: 200 }, // lighter is better, so `best` is the lower number
 };
 
 /**
