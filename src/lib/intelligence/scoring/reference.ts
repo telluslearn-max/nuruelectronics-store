@@ -66,6 +66,20 @@ export const NUMERIC_BANDS: Record<string, { worst: number; best: number }> = {
   laptop_weight_kg: { worst: 2.5, best: 1.1 }, // lighter is better, so `best` is the lower number
   laptop_webcam_mp: { worst: 0.9, best: 12 }, // 720p ≈0.9MP legacy webcams; current best laptop webcams ≈12MP
   laptop_os_update_years: { worst: 0, best: 8 }, // Apple's macOS support for a given Mac typically runs ~7-8 years
+
+  // --- Tablet-scale attributes -------------------------------------------
+  // Own keys for the same reason as the laptop_* bands above: a tablet's RAM,
+  // battery, camera and weight ranges sit between a phone's and a laptop's,
+  // not on either one.
+  tablet_ram_gb: { worst: 3, best: 16 },
+  tablet_storage_gb: { worst: 64, best: 1024 },
+  tablet_display_ppi: { worst: 220, best: 270 }, // most current tablets cluster tightly around ~260-264ppi regardless of price tier
+  tablet_peak_brightness_nits: { worst: 400, best: 1600 },
+  tablet_main_cam_mp: { worst: 5, best: 12 }, // tablet rear cameras are a secondary feature; even flagship tablets rarely exceed 12MP
+  tablet_front_cam_mp: { worst: 5, best: 12 },
+  tablet_battery_wh: { worst: 20, best: 40 },
+  tablet_charging_w: { worst: 5, best: 30 },
+  tablet_weight_g: { worst: 700, best: 400 }, // lighter is better, so `best` is the lower number
 };
 
 /**
