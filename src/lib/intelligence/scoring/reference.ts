@@ -102,6 +102,15 @@ export const NUMERIC_BANDS: Record<string, { worst: number; best: number }> = {
   camera_shots_per_charge: { worst: 200, best: 700 },
   camera_weight_g: { worst: 700, best: 350 }, // lighter is better, so `best` is the lower number
   camera_card_slots: { worst: 1, best: 2 },
+
+  // --- Gaming console (handheld/hybrid) attributes -------------------------
+  console_ram_gb: { worst: 4, best: 16 },
+  console_storage_gb: { worst: 64, best: 2048 },
+  console_battery_life_hours: { worst: 3, best: 9 },
+  console_battery_mah: { worst: 4000, best: 8000 }, // handheld-gaming-class batteries run larger than a phone's
+  console_charging_w: { worst: 18, best: 65 },
+  console_weight_g: { worst: 600, best: 350 }, // lighter is better, so `best` is the lower number
+  console_usb_ports: { worst: 1, best: 3 },
 };
 
 /**
