@@ -21,7 +21,7 @@
 export const NUMERIC_BANDS: Record<string, { worst: number; best: number }> = {
   // Display
   display_ppi: { worst: 260, best: 520 }, // budget 720p-on-6.5in ≈260ppi; sharpest current flagships ≈500-520ppi
-  refresh_rate_hz: { worst: 60, best: 144 }, // 60Hz is the old standard floor; 144Hz is current high-refresh ceiling
+  refresh_rate_hz: { worst: 60, best: 144 }, // 60Hz is the old standard floor; 144Hz is current high-refresh ceiling; shared across smartphone/laptop schemas — the same numbers mean the same thing on either screen
   peak_brightness_nits: { worst: 500, best: 3000 }, // 500 nits struggles outdoors; ~2500-3000 is current flagship peak (HBM)
 
   // Performance
@@ -48,6 +48,24 @@ export const NUMERIC_BANDS: Record<string, { worst: number; best: number }> = {
   // Software
   os_update_years: { worst: 0, best: 7 }, // Google/Samsung's longest current commitments are ~7 years
   security_update_years: { worst: 0, best: 7 },
+
+  // --- Laptop-scale attributes ------------------------------------------
+  // Given their own keys (`laptop_*`) rather than reusing e.g. `ram_gb` or
+  // `weight_g`: a laptop's 16-64GB RAM or 1.1-2.5kg weight sits on a
+  // completely different scale than a phone's, and NUMERIC_BANDS is one flat
+  // namespace keyed by attribute — sharing a key would silently apply the
+  // wrong scale to whichever category scores second.
+  laptop_ram_gb: { worst: 8, best: 64 },
+  laptop_storage_gb: { worst: 256, best: 2048 },
+  laptop_display_ppi: { worst: 110, best: 260 }, // 1080p-on-15.6in ≈140ppi; sharpest current Retina/OLED laptop panels ≈220-260ppi
+  laptop_peak_brightness_nits: { worst: 300, best: 1600 }, // 300 nits is a dim budget panel; ~1000-1600 is current premium HDR peak
+  laptop_battery_wh: { worst: 40, best: 100 },
+  battery_life_hours: { worst: 6, best: 20 }, // manufacturer-rated video-playback estimate; 6h is a dated budget laptop, ~18-20h is current best-in-class
+  laptop_charging_w: { worst: 30, best: 140 },
+  thunderbolt_ports: { worst: 0, best: 4 },
+  laptop_weight_kg: { worst: 2.5, best: 1.1 }, // lighter is better, so `best` is the lower number
+  laptop_webcam_mp: { worst: 0.9, best: 12 }, // 720p ≈0.9MP legacy webcams; current best laptop webcams ≈12MP
+  laptop_os_update_years: { worst: 0, best: 8 }, // Apple's macOS support for a given Mac typically runs ~7-8 years
 };
 
 /**
@@ -100,6 +118,53 @@ export const CHIPSET_PERFORMANCE_INDEX: Record<string, number> = {
   "A12 Bionic": 46,
   "A11 Bionic": 38,
   Bionic: 55, // unqualified "Bionic" from a source that dropped the generation number
+};
+
+/**
+ * Coarse relative performance tier, 0-100, for laptop CPUs — same idea as
+ * CHIPSET_PERFORMANCE_INDEX above but a deliberately separate table and
+ * scale: a laptop chip and a phone SoC are not comparable on one line, and
+ * scoreAttributeValue() picks the table by attribute key (see
+ * TEXT_LOOKUP_TABLES below) precisely so the two scales never mix.
+ */
+export const LAPTOP_CPU_PERFORMANCE_INDEX: Record<string, number> = {
+  // Apple Silicon
+  "M4 Max": 100,
+  "M4 Pro": 93,
+  M4: 82,
+  "M3 Max": 96,
+  "M3 Pro": 88,
+  M3: 78,
+  "M2 Max": 90,
+  "M2 Pro": 84,
+  M2: 70,
+  "M1 Max": 80,
+  "M1 Pro": 72,
+  M1: 58,
+
+  // Intel Core Ultra (Meteor Lake / Lunar Lake / Arrow Lake generations)
+  "Core Ultra 9 285H": 91,
+  "Core Ultra 9 185H": 85,
+  "Core Ultra 7 155H": 74,
+  "Core Ultra 7 165H": 76,
+  "Core Ultra 5 125H": 60,
+
+  // AMD Ryzen (mobile H/HS/U series)
+  "Ryzen 9 8945HS": 87,
+  "Ryzen 9 7940HS": 83,
+  "Ryzen 7 8845HS": 71,
+  "Ryzen 7 7840U": 65,
+  "Ryzen 5 7640U": 50,
+};
+
+/**
+ * Which lookup table (if any) scores a `text`-typed attribute's normalized
+ * value, keyed by the attribute's own key so two categories can each define a
+ * "main chip" attribute without sharing a scale. See scoreAttributeValue().
+ */
+export const TEXT_LOOKUP_TABLES: Record<string, Record<string, number>> = {
+  chipset: CHIPSET_PERFORMANCE_INDEX,
+  cpu: LAPTOP_CPU_PERFORMANCE_INDEX,
 };
 
 /** Linear-map `value` between [worst, best] to a 0-100 score, clamped. Direction follows which anchor is larger. */

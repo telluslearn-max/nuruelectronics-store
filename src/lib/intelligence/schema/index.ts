@@ -1,4 +1,5 @@
 import { smartphoneSchema } from "@/lib/intelligence/schema/smartphone";
+import { laptopSchema } from "@/lib/intelligence/schema/laptop";
 import type { CategorySchema, SpecAttribute } from "@/lib/intelligence/types";
 
 /**
@@ -9,6 +10,7 @@ import type { CategorySchema, SpecAttribute } from "@/lib/intelligence/types";
  */
 const SCHEMAS: Record<string, CategorySchema> = {
   [smartphoneSchema.id]: smartphoneSchema,
+  [laptopSchema.id]: laptopSchema,
 };
 
 /** The schema for a category id ("smartphone"), or null if the category is unknown. */

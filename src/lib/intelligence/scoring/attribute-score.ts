@@ -1,4 +1,4 @@
-import { CHIPSET_PERFORMANCE_INDEX, NUMERIC_BANDS, scoreFromBand } from "@/lib/intelligence/scoring/reference";
+import { NUMERIC_BANDS, TEXT_LOOKUP_TABLES, scoreFromBand } from "@/lib/intelligence/scoring/reference";
 import type { SpecAttribute } from "@/lib/intelligence/types";
 
 /**
@@ -25,9 +25,9 @@ export function scoreAttributeValue(attr: SpecAttribute, normalizedValue: string
 
     case "number":
     case "integer": {
-      // The chipset attribute is `text`-typed in the schema (its normalizer produces a
-      // canonical name, not a number) but scored via the lookup table below, so it never
-      // reaches this branch — handled in the `text` case instead.
+      // A chip attribute (chipset, cpu) is `text`-typed in the schema (its normalizer
+      // produces a canonical name, not a number) but scored via a lookup table, so it
+      // never reaches this branch — handled in the `text` case instead.
       const n = Number(normalizedValue);
       if (!Number.isFinite(n)) return null;
       const band = NUMERIC_BANDS[attr.key];
@@ -36,9 +36,9 @@ export function scoreAttributeValue(attr: SpecAttribute, normalizedValue: string
     }
 
     case "text": {
-      if (attr.key !== "chipset") return null;
-      const index = CHIPSET_PERFORMANCE_INDEX[normalizedValue];
-      return index ?? null;
+      const table = TEXT_LOOKUP_TABLES[attr.key];
+      if (!table) return null;
+      return table[normalizedValue] ?? null;
     }
   }
 }
