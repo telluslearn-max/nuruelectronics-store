@@ -1,8 +1,10 @@
 # WebMCP layer
 
 NURU exposes its product-intelligence and commerce capabilities to in-browser
-AI agents (ChatGPT's browser, Chrome's WebMCP) via `navigator.modelContext`.
-Built for [The WebMCP Challenge](https://webmcp.devpost.com/).
+AI agents (ChatGPT's browser, Chrome 149+ with WebMCP) via `document.modelContext`
+— `register.ts` also checks the older `navigator.modelContext` and the bulk
+`registerTools` / `provideContext` shapes. Built for
+[The WebMCP Challenge](https://webmcp.devpost.com/).
 
 ## How it's wired
 
@@ -45,7 +47,8 @@ endpoints back the storefront UI and the AI concierge.
 
 ## Testing
 
-- ChatGPT's in-app browser (WebMCP out of the box), or Chrome 149+ with WebMCP
-  enabled, on any storefront page.
+- ChatGPT's in-app browser (WebMCP out of the box), or Chrome 149+ with
+  `chrome://flags/#enable-webmcp-testing` = Enabled, on any storefront page.
+  Confirm with `await document.modelContext.getTools()` in DevTools.
 - Without a WebMCP host, the tools are also on `window.nuruWebMcp`:
   `await window.nuruWebMcp.call("search_products", { query: "best camera phone under 60k" })`.

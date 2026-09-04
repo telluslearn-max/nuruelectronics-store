@@ -3,32 +3,51 @@ import { webMcpToolDefs, type WebMcpToolDef } from "@/lib/webmcp/tool-defs";
 /**
  * Binds NURU's tool set (tool-defs.ts) to the browser's WebMCP surface.
  *
- * WebMCP (`navigator.modelContext`) is an emerging standard and its exact shape
- * still varies between the ChatGPT browser, Chrome, and the polyfills, so this
- * is deliberately defensive: it tries `registerTool` (per-tool, returns a
- * disposable), falls back to `provideContext`/`registerTools` (whole set), and
- * normalises both the argument shape passed to a tool and the result shape it
- * must return. When no WebMCP host is present it installs nothing but still
- * exposes the tools on `window.nuruWebMcp` so a demo page or a test can invoke
- * them directly.
+ * The WebMCP standard (webmachinelearning/webmcp) settled on
+ * `document.modelContext.registerTool(descriptor, { signal })`, where the
+ * descriptor is `{ name, description, inputSchema, execute }`, `execute` gets
+ * the argument object plus `{ signal }` and returns
+ * `{ content: [{ type: "text", text }] }`, and a tool is removed by aborting
+ * the signal it was registered with. Chrome 149+ (behind
+ * `chrome://flags/#enable-webmcp-testing`) and ChatGPT's in-app browser are the
+ * judged runtimes; earlier drafts and some hosts put the object on `navigator`
+ * or expose a bulk `registerTools` / `provideContext`, so this stays defensive
+ * about where the host object lives and which method it offers.
+ *
+ * With no WebMCP host present it still exposes the tools on `window.nuruWebMcp`
+ * so a demo page or a test can invoke them directly.
  */
 
 type ToolResult = { content: { type: "text"; text: string }[]; isError?: boolean };
 
 type ModelContextLike = {
-  registerTool?: (tool: unknown) => { unregister?: () => void } | void;
-  registerTools?: (tools: unknown[]) => void;
+  registerTool?: (tool: unknown, options?: { signal?: AbortSignal }) => unknown;
+  registerTools?: (tools: unknown[], options?: { signal?: AbortSignal }) => void;
   provideContext?: (context: { tools: unknown[] }) => void;
   unregisterTool?: (name: string) => void;
 };
+
+/** The spec puts `modelContext` on `document`; older drafts and some hosts use `navigator`. Take whichever exists. */
+function resolveHost(): ModelContextLike | null {
+  if (typeof document !== "undefined") {
+    const fromDocument = (document as unknown as { modelContext?: ModelContextLike }).modelContext;
+    if (fromDocument) return fromDocument;
+  }
+  if (typeof navigator !== "undefined") {
+    const fromNavigator = (navigator as unknown as { modelContext?: ModelContextLike }).modelContext;
+    if (fromNavigator) return fromNavigator;
+  }
+  return null;
+}
 
 function toWebMcpTool(def: WebMcpToolDef) {
   return {
     name: def.name,
     description: def.description,
     inputSchema: def.inputSchema,
-    // Host implementations differ on whether the tool gets the args object
-    // directly or wrapped as `{ arguments }` / `{ params }`.
+    // The spec passes the argument object directly (a second `{ signal }` arg,
+    // which we don't need, follows); a few hosts still wrap the args as
+    // `{ arguments }` / `{ params }`, so unwrap those before handing them on.
     async execute(input: unknown): Promise<ToolResult> {
       const args =
         input && typeof input === "object"
@@ -41,7 +60,9 @@ function toWebMcpTool(def: WebMcpToolDef) {
         return { content: [{ type: "text", text: JSON.stringify(result) }] };
       } catch (error) {
         return {
-          content: [{ type: "text", text: JSON.stringify({ error: error instanceof Error ? error.message : "Tool failed." }) }],
+          content: [
+            { type: "text", text: JSON.stringify({ error: error instanceof Error ? error.message : "Tool failed." }) },
+          ],
           isError: true,
         };
       }
@@ -60,10 +81,9 @@ export type WebMcpInstallResult = {
 /** Registers NURU's WebMCP tools with the current browser. Safe to call on any page; returns a disposer. */
 export function installWebMcpTools(): WebMcpInstallResult {
   const tools = webMcpToolDefs.map(toWebMcpTool);
-  const disposers: (() => void)[] = [];
 
   // Always expose a direct-call fallback for demos / tests / hosts that read a
-  // global rather than navigator.modelContext. Not torn down on dispose — it's
+  // global rather than the modelContext object. Not torn down on dispose — it's
   // a harmless global that the next mount overwrites, and removing it in an
   // effect cleanup would leave it gone under React's strict-mode timing.
   if (typeof window !== "undefined") {
@@ -77,35 +97,44 @@ export function installWebMcpTools(): WebMcpInstallResult {
     };
   }
 
-  const mc =
-    typeof navigator !== "undefined"
-      ? ((navigator as unknown as { modelContext?: ModelContextLike }).modelContext ?? null)
-      : null;
-
+  const host = resolveHost();
+  // One controller for the whole set — aborting it unregisters every tool, which
+  // is how the spec says teardown works.
+  const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
   let transport: WebMcpInstallResult["transport"] = "none";
 
-  if (mc && typeof mc.registerTool === "function") {
+  if (host && typeof host.registerTool === "function") {
     transport = "registerTool";
     for (const tool of tools) {
-      const handle = mc.registerTool(tool);
-      disposers.push(() => {
-        if (handle && typeof handle.unregister === "function") handle.unregister();
-        else if (typeof mc.unregisterTool === "function") mc.unregisterTool(tool.name);
-      });
+      try {
+        // May return a Promise (spec), a disposable, or nothing — we don't need
+        // the return value; teardown goes through the AbortSignal.
+        const returned = host.registerTool(tool, controller ? { signal: controller.signal } : undefined);
+        void Promise.resolve(returned).catch(() => {
+          /* a host that rejects one registration shouldn't break the rest */
+        });
+      } catch {
+        /* skip a tool the host rejects synchronously */
+      }
     }
-  } else if (mc && typeof mc.registerTools === "function") {
+  } else if (host && typeof host.registerTools === "function") {
     transport = "registerTools";
-    mc.registerTools(tools);
-    disposers.push(() => tools.forEach((t) => mc.unregisterTool?.(t.name)));
-  } else if (mc && typeof mc.provideContext === "function") {
+    host.registerTools(tools, controller ? { signal: controller.signal } : undefined);
+  } else if (host && typeof host.provideContext === "function") {
     transport = "provideContext";
-    mc.provideContext({ tools });
-    disposers.push(() => mc.provideContext?.({ tools: [] }));
+    host.provideContext({ tools });
   }
 
   return {
     transport,
     toolCount: tools.length,
-    dispose: () => disposers.forEach((d) => d()),
+    dispose: () => {
+      controller?.abort();
+      // provideContext hosts have no signal contract — clear the set explicitly.
+      if (transport === "provideContext") host?.provideContext?.({ tools: [] });
+      else if (transport === "registerTools" && typeof host?.unregisterTool === "function") {
+        for (const tool of tools) host.unregisterTool(tool.name);
+      }
+    },
   };
 }
