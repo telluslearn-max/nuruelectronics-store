@@ -5,7 +5,13 @@ import { normalizeRecord } from "@/lib/intelligence/normalize";
 import { computeCompleteness } from "@/lib/intelligence/ingest/completeness";
 import { replaceProfileSpecs, type SpecWrite } from "@/lib/intelligence/ingest/write-specs";
 import { recomputeNuruScore } from "@/lib/intelligence/scoring/recompute";
-import { IPHONE_MODEL_SPECS, SMARTPHONE_SEED } from "@/lib/intelligence/seed/smartphones";
+import { GALAXY_MODEL_SPECS, IPHONE_MODEL_SPECS, SMARTPHONE_SEED } from "@/lib/intelligence/seed/smartphones";
+
+/** Brand -> its curated model-spec table. Extend this map, not the loop below, when a new brand is seeded. */
+const SPECS_BY_BRAND: Record<string, Record<string, Record<string, string>>> = {
+  Apple: IPHONE_MODEL_SPECS,
+  Samsung: GALAXY_MODEL_SPECS,
+};
 
 /**
  * Applies the curated smartphone seed (src/lib/intelligence/seed/smartphones.ts):
@@ -19,7 +25,9 @@ export async function applySmartphoneSeed(): Promise<{ applied: number; models: 
 
   let applied = 0;
   for (const [handle, entry] of Object.entries(SMARTPHONE_SEED)) {
-    const specs = IPHONE_MODEL_SPECS[entry.model];
+    const brand = entry.brand ?? "Apple";
+    const productFamily = entry.productFamily ?? "iPhone";
+    const specs = SPECS_BY_BRAND[brand]?.[entry.model];
     if (!specs) continue;
 
     try {
@@ -29,16 +37,16 @@ export async function applySmartphoneSeed(): Promise<{ applied: number; models: 
           shopifyProductId: entry.shopifyProductId,
           handle,
           category: "smartphone",
-          brand: "Apple",
-          productFamily: "iPhone",
+          brand,
+          productFamily,
           model: entry.model,
           releaseYear: entry.releaseYear,
         },
         update: {
           handle,
           category: "smartphone",
-          brand: "Apple",
-          productFamily: "iPhone",
+          brand,
+          productFamily,
           model: entry.model,
           releaseYear: entry.releaseYear,
         },
@@ -69,5 +77,6 @@ export async function applySmartphoneSeed(): Promise<{ applied: number; models: 
     }
   }
 
-  return { applied, models: Object.keys(IPHONE_MODEL_SPECS).length };
+  const modelCount = Object.values(SPECS_BY_BRAND).reduce((sum, table) => sum + Object.keys(table).length, 0);
+  return { applied, models: modelCount };
 }

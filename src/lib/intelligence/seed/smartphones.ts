@@ -767,10 +767,62 @@ export const IPHONE_MODEL_SPECS: Record<string, SeedSpecs> = {
   },
 };
 
-/** Shopify handle -> the model it is (and identity fields). Covers both the new Apple line and the Ex-UK units. */
+/**
+ * Samsung Galaxy model -> specs, keyed and shaped exactly like
+ * `IPHONE_MODEL_SPECS` above. Web-verified against Samsung's own spec page and
+ * GSMArena (collected 2026-09-04) — see the source note on each model's
+ * `SMARTPHONE_SEED` entry via `brand`/`productFamily`.
+ */
+export const GALAXY_MODEL_SPECS: Record<string, SeedSpecs> = {
+  "Galaxy S23": {
+    os: "Android (One UI)",
+    expandable_storage: "No",
+    nfc: "Yes",
+    reverse_charging: "Yes",
+    biometrics: "Ultrasonic fingerprint, Face recognition",
+    video_max_resolution: "8K",
+    display_size_in: "6.1 in",
+    display_tech: "Dynamic AMOLED 2X",
+    display_resolution: "1080 x 2340",
+    display_ppi: "425",
+    refresh_rate_hz: "120 Hz",
+    peak_brightness_nits: "1750 nits",
+    chipset: "Qualcomm Snapdragon 8 Gen 2",
+    cpu_cores: "8",
+    gpu: "Adreno 740",
+    ram_gb: "8 GB",
+    storage_gb: "128 GB",
+    main_cam_mp: "50 MP",
+    main_cam_ois: "Yes",
+    ultrawide_mp: "12 MP",
+    telephoto_mp: "10 MP",
+    telephoto_zoom_x: "3x",
+    front_cam_mp: "12 MP",
+    battery_mah: "3900 mAh",
+    charging_wired_w: "25 W",
+    charging_wireless_w: "10 W",
+    cellular: "5G",
+    wifi_gen: "Wi-Fi 6E",
+    usb_standard: "USB-C",
+    sim_config: "Nano-SIM + eSIM",
+    ip_rating: "IP68",
+    weight_g: "168 g",
+    build_materials: "Gorilla Glass Victus 2 front and back, aluminium frame",
+    android_version: "13",
+    os_update_years: "4",
+    security_update_years: "5",
+  },
+};
+
+/**
+ * Shopify handle -> the model it is (and identity fields). Covers Apple's
+ * current line, its Ex-UK units, and (from `brand`/`productFamily`) the first
+ * non-Apple entries. `brand`/`productFamily` default to Apple/iPhone when
+ * omitted, matching every pre-existing row below — see `seed/apply.ts`.
+ */
 export const SMARTPHONE_SEED: Record<
   string,
-  { shopifyProductId: string; model: string; releaseYear: number }
+  { shopifyProductId: string; model: string; releaseYear: number; brand?: string; productFamily?: string }
 > = {
   // Apple's current line
   "apple-iphone-17-pro-max": { shopifyProductId: "gid://shopify/Product/7749352620099", model: "iPhone 17 Pro Max", releaseYear: 2025 },
@@ -801,4 +853,17 @@ export const SMARTPHONE_SEED: Record<
   "iphone-11-pro": { shopifyProductId: "gid://shopify/Product/7797937700931", model: "iPhone 11 Pro", releaseYear: 2019 },
   "iphone-11": { shopifyProductId: "gid://shopify/Product/7797937832003", model: "iPhone 11", releaseYear: 2019 },
   "iphone-x": { shopifyProductId: "gid://shopify/Product/7797937930307", model: "iPhone X", releaseYear: 2017 },
+
+  // This storefront's own catalog listings not already covered above.
+  "iphone-17-pro": { shopifyProductId: "gid://shopify/Product/7812000000101", model: "iPhone 17 Pro", releaseYear: 2025 },
+  "ex-uk-iphone-14-pro": { shopifyProductId: "gid://shopify/Product/7812000000102", model: "iPhone 14 Pro", releaseYear: 2022 },
+  "ex-uk-galaxy-s23": {
+    shopifyProductId: "gid://shopify/Product/7812000000103",
+    model: "Galaxy S23",
+    releaseYear: 2023,
+    brand: "Samsung",
+    productFamily: "Galaxy S",
+  },
+  // "galaxy-s27-ultra" is intentionally not seeded: no such Samsung device
+  // exists to verify specs against (flagged, not guessed — see provenance.ts).
 };

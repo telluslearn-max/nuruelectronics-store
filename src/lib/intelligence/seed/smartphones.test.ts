@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { IPHONE_MODEL_SPECS, SMARTPHONE_SEED } from "./smartphones";
+import { GALAXY_MODEL_SPECS, IPHONE_MODEL_SPECS, SMARTPHONE_SEED } from "./smartphones";
 import { getCategorySchema } from "@/lib/intelligence/schema";
 import { normalizeRecord } from "@/lib/intelligence/normalize";
 import { computeNuruScore } from "@/lib/intelligence/scoring/nuru-score";
@@ -9,11 +9,26 @@ import { getAttribute } from "@/lib/intelligence/schema";
 
 const schema = getCategorySchema("smartphone")!;
 
+/** Every brand's model-spec table, keyed the same way `apply.ts`'s SPECS_BY_BRAND is. */
+const ALL_MODEL_SPECS: Record<string, Record<string, string>> = {
+  ...IPHONE_MODEL_SPECS,
+  ...GALAXY_MODEL_SPECS,
+};
+
 describe("smartphone seed", () => {
   it("every seeded handle maps to a model that has specs", () => {
     for (const [handle, entry] of Object.entries(SMARTPHONE_SEED)) {
-      expect(IPHONE_MODEL_SPECS[entry.model], `${handle} -> ${entry.model}`).toBeDefined();
+      expect(ALL_MODEL_SPECS[entry.model], `${handle} -> ${entry.model}`).toBeDefined();
       expect(entry.shopifyProductId).toMatch(/^gid:\/\/shopify\/Product\/\d+$/);
+    }
+  });
+
+  it("a non-Apple entry always names its brand and product family explicitly", () => {
+    for (const [handle, entry] of Object.entries(SMARTPHONE_SEED)) {
+      if (GALAXY_MODEL_SPECS[entry.model]) {
+        expect(entry.brand, handle).toBeTruthy();
+        expect(entry.productFamily, handle).toBeTruthy();
+      }
     }
   });
 
@@ -24,7 +39,7 @@ describe("smartphone seed", () => {
     expect(new Set(handles).size).toBe(handles.length);
   });
 
-  describe.each(Object.entries(IPHONE_MODEL_SPECS))("%s", (model, specs) => {
+  describe.each(Object.entries(ALL_MODEL_SPECS))("%s", (model, specs) => {
     const normalized = normalizeRecord(schema.attributes, specs);
 
     it("uses only real schema keys and every value normalizes", () => {
