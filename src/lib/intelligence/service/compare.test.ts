@@ -71,4 +71,35 @@ describe("buildComparison", () => {
   it("picks the composite winner", () => {
     expect(result.compositeWinners).toEqual([1]); // samsung 84 > pixel 82
   });
+
+  it("buckets each product's decisive spec wins into 'The Fork', widest gap first", () => {
+    expect(result.fork[1]).toEqual([]); // samsung wins no scoreable spec outright here
+    const pixelWins = result.fork[0].map((e) => e.key);
+    expect(pixelWins).toContain("battery_mah");
+    expect(pixelWins).toContain("main_cam_mp");
+    const gaps = result.fork[0].map((e) => e.gap);
+    expect(gaps).toEqual([...gaps].sort((a, b) => b - a));
+    expect(result.fork[0].every((e) => e.gap >= 3)).toBe(true);
+  });
+
+  it("keeps a spec out of the fork when only one product has a scoreable value", () => {
+    const lonely: CompareInputProduct = {
+      ...pixel,
+      specs: new Map([...pixel.specs, ["weight_g", spec("170")]]),
+    };
+    const r = buildComparison([lonely, samsung], schema);
+    expect(r.fork.flat().some((e) => e.key === "weight_g")).toBe(false);
+  });
+
+  it("issues a ruling: the composite leader, what it leads, and the strongest holdout", () => {
+    expect(result.ruling).not.toBeNull();
+    expect(result.ruling!.pick).toBe(1); // samsung
+    expect(result.ruling!.leads).toEqual(["performance"]);
+    expect(result.ruling!.holdout).toEqual({ index: 0, leads: ["camera", "battery"] });
+  });
+
+  it("issues no ruling when the composite is a tie", () => {
+    const tied = buildComparison([pixel, { ...samsung, composite: 82 }], schema);
+    expect(tied.ruling).toBeNull();
+  });
 });

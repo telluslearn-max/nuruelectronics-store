@@ -6,8 +6,9 @@ import { useMemo, useState } from "react";
 import { formatPrice } from "@/lib/format";
 import { AddToCartButton } from "@/components/cart/add-to-cart-button";
 import { CompareTable } from "@/components/compare/compare-table";
+import { ComponentRadar, PRODUCT_COLORS } from "@/components/compare/component-radar";
 import type { ComparisonResultView } from "@/components/compare/comparison-result";
-import type { ComparePayload } from "@/lib/intelligence/service/compare";
+import type { ComparePayload, SpecRow } from "@/lib/intelligence/service/compare";
 import { computeFitScore, type FitWeights } from "@/lib/intelligence/recommend/fit-score";
 import { parseSearchIntent } from "@/lib/intelligence/service/intent";
 import { SCORE_COMPONENTS, type ScoreComponent } from "@/lib/intelligence/types";
@@ -22,6 +23,13 @@ const COMPONENT_LABELS: Record<ScoreComponent, string> = {
   software: "Software",
   value: "Value",
 };
+
+/** "a, b and c" — the Oxford comma is deliberately omitted to read as speech. */
+function joinAnd(items: string[]): string {
+  if (items.length <= 1) return items[0] ?? "";
+  if (items.length === 2) return `${items[0]} and ${items[1]}`;
+  return `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
+}
 
 /** Renders whichever comparison shape the server produced. */
 export function ComparisonView({
@@ -133,8 +141,13 @@ function PremiumComparison({
               </div>
               <Link
                 href={`/products/${handle}`}
-                className="mt-3 block text-sm font-semibold leading-snug hover:text-accent"
+                className="mt-3 flex items-start gap-1.5 text-sm font-semibold leading-snug hover:text-accent"
               >
+                <span
+                  className="mt-1 h-2 w-2 shrink-0 rounded-full"
+                  style={{ backgroundColor: PRODUCT_COLORS[i % PRODUCT_COLORS.length] }}
+                  aria-hidden
+                />
                 {payload.titles[i]}
               </Link>
               <div className="mt-1 text-sm text-neutral-600">
@@ -201,6 +214,9 @@ function PremiumComparison({
         </p>
       </div>
 
+      {/* The ruling — one sentence: which to get, and the one reason not to */}
+      <RulingLine payload={payload} personalized={personalized} />
+
       {/* At a glance */}
       {payload.summary.length > 0 && (
         <section>
@@ -227,11 +243,26 @@ function PremiumComparison({
         </section>
       )}
 
+      {/* The fork — the specs each product wins outright, bucketed by product */}
+      <TheFork payload={payload} />
+
       {/* Component scores */}
       {componentRows.length > 0 && (
         <section>
           <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-400">Score breakdown</h2>
-          <div className="mt-3 space-y-4">
+          {payload.components.length >= 3 && (
+            <div className="mt-4">
+              <ComponentRadar
+                axes={payload.components.map((row) => row.component)}
+                labels={payload.components.map((row) => COMPONENT_LABELS[row.component])}
+                series={payload.handles.map((_, i) => ({
+                  label: payload.titles[i],
+                  scores: payload.components.map((row) => row.scores[i]),
+                }))}
+              />
+            </div>
+          )}
+          <div className="mt-4 space-y-4">
             {componentRows.map((row) => (
               <div key={row.component}>
                 <div className="mb-1 flex items-center justify-between text-sm">
@@ -297,14 +328,161 @@ function PremiumComparison({
   );
 }
 
+/**
+ * The one-line verdict above the fold. A stated set of priorities overrides the
+ * generic ruling with a Fit-Score-based one; with nothing stated it falls back
+ * to the server's composite-score ruling, or a "too close to call" line when no
+ * product leads outright.
+ */
+function RulingLine({
+  payload,
+  personalized,
+}: {
+  payload: ComparePayload;
+  personalized: Personalized | null;
+}) {
+  if (personalized && personalized.bestIndex !== null) {
+    const best = personalized.bestIndex;
+    const bestFit = personalized.fit[best].fitScore;
+    const rivals = personalized.fit
+      .filter((_, i) => i !== best)
+      .map((f) => f.fitScore)
+      .filter((s): s is number => s !== null);
+    const margin =
+      bestFit !== null && rivals.length > 0 ? Math.round((bestFit - Math.max(...rivals)) * 10) / 10 : null;
+    return (
+      <p className="text-lg leading-snug">
+        For your priorities, the{" "}
+        <strong className="font-semibold">{payload.titles[best]}</strong> fits best
+        {bestFit !== null && (
+          <>
+            {" "}
+            — Fit Score {bestFit}
+            {margin !== null && margin > 0 ? `, ${margin} ahead of the next` : ""}
+          </>
+        )}
+        .
+      </p>
+    );
+  }
+
+  const ruling = payload.ruling;
+  if (!ruling) {
+    return (
+      <p className="text-lg leading-snug text-neutral-600">
+        Too close to call on overall NURU Score — the differences below decide it.
+      </p>
+    );
+  }
+  const leads = ruling.leads.map((c) => COMPONENT_LABELS[c]);
+  const holdout = ruling.holdout;
+  return (
+    <p className="text-lg leading-snug">
+      Get the <strong className="font-semibold">{payload.titles[ruling.pick]}</strong>
+      {leads.length > 0 ? <> — it leads {joinAnd(leads)}</> : <> — it takes the overall NURU Score</>}
+      {holdout && holdout.leads.length > 0 && (
+        <>
+          . Choose the{" "}
+          <strong className="font-semibold">{payload.titles[holdout.index]}</strong> only if{" "}
+          {joinAnd(holdout.leads.map((c) => COMPONENT_LABELS[c].toLowerCase()))}{" "}
+          {holdout.leads.length === 1 ? "matters" : "matter"} most
+        </>
+      )}
+      .
+    </p>
+  );
+}
+
+/** "If you care about…" — each product's widest spec wins, side by side. */
+function TheFork({ payload }: { payload: ComparePayload }) {
+  if (!payload.fork.some((column) => column.length > 0)) return null;
+  return (
+    <section>
+      <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-400">The fork</h2>
+      <p className="mt-1 text-xs text-neutral-500">
+        Where each one pulls ahead. Pick the column that sounds like you.
+      </p>
+      <div
+        className="mt-3 grid gap-4"
+        style={{ gridTemplateColumns: `repeat(${payload.handles.length}, minmax(0, 1fr))` }}
+      >
+        {payload.handles.map((handle, i) => (
+          <div key={handle} className="rounded-card border border-border-subtle p-4">
+            <div className="flex items-start gap-1.5">
+              <span
+                className="mt-1 h-2 w-2 shrink-0 rounded-full"
+                style={{ backgroundColor: PRODUCT_COLORS[i % PRODUCT_COLORS.length] }}
+                aria-hidden
+              />
+              <span className="text-sm font-semibold leading-snug">{payload.titles[i]}</span>
+            </div>
+            <div className="mt-0.5 pl-3.5 text-[11px] uppercase tracking-wide text-neutral-400">
+              if you care about…
+            </div>
+            {payload.fork[i].length === 0 ? (
+              <p className="mt-3 text-xs text-neutral-400">
+                No standout wins — it trades on balance, not one strength.
+              </p>
+            ) : (
+              <ul className="mt-3 space-y-2.5">
+                {payload.fork[i].map((entry) => (
+                  <li key={entry.key} className="text-sm">
+                    <div className="font-medium">{entry.label}</div>
+                    <div className="tabular-nums text-neutral-600">
+                      {entry.values[i] ?? "—"}
+                      <span className="text-neutral-400">
+                        {" vs "}
+                        {entry.values
+                          .filter((_, j) => j !== i)
+                          .map((v) => v ?? "—")
+                          .join(" / ")}
+                      </span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/** True when the row isn't identical across every product — i.e. worth showing in "differences only" mode. */
+function rowHasDifference(row: SpecRow): boolean {
+  if (row.winners.length > 0) return true;
+  const values = row.cells.map((cell) => cell?.rawValue ?? null);
+  if (values.some((value) => value === null)) return true;
+  return new Set(values).size > 1;
+}
+
 function SpecGroups({ payload }: { payload: ComparePayload }) {
   const [active, setActive] = useState(payload.groups[0]?.id ?? "");
-  const group = payload.groups.find((g) => g.id === active) ?? payload.groups[0];
+  const [diffOnly, setDiffOnly] = useState(false);
+
+  const groups = diffOnly
+    ? payload.groups
+        .map((g) => ({ ...g, rows: g.rows.filter(rowHasDifference) }))
+        .filter((g) => g.rows.length > 0)
+    : payload.groups;
+
+  if (groups.length === 0) {
+    return (
+      <section>
+        <DiffToggle diffOnly={diffOnly} setDiffOnly={setDiffOnly} />
+        <p className="mt-4 text-sm text-neutral-500">These share every verified spec.</p>
+      </section>
+    );
+  }
+
+  const group = groups.find((g) => g.id === active) ?? groups[0];
 
   return (
     <section>
-      <div className="flex flex-wrap gap-2 border-b border-border-subtle pb-2">
-        {payload.groups.map((g) => (
+      <DiffToggle diffOnly={diffOnly} setDiffOnly={setDiffOnly} />
+      <div className="mt-3 flex flex-wrap gap-2 border-b border-border-subtle pb-2">
+        {groups.map((g) => (
           <button
             key={g.id}
             type="button"
@@ -347,6 +525,26 @@ function SpecGroups({ payload }: { payload: ComparePayload }) {
         </tbody>
       </table>
     </section>
+  );
+}
+
+function DiffToggle({
+  diffOnly,
+  setDiffOnly,
+}: {
+  diffOnly: boolean;
+  setDiffOnly: (value: boolean) => void;
+}) {
+  return (
+    <label className="inline-flex cursor-pointer select-none items-center gap-2 text-sm text-neutral-600">
+      <input
+        type="checkbox"
+        checked={diffOnly}
+        onChange={(event) => setDiffOnly(event.target.checked)}
+        className="h-4 w-4 rounded border-border-subtle accent-accent"
+      />
+      Differences only
+    </label>
   );
 }
 

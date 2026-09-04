@@ -49,6 +49,29 @@ export type ComponentRow = {
   winners: number[];
 };
 
+/** One attribute a product wins decisively — the raw material for "The Fork". */
+export type ForkEntry = {
+  key: string;
+  label: string;
+  group: string;
+  /** Raw display value per product, index-aligned to `handles`; null where the product has no value. */
+  values: (string | null)[];
+  /** The single product index that wins this attribute. */
+  winner: number;
+  /** 0-100 gap between the winner's attribute score and the next best — how decisive the win is. */
+  gap: number;
+};
+
+/** A one-line verdict: which product to get, and the one reason you might not. */
+export type Ruling = {
+  /** Product index with the single highest composite NURU Score. */
+  pick: number;
+  /** Components the pick leads outright (may be empty if it only edges ahead on the composite). */
+  leads: ScoreComponent[];
+  /** A runner-up worth keeping in mind and the components it still leads; null if the pick sweeps. */
+  holdout: { index: number; leads: ScoreComponent[] } | null;
+};
+
 export type ComparisonResult = {
   handles: string[];
   groups: { id: string; label: string; rows: SpecRow[] }[];
@@ -57,6 +80,10 @@ export type ComparisonResult = {
   compositeWinners: number[];
   /** One line per component that at least two products are scored on: who leads and by how much. */
   summary: { component: ScoreComponent; leaderHandle: string; margin: number }[];
+  /** Per product (index-aligned to `handles`): the specs it wins by the widest scored margin, widest first. */
+  fork: ForkEntry[][];
+  /** A single recommendation drawn from the composite scores, or null when no product leads outright. */
+  ruling: Ruling | null;
 };
 
 /**
@@ -73,6 +100,11 @@ export type ComparePayload = ComparisonResult & {
   /** First Shopify variant id per product, for a direct add-to-cart; null if unknown. */
   defaultVariantIds: (string | null)[];
 };
+
+/** A win narrower than this in normalized points is a wash, not a fork-worthy difference. */
+const FORK_MIN_GAP = 3;
+/** No column of "The Fork" lists more than this — past the top few, it stops being a decision aid. */
+const FORK_MAX_PER_PRODUCT = 4;
 
 /** Indices holding the maximum finite value in `values`; empty if fewer than two are finite. */
 function argMax(values: (number | null | undefined)[]): number[] {
@@ -137,12 +169,63 @@ export function buildComparison(products: CompareInputProduct[], schema: Categor
     }
   }
 
+  const compositeWinners = argMax(products.map((p) => p.composite));
+
+  // "The Fork": every spec one product wins outright, bucketed by winner and
+  // sorted by how decisive the win is. A win only counts when at least two
+  // products carry a scoreable value — "it has X, the other has no data" isn't
+  // a difference a shopper can weigh.
+  const forkEntries: ForkEntry[] = [];
+  for (const row of groups.flatMap((g) => g.rows)) {
+    if (row.winners.length !== 1) continue;
+    const winner = row.winners[0];
+    const scores = row.cells.map((cell) => (typeof cell?.score === "number" ? cell.score : null));
+    const winnerScore = scores[winner];
+    const rivalScores = scores.filter((s, i) => i !== winner && s !== null) as number[];
+    if (winnerScore === null || rivalScores.length === 0) continue;
+    const gap = Math.round((winnerScore - Math.max(...rivalScores)) * 100) / 100;
+    if (gap < FORK_MIN_GAP) continue;
+    forkEntries.push({
+      key: row.key,
+      label: row.label,
+      group: row.group,
+      values: row.cells.map((cell) => cell?.rawValue ?? null),
+      winner,
+      gap,
+    });
+  }
+  const fork = handles.map((_, i) =>
+    forkEntries.filter((e) => e.winner === i).sort((a, b) => b.gap - a.gap).slice(0, FORK_MAX_PER_PRODUCT),
+  );
+
+  // "The Ruling": recommend the outright composite leader, name what it wins,
+  // and surface the strongest holdout — the rival that still leads the most
+  // components — as the one reason a shopper might choose otherwise.
+  let ruling: Ruling | null = null;
+  if (compositeWinners.length === 1) {
+    const pick = compositeWinners[0];
+    const leads = summary.filter((s) => s.leaderHandle === handles[pick]).map((s) => s.component);
+    const rivalLeads = new Map<number, ScoreComponent[]>();
+    for (const s of summary) {
+      const idx = handles.indexOf(s.leaderHandle);
+      if (idx === pick || idx < 0) continue;
+      rivalLeads.set(idx, [...(rivalLeads.get(idx) ?? []), s.component]);
+    }
+    let holdout: Ruling["holdout"] = null;
+    for (const [index, comps] of rivalLeads) {
+      if (!holdout || comps.length > holdout.leads.length) holdout = { index, leads: comps };
+    }
+    ruling = { pick, leads, holdout };
+  }
+
   return {
     handles,
     groups,
     components,
     composites: products.map((p) => p.composite),
-    compositeWinners: argMax(products.map((p) => p.composite)),
+    compositeWinners,
     summary,
+    fork,
+    ruling,
   };
 }
