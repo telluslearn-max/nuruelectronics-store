@@ -5,9 +5,10 @@ where each fact came from, and how much it can be trusted. Kept deliberately sep
 from Shopify (the system of record for what's for sale and at what price) and from the
 ERP ledger.
 
-> Status: **PR 1 of the series** — schema + normalization engine only. Ingestion,
-> the nightly reconcile job, NURU Score, Fit Score, the comparison rebuild, the
-> `/api/products/*` service layer and the WebMCP tools land in later PRs.
+> Status: schema + normalization engine, ingestion, the nightly reconcile job,
+> NURU Score, Fit Score, the comparison rebuild, the `/api/products/*` service
+> layer and the WebMCP tools have all shipped. Schema coverage spans eight
+> tech categories (below); six carry curated seed data today.
 
 ## Shape
 
@@ -34,11 +35,32 @@ ERP ledger.
 - **Categories are code.** Adding a category or re-tuning a weight is a reviewed
   change in `src/lib/intelligence/schema/`, not a database edit.
 
-## Filling the smartphone spec sheet
+## Categories
 
-`smartphone-specs.template.csv` in this folder has one column per smartphone
-schema attribute plus the identity columns. One row per **purchasable variant**,
-matched to Shopify by `shopify_handle`.
+| Category | Schema | Seed | Notes |
+|---|---|---|---|
+| Smartphone | `schema/smartphone.ts` | `seed/smartphones.ts` (Apple + Samsung) | |
+| Laptop | `schema/laptop.ts` | `seed/laptops.ts` | |
+| Tablet | `schema/tablet.ts` | `seed/tablets.ts` | |
+| Audio (headphones) | `schema/audio.ts` | `seed/audio.ts` | |
+| Camera | `schema/camera.ts` | `seed/cameras.ts` | |
+| Gaming console | `schema/gaming-console.ts` | `seed/gaming-consoles.ts` | |
+| Television | `schema/television.ts` | — | infra only; no catalog listing names a specific model yet |
+| Power bank | `schema/power-bank.ts` | — | infra only; no catalog listing names a specific model yet |
+
+Each seeded category has a matching `seed/apply-<category>.ts` (or, for
+smartphones, `seed/apply.ts`) built on the shared `applyCuratedSeed` helper in
+`seed/apply-shared.ts`, called from the nightly sync
+(`ingest/sync.ts`/`syncProductIntelligence`).
+
+## Filling a category's spec sheet
+
+`<category>-specs.template.csv` in this folder has one column per that
+category's schema attributes plus the identity columns (regenerate both the
+CSV and its `.columns.md` guide with
+`npx tsx scripts/intelligence/emit-spec-template.ts <category-id>` after
+changing a schema). One row per **purchasable variant**, matched to Shopify by
+`shopify_handle`.
 
 - Leave a cell blank if you don't have a verified figure — do not guess.
 - Values can be written naturally: `120 Hz`, `up to 120Hz`, `5000mAh`,
@@ -46,4 +68,5 @@ matched to Shopify by `shopify_handle`.
 - The `source` / `source_url` / `collected_date` columns describe where the row's
   figures came from; the importer records them as one `IntelSource`.
 
-Column meanings are in `smartphone-specs.columns.md`.
+Column meanings are in `<category>-specs.columns.md`, e.g.
+`smartphone-specs.columns.md`, `laptop-specs.columns.md`.

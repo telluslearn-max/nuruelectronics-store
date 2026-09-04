@@ -10,6 +10,11 @@ import { computeCompleteness } from "@/lib/intelligence/ingest/completeness";
 import { replaceProfileSpecs } from "@/lib/intelligence/ingest/write-specs";
 import { recomputeNuruScore } from "@/lib/intelligence/scoring/recompute";
 import { applySmartphoneSeed } from "@/lib/intelligence/seed/apply";
+import { applyLaptopSeed } from "@/lib/intelligence/seed/apply-laptops";
+import { applyTabletSeed } from "@/lib/intelligence/seed/apply-tablets";
+import { applyAudioSeed } from "@/lib/intelligence/seed/apply-audio";
+import { applyCameraSeed } from "@/lib/intelligence/seed/apply-cameras";
+import { applyGamingConsoleSeed } from "@/lib/intelligence/seed/apply-gaming-consoles";
 import type { CategorySchema } from "@/lib/intelligence/types";
 
 /**
@@ -147,10 +152,24 @@ async function syncOneProduct(
 export async function syncProductIntelligence(options: SyncOptions = {}): Promise<SyncResult> {
   const startedAt = Date.now();
 
-  // The curated seed runs first, every time — it's fast, idempotent, and gives
-  // the flagship products verified data immediately rather than waiting on the
-  // grounded-search crawl.
-  const seed = options.handles ? { applied: 0, models: 0 } : await applySmartphoneSeed();
+  // Every category's curated seed runs first, every time — fast, idempotent,
+  // and gives the flagship products verified data immediately rather than
+  // waiting on the grounded-search crawl. Categories with no curated seed yet
+  // (television, power_bank — see their schema files) simply have nothing to
+  // apply here; the AI research pass below still covers them.
+  let seeded = 0;
+  if (!options.handles) {
+    for (const apply of [
+      applySmartphoneSeed,
+      applyLaptopSeed,
+      applyTabletSeed,
+      applyAudioSeed,
+      applyCameraSeed,
+      applyGamingConsoleSeed,
+    ]) {
+      seeded += (await apply()).applied;
+    }
+  }
 
   const allProducts = await getAllProducts({ includeSpecs: true, includeExUk: true, includeComingSoon: true });
   const targeted = options.handles
@@ -177,7 +196,7 @@ export async function syncProductIntelligence(options: SyncOptions = {}): Promis
   }
 
   return {
-    seeded: seed.applied,
+    seeded,
     profilesSeen,
     profilesResearched: budget.researched,
     timedOut,
