@@ -103,3 +103,47 @@ describe("buildComparison", () => {
     expect(tied.ruling).toBeNull();
   });
 });
+
+describe("buildComparison works for a non-smartphone category (proves the engine is schema-generic)", () => {
+  const laptopSchema = getCategorySchema("laptop")!;
+
+  const macbookPro: CompareInputProduct = {
+    handle: "macbook-pro-14-m2",
+    specs: new Map([
+      ["cpu", spec("M2 Pro")],
+      ["laptop_ram_gb", spec("16")],
+      ["laptop_weight_kg", spec("1.6")],
+    ]),
+    components: { performance: 90, display: 85, battery: 70 },
+    composite: 85,
+  };
+  const budgetLaptop: CompareInputProduct = {
+    handle: "budget-laptop-14",
+    specs: new Map([
+      ["cpu", spec("Ryzen 5 7640U")],
+      ["laptop_ram_gb", spec("8")],
+      ["laptop_weight_kg", spec("1.6")],
+    ]),
+    components: { performance: 55, display: 60, battery: 80 },
+    composite: 63,
+  };
+
+  const result = buildComparison([macbookPro, budgetLaptop], laptopSchema);
+
+  it("scores the text-lookup `cpu` attribute through the full pipeline and picks the real winner", () => {
+    const cpuRow = result.groups.flatMap((g) => g.rows).find((r) => r.key === "cpu")!;
+    expect(cpuRow.winners).toEqual([0]); // M2 Pro outranks Ryzen 5 7640U in LAPTOP_CPU_PERFORMANCE_INDEX
+  });
+
+  it("declares no winner on an identical, non-scoreable-difference value", () => {
+    const weightRow = result.groups.flatMap((g) => g.rows).find((r) => r.key === "laptop_weight_kg")!;
+    expect(weightRow.winners).toEqual([]);
+  });
+
+  it("still produces a full ruling for a category other than smartphone", () => {
+    expect(result.compositeWinners).toEqual([0]);
+    expect(result.ruling).not.toBeNull();
+    expect(result.ruling!.pick).toBe(0);
+    expect(result.ruling!.holdout).toEqual({ index: 1, leads: ["battery"] });
+  });
+});
